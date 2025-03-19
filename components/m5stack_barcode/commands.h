@@ -1,5 +1,5 @@
-#ifndef USERS_SCOTLAND_WORKSPACE_HA_ESPHOME_M5STACK_ATOM_BARCODE_SCANNER_COMPONENTS_M5STACK_BARCODE_COMMANDS_H
-#define USERS_SCOTLAND_WORKSPACE_HA_ESPHOME_M5STACK_ATOM_BARCODE_SCANNER_COMPONENTS_M5STACK_BARCODE_COMMANDS_H
+#ifndef ESPHOME_M5STACK_BARCODE_COMMANDS_H
+#define ESPHOME_M5STACK_BARCODE_COMMANDS_H
 
 #pragma once
 
@@ -41,14 +41,8 @@ public:
     static constexpr uint8_t CONTINUOUS[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x04, 0xFE, 0x99};
     static constexpr uint8_t AUTO_SENSE[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x09, 0xFE, 0x94};
 
-    // Add size constants for better safety
-    static constexpr size_t MODE_CMD_SIZE = 9;
-    // Add specific size constants for each mode
-    static constexpr size_t HOST_SIZE = 9;
-    static constexpr size_t LEVEL_SIZE = 9;
-    static constexpr size_t PULSE_SIZE = 9;
-    static constexpr size_t CONTINUOUS_SIZE = 9;
-    static constexpr size_t AUTO_SENSE_SIZE = 9;
+    // Single size constant for all mode commands
+    static constexpr size_t SIZE = 9;
   };
 
   /**
@@ -64,15 +58,8 @@ public:
     static constexpr uint8_t CRLFCRLF[] = {0x08, 0xC6, 0x04, 0x08, 0x00,
                                            0xF2, 0x05, 0x05, 0xFE, 0x2A};
 
-    // Add size constants for better safety
-    static constexpr size_t TERMINATOR_CMD_SIZE = 10;
-    // Add specific size constants for each terminator
-    static constexpr size_t NONE_SIZE = 10;
-    static constexpr size_t CRLF_SIZE = 10;
-    static constexpr size_t CR_SIZE = 10;
-    static constexpr size_t TAB_SIZE = 10;
-    static constexpr size_t CRCR_SIZE = 10;
-    static constexpr size_t CRLFCRLF_SIZE = 10;
+    // Single size constant for all terminator commands
+    static constexpr size_t SIZE = 10;
   };
 
   /**
@@ -87,12 +74,8 @@ public:
     static constexpr uint8_t ALWAYS_OFF[] = {0x08, 0xC6, 0x04, 0x08, 0x00,
                                              0xF2, 0x02, 0x02, 0xFE, 0x30};
 
-    // Add size constants for better safety
-    static constexpr size_t LIGHT_CMD_SIZE = 10;
-    // Add specific size constants for each light mode
-    static constexpr size_t ON_WHEN_READING_SIZE = 10;
-    static constexpr size_t ALWAYS_ON_SIZE = 10;
-    static constexpr size_t ALWAYS_OFF_SIZE = 10;
+    // Single size constant for all light commands
+    static constexpr size_t SIZE = 10;
   };
 
   /**
@@ -107,12 +90,8 @@ public:
     static constexpr uint8_t ALWAYS_OFF[] = {0x08, 0xC6, 0x04, 0x08, 0x00,
                                              0xF2, 0x03, 0x02, 0xFE, 0x2F};
 
-    // Add size constants for better safety
-    static constexpr size_t LOCATE_LIGHT_CMD_SIZE = 10;
-    // Add specific size constants for each locate light mode
-    static constexpr size_t ON_WHEN_READING_SIZE = 10;
-    static constexpr size_t ALWAYS_ON_SIZE = 10;
-    static constexpr size_t ALWAYS_OFF_SIZE = 10;
+    // Single size constant for all locate light commands
+    static constexpr size_t SIZE = 10;
   };
 
   /**
@@ -125,11 +104,8 @@ public:
     static constexpr uint8_t ENABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00,
                                           0xF2, 0x0C, 0x01, 0xFE, 0x27};
 
-    // Add size constants for better safety
-    static constexpr size_t SOUND_CMD_SIZE = 10;
-    // Add specific size constants for each sound mode
-    static constexpr size_t SOUND_DISABLED_SIZE = 10;
-    static constexpr size_t ENABLED_SIZE = 10;
+    // Single size constant for all sound commands
+    static constexpr size_t SIZE = 10;
   };
 
   /**
@@ -143,12 +119,8 @@ public:
     // Renamed from LOW to avoid conflicts with Arduino
     static constexpr uint8_t VOLUME_LOW[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8C, 0x02, 0xFE, 0x99};
 
-    // Add size constants for better safety
-    static constexpr size_t VOLUME_CMD_SIZE = 9;
-    // Add specific size constants for each volume level
-    static constexpr size_t VOLUME_HIGH_SIZE = 9;
-    static constexpr size_t MEDIUM_SIZE = 9;
-    static constexpr size_t VOLUME_LOW_SIZE = 9;
+    // Single size constant for all volume commands
+    static constexpr size_t SIZE = 9;
   };
 
   /**
@@ -160,7 +132,7 @@ public:
     // Non-host mode acknowledgment has a different format
     static constexpr uint8_t NON_HOST_ACK[] = {0x05, 0xD1, 0x00, 0x00, 0x06, 0xFF, 0x24};
 
-    // Add size constants for better safety
+    // Size constants for responses (these differ, so we keep both)
     static constexpr size_t ACK_SIZE = 6;
     static constexpr size_t NON_HOST_ACK_SIZE = 7;
   };
