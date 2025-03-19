@@ -12,4 +12,4 @@ rules:
     present: false
   indentation:
     spaces: 2
-    indent-sequences: true 
+    indent-sequences: true

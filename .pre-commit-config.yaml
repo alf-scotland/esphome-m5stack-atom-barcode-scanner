@@ -22,36 +22,36 @@ repos:
       - id: yamllint
         args: [-c=.yamllint.yaml]
 
-# C++ formatting
+  # C++ formatting
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v17.0.6
     hooks:
       - id: clang-format
         types_or: [c++, c, cuda]
 
-# C++ static analysis with cppcheck
-- repo: https://github.com/pocc/pre-commit-hooks
-  rev: v1.3.5
-  hooks:
-    - id: cppcheck
-      args:
-        - --std=c++17
-        - --language=c++
-        - --enable=warning,style,performance,portability
-        - --suppress=missingInclude
-        - --suppress=unusedFunction
+  # C++ static analysis with cppcheck
+  - repo: https://github.com/pocc/pre-commit-hooks
+    rev: v1.3.5
+    hooks:
+      - id: cppcheck
+        args:
+          - --std=c++17
+          - --language=c++
+          - --enable=warning,style,performance,portability
+          - --suppress=missingInclude
+          - --suppress=unusedFunction
 
-# Uncomment when clang-tidy is installed
-# - repo: https://github.com/pocc/pre-commit-hooks
-#   rev: v1.3.5
-#   hooks:
-#     - id: clang-tidy
-#       args:
-#         - -checks=*
-#         - -fuchsia-*
-#         - -google-*
-#         - -zircon-*
-#         - -abseil-*
-#         - -modernize-use-trailing-return-type
-#         - -llvm-*
-#         - -llvmlibc-*
+  # Uncomment when clang-tidy is installed
+  - repo: https://github.com/pocc/pre-commit-hooks
+    rev: v1.3.5
+    hooks:
+      - id: clang-tidy
+        args:
+          - -checks=*
+          - -fuchsia-*
+          - -google-*
+          - -zircon-*
+          - -abseil-*
+          - -modernize-use-trailing-return-type
+          - -llvm-*
+          - -llvmlibc-*

@@ -47,7 +47,7 @@ sensor:
     suffix: ""
     on_barcode:
       then:
-        - logger.log: 
+        - logger.log:
             format: "Scanned barcode: %s"
             args: [ 'x' ]
 ```

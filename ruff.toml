@@ -23,6 +23,12 @@ unfixable = []
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
+[lint.per-file-ignores]
+# Ignore ANN401 (Any type annotation) in the m5stack_barcode/__init__.py file
+# This is necessary because of ESPHome's automation framework, which requires
+# generic Any types for its automation functions
+"components/m5stack_barcode/__init__.py" = ["ANN401"]
+
 [format]
 # Use double quotes for strings.
 quote-style = "double"
