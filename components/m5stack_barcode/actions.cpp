@@ -33,11 +33,26 @@ void SetModeAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  // Use the operation_mode_to_string helper
-  const char* mode_str = operation_mode_to_string(this->mode_);
-  ESP_LOGD(TAG_ACTION, "Setting operation mode to: %s", mode_str);
+  std::string mode_str = this->mode_.value(x...);
+  OperationMode mode;
 
-  this->scanner_->set_operation_mode(this->mode_);
+  if (mode_str == "host")
+    mode = OperationMode::HOST;
+  else if (mode_str == "level")
+    mode = OperationMode::LEVEL;
+  else if (mode_str == "pulse")
+    mode = OperationMode::PULSE;
+  else if (mode_str == "continuous")
+    mode = OperationMode::CONTINUOUS;
+  else if (mode_str == "auto_sense")
+    mode = OperationMode::AUTO_SENSE;
+  else {
+    ESP_LOGW(TAG_ACTION, "Unknown operation mode: %s", mode_str.c_str());
+    return;
+  }
+
+  ESP_LOGD(TAG_ACTION, "Setting operation mode to: %s", mode_str.c_str());
+  this->scanner_->set_operation_mode(mode);
 }
 
 template <typename... Ts>
@@ -47,11 +62,28 @@ void SetTerminatorAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  // Use the terminator_to_string helper
-  const char* term_str = terminator_to_string(this->terminator_);
-  ESP_LOGD(TAG_ACTION, "Setting terminator to: %s", term_str);
+  std::string term_str = this->terminator_.value(x...);
+  Terminator term;
 
-  this->scanner_->set_terminator(this->terminator_);
+  if (term_str == "none")
+    term = Terminator::NONE;
+  else if (term_str == "crlf")
+    term = Terminator::CRLF;
+  else if (term_str == "cr")
+    term = Terminator::CR;
+  else if (term_str == "tab")
+    term = Terminator::TAB;
+  else if (term_str == "crcr")
+    term = Terminator::CRCR;
+  else if (term_str == "crlfcrlf")
+    term = Terminator::CRLFCRLF;
+  else {
+    ESP_LOGW(TAG_ACTION, "Unknown terminator: %s", term_str.c_str());
+    return;
+  }
+
+  ESP_LOGD(TAG_ACTION, "Setting terminator to: %s", term_str.c_str());
+  this->scanner_->set_terminator(term);
 }
 
 template <typename... Ts>
@@ -61,11 +93,22 @@ void SetLightModeAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  // Use the light_mode_to_string helper
-  const char* mode_str = light_mode_to_string(this->mode_);
-  ESP_LOGD(TAG_ACTION, "Setting light mode to: %s", mode_str);
+  std::string mode_str = this->mode_.value(x...);
+  LightMode mode;
 
-  this->scanner_->set_light_mode(this->mode_);
+  if (mode_str == "on_when_reading")
+    mode = LightMode::ON_WHEN_READING;
+  else if (mode_str == "always_on")
+    mode = LightMode::ALWAYS_ON;
+  else if (mode_str == "always_off")
+    mode = LightMode::ALWAYS_OFF;
+  else {
+    ESP_LOGW(TAG_ACTION, "Unknown light mode: %s", mode_str.c_str());
+    return;
+  }
+
+  ESP_LOGD(TAG_ACTION, "Setting light mode to: %s", mode_str.c_str());
+  this->scanner_->set_light_mode(mode);
 }
 
 template <typename... Ts>
@@ -75,11 +118,22 @@ void SetLocateLightModeAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  // Use the locate_light_mode_to_string helper
-  const char* mode_str = locate_light_mode_to_string(this->mode_);
-  ESP_LOGD(TAG_ACTION, "Setting locate light mode to: %s", mode_str);
+  std::string mode_str = this->mode_.value(x...);
+  LocateLightMode mode;
 
-  this->scanner_->set_locate_light_mode(this->mode_);
+  if (mode_str == "on_when_reading")
+    mode = LocateLightMode::ON_WHEN_READING;
+  else if (mode_str == "always_on")
+    mode = LocateLightMode::ALWAYS_ON;
+  else if (mode_str == "always_off")
+    mode = LocateLightMode::ALWAYS_OFF;
+  else {
+    ESP_LOGW(TAG_ACTION, "Unknown locate light mode: %s", mode_str.c_str());
+    return;
+  }
+
+  ESP_LOGD(TAG_ACTION, "Setting locate light mode to: %s", mode_str.c_str());
+  this->scanner_->set_locate_light_mode(mode);
 }
 
 template <typename... Ts>
@@ -89,11 +143,20 @@ void SetSoundModeAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  // Use the sound_mode_to_string helper
-  const char* mode_str = sound_mode_to_string(this->mode_);
-  ESP_LOGD(TAG_ACTION, "Setting sound mode to: %s", mode_str);
+  std::string mode_str = this->mode_.value(x...);
+  SoundMode mode;
 
-  this->scanner_->set_sound_mode(this->mode_);
+  if (mode_str == "disabled")
+    mode = SoundMode::SOUND_DISABLED;
+  else if (mode_str == "enabled")
+    mode = SoundMode::ENABLED;
+  else {
+    ESP_LOGW(TAG_ACTION, "Unknown sound mode: %s", mode_str.c_str());
+    return;
+  }
+
+  ESP_LOGD(TAG_ACTION, "Setting sound mode to: %s", mode_str.c_str());
+  this->scanner_->set_sound_mode(mode);
 }
 
 template <typename... Ts>
@@ -103,11 +166,22 @@ void SetBuzzerVolumeAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  // Use the buzzer_volume_to_string helper
-  const char* volume_str = buzzer_volume_to_string(this->volume_);
-  ESP_LOGD(TAG_ACTION, "Setting buzzer volume to: %s", volume_str);
+  std::string volume_str = this->volume_.value(x...);
+  BuzzerVolume volume;
 
-  this->scanner_->set_buzzer_volume(this->volume_);
+  if (volume_str == "high")
+    volume = BuzzerVolume::VOLUME_HIGH;
+  else if (volume_str == "medium")
+    volume = BuzzerVolume::MEDIUM;
+  else if (volume_str == "low")
+    volume = BuzzerVolume::VOLUME_LOW;
+  else {
+    ESP_LOGW(TAG_ACTION, "Unknown buzzer volume: %s", volume_str.c_str());
+    return;
+  }
+
+  ESP_LOGD(TAG_ACTION, "Setting buzzer volume to: %s", volume_str.c_str());
+  this->scanner_->set_buzzer_volume(volume);
 }
 
 // Explicit template instantiations

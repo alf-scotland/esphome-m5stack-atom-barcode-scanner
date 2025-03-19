@@ -229,13 +229,8 @@ async def barcode_set_mode_to_code(
     """Register set mode action."""
     parent = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, parent)
-
-    if isinstance(config[CONF_MODE], str):
-        template = OPERATION_MODES[config[CONF_MODE]]
-        cg.add(var.set_mode(template))
-    else:
-        template_ = await cg.templatable(config[CONF_MODE], args, cg.std_string)
-        cg.add(var.set_mode(template_))
+    template_ = await cg.templatable(config[CONF_MODE], args, cg.std_string)
+    cg.add(var.set_mode(template_))
     return var
 
 
@@ -260,13 +255,8 @@ async def barcode_set_terminator_to_code(
     """Register set terminator action."""
     parent = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, parent)
-
-    if isinstance(config[CONF_TERMINATOR], str):
-        template = TERMINATORS[config[CONF_TERMINATOR]]
-        cg.add(var.set_terminator(template))
-    else:
-        template_ = await cg.templatable(config[CONF_TERMINATOR], args, cg.std_string)
-        cg.add(var.set_terminator(template_))
+    template_ = await cg.templatable(config[CONF_TERMINATOR], args, cg.std_string)
+    cg.add(var.set_terminator(template_))
     return var
 
 
@@ -276,7 +266,16 @@ async def barcode_set_terminator_to_code(
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_LIGHT_MODE): cv.templatable(cv.string),
+            cv.Required(CONF_LIGHT_MODE): cv.templatable(
+                cv.enum(
+                    {
+                        "on_when_reading": "on_when_reading",
+                        "always_on": "always_on",
+                        "always_off": "always_off",
+                    },
+                    lower=True,
+                ),
+            ),
         },
     ),
 )
@@ -289,7 +288,6 @@ async def barcode_set_light_mode_to_code(
     """Register set light mode action."""
     parent = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, parent)
-
     template_ = await cg.templatable(config[CONF_LIGHT_MODE], args, cg.std_string)
     cg.add(var.set_mode(template_))
     return var
@@ -301,7 +299,16 @@ async def barcode_set_light_mode_to_code(
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_LOCATE_LIGHT_MODE): cv.templatable(cv.string),
+            cv.Required(CONF_LOCATE_LIGHT_MODE): cv.templatable(
+                cv.enum(
+                    {
+                        "on_when_reading": "on_when_reading",
+                        "always_on": "always_on",
+                        "always_off": "always_off",
+                    },
+                    lower=True,
+                ),
+            ),
         },
     ),
 )
@@ -314,11 +321,8 @@ async def barcode_set_locate_light_mode_to_code(
     """Register set locate light mode action."""
     parent = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, parent)
-
     template_ = await cg.templatable(
-        config[CONF_LOCATE_LIGHT_MODE],
-        args,
-        cg.std_string,
+        config[CONF_LOCATE_LIGHT_MODE], args, cg.std_string
     )
     cg.add(var.set_mode(template_))
     return var
@@ -330,7 +334,15 @@ async def barcode_set_locate_light_mode_to_code(
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_SOUND_MODE): cv.templatable(cv.string),
+            cv.Required(CONF_SOUND_MODE): cv.templatable(
+                cv.enum(
+                    {
+                        "disabled": "disabled",
+                        "enabled": "enabled",
+                    },
+                    lower=True,
+                ),
+            ),
         },
     ),
 )
@@ -343,7 +355,6 @@ async def barcode_set_sound_mode_to_code(
     """Register set sound mode action."""
     parent = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, parent)
-
     template_ = await cg.templatable(config[CONF_SOUND_MODE], args, cg.std_string)
     cg.add(var.set_mode(template_))
     return var
@@ -355,7 +366,16 @@ async def barcode_set_sound_mode_to_code(
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_VOLUME): cv.templatable(cv.string),
+            cv.Required(CONF_VOLUME): cv.templatable(
+                cv.enum(
+                    {
+                        "high": "high",
+                        "medium": "medium",
+                        "low": "low",
+                    },
+                    lower=True,
+                ),
+            ),
         },
     ),
 )
@@ -368,7 +388,6 @@ async def barcode_set_buzzer_volume_to_code(
     """Register set buzzer volume action."""
     parent = await cg.get_variable(config[CONF_ID])
     var = cg.new_Pvariable(action_id, template_arg, parent)
-
     template_ = await cg.templatable(config[CONF_VOLUME], args, cg.std_string)
     cg.add(var.set_volume(template_))
     return var
