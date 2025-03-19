@@ -2,7 +2,7 @@ substitutions:
   name: atom-barcode
   friendly_name: Atom Barcode Scanner
   project_name: esphome-m5stack-atom-barcode-scanner
-  project_version: !env_var VERSION "0.1.0"
+  project_version: "0.1.0"
 
 esphome:
   name: ${name}
@@ -48,10 +48,10 @@ safe_mode:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  
+
   # Enable fast reconnect for better reliability
   fast_connect: true
-  
+
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "${friendly_name} Fallback"
@@ -87,10 +87,10 @@ output:
     pin: GPIO23
     id: scanner_trig_pin
     inverted: true  # Inverted because LOW activates the scanner
-    
+
 binary_sensor:
   - platform: gpio
-    pin: 
+    pin:
       number: GPIO33
       mode: INPUT
     name: "${friendly_name} Detection LED"
@@ -110,7 +110,7 @@ binary_sensor:
             green: 0%
             blue: 0%
             flash_length: 500ms
-            
+
   # Atom Lite built-in button on GPIO39
   - platform: gpio
     pin:
@@ -187,13 +187,13 @@ text_sensor:
                   green: 0%
                   blue: 0%
                   flash_length: 500ms
-    
+
   - platform: template
     name: "Scanner Version"
     id: scanner_version
     entity_category: "diagnostic"
     icon: "mdi:information-outline"
-    
+
   # Add firmware version sensor
   - platform: version
     name: "${friendly_name} Firmware Version"
@@ -206,16 +206,16 @@ button:
     name: "Start Scan"
     icon: "mdi:play-circle-outline"
     on_press:
-      - m5stack_barcode.start: 
+      - m5stack_barcode.start:
           id: barcode_scanner
-      
+
   - platform: template
     name: "Stop Scan"
     icon: "mdi:stop-circle-outline"
     on_press:
-      - m5stack_barcode.stop: 
+      - m5stack_barcode.stop:
           id: barcode_scanner
-      
+
   # Add restart button
   - platform: restart
     name: "${friendly_name} Restart"
@@ -240,7 +240,7 @@ select:
       - m5stack_barcode.set_mode:
           id: barcode_scanner
           mode: !lambda 'return x;'
-          
+
   - platform: template
     name: "Terminator"
     id: terminator
@@ -259,7 +259,7 @@ select:
       - m5stack_barcode.set_terminator:
           id: barcode_scanner
           terminator: !lambda 'return x;'
-          
+
   - platform: template
     name: "Light Mode"
     id: light_mode

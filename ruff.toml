@@ -2,8 +2,8 @@
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.13
-target-version = "py313"
+# Assume Python 3.12
+target-version = "py312"
 
 [lint]
 # Enable all rules by default
@@ -34,4 +34,4 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 
 # Automatically detect the appropriate line ending.
-line-ending = "auto" 
+line-ending = "auto"
