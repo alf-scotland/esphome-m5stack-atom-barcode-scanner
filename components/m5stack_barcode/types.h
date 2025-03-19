@@ -1,6 +1,3 @@
-#ifndef USERS_SCOTLAND_WORKSPACE_HA_ESPHOME_M5STACK_ATOM_BARCODE_SCANNER_COMPONENTS_M5STACK_BARCODE_TYPES_H
-#define USERS_SCOTLAND_WORKSPACE_HA_ESPHOME_M5STACK_ATOM_BARCODE_SCANNER_COMPONENTS_M5STACK_BARCODE_TYPES_H
-
 #pragma once
 
 #include <cstdint>  // For uint8_t
@@ -72,5 +69,3 @@ auto sound_mode_to_string(SoundMode mode) -> const char*;
 auto buzzer_volume_to_string(BuzzerVolume volume) -> const char*;
 
 }  // namespace esphome::m5stack_barcode
-
-#endif
