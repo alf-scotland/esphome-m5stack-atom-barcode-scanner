@@ -22,6 +22,7 @@ esp32:
   board: m5stack-atom
   framework:
     type: arduino
+  baud_rate: 115200
 
 # Enable logging
 logger:
@@ -88,6 +89,47 @@ output:
     id: scanner_trig_pin
     inverted: true  # Inverted because LOW activates the scanner
 
+# Scripts for LED status indications
+script:
+  - id: led_off
+    then:
+      - light.turn_off:
+          id: atom_status_led
+
+  - id: led_scan_start
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 0%
+          green: 0%
+          blue: 100%
+
+  - id: led_scan_success
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 0%
+          green: 100%
+          blue: 0%
+          flash_length: 500ms
+      - delay: 500ms
+      - script.execute: led_off
+
+  - id: led_scan_timeout
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 100%
+          green: 100%
+          blue: 0%
+          flash_length: 500ms
+      - delay: 500ms
+      - script.execute: led_off
+
+
 binary_sensor:
   - platform: gpio
     pin:
@@ -103,13 +145,8 @@ binary_sensor:
     on_press:
       then:
         - logger.log: "QR code detected via DLED pin"
-        - light.turn_on:
-            id: atom_status_led
-            brightness: 100%
-            red: 100%
-            green: 0%
-            blue: 0%
-            flash_length: 500ms
+        - script.execute: led_scan_success
+        - switch.turn_off: scanner_trigger_internal
 
   # Atom Lite built-in button on GPIO39
   - platform: gpio
@@ -126,86 +163,55 @@ binary_sensor:
       - delayed_off: 20ms
     on_press:
       then:
-        - logger.log: "Atom button pressed, toggling scanner"
-        - switch.toggle: scanner_trigger_switch
-        - light.turn_on:
-            id: atom_status_led
-            brightness: 100%
-            red: 100%
-            green: 65%
-            blue: 0%
-            flash_length: 200ms
+        - logger.log: "Atom button pressed, starting scan"
+        - button.press: start_scan_button
 
-# Hardware trigger switch
+# Hardware trigger switch (internal)
 switch:
   - platform: output
     name: "${friendly_name} Hardware Trigger"
-    id: scanner_trigger_switch
+    id: scanner_trigger_internal
     output: scanner_trig_pin
     icon: "mdi:barcode-scan"
+    entity_category: "diagnostic"
     restore_mode: ALWAYS_OFF
+    internal: true  # Make this switch internal
     on_turn_on:
       then:
         - logger.log: "Hardware trigger activated"
-        - light.turn_on:
-            id: atom_status_led
-            brightness: 100%
-            red: 0%
-            green: 0%
-            blue: 100%
-    on_turn_off:
-      then:
-        - logger.log: "Hardware trigger deactivated"
-        - light.turn_on:
-            id: atom_status_led
-            brightness: 100%
-            red: 0%
-            green: 100%
-            blue: 0%
+        - script.execute: led_scan_start
+        # Set up timeout to turn off after 2.5 seconds
+        - delay: 2.5s
+        - if:
+            condition:
+              switch.is_on: scanner_trigger_internal
+            then:
+              - logger.log: "Scan timeout reached"
+              - script.execute: led_scan_timeout
+              - switch.turn_off: scanner_trigger_internal
 
 text_sensor:
   - platform: template
     name: "Last Barcode"
     id: last_barcode
     icon: "mdi:barcode"
-    on_value:
-      then:
-        - if:
-            condition:
-              not:
-                text_sensor.state:
-                  id: last_barcode
-                  state: ""
-            then:
-              - logger.log:
-                  format: "Barcode detected: %s"
-                  args: ["x.c_str()"]
-              - light.turn_on:
-                  id: atom_status_led
-                  brightness: 100%
-                  red: 100%
-                  green: 0%
-                  blue: 0%
-                  flash_length: 500ms
 
+  # Diagnostic entities
   - platform: template
     name: "Scanner Version"
     id: scanner_version
     entity_category: "diagnostic"
     icon: "mdi:information-outline"
 
-  # Add firmware version sensor
-  - platform: version
-    name: "${friendly_name} Firmware Version"
-    entity_category: "diagnostic"
-    icon: "mdi:chip"
-    hide_timestamp: true
 
 button:
+  # Main scanning buttons using software-based scanning
   - platform: template
     name: "Start Scan"
+    id: start_scan_button
     icon: "mdi:play-circle-outline"
     on_press:
+      - script.execute: led_scan_start
       - m5stack_barcode.start:
           id: barcode_scanner
 
@@ -215,14 +221,26 @@ button:
     on_press:
       - m5stack_barcode.stop:
           id: barcode_scanner
+      - script.execute: led_off
 
-  # Add restart button
+  # Diagnostic buttons for hardware-based scanning
+  - platform: template
+    name: "Hardware Trigger"
+    id: hardware_trigger_button
+    icon: "mdi:barcode-scan"
+    entity_category: "diagnostic"
+    on_press:
+      - script.execute: led_scan_start
+      - switch.turn_on: scanner_trigger_internal
+
+  # Config entities
   - platform: restart
     name: "${friendly_name} Restart"
     entity_category: "config"
     icon: "mdi:restart"
 
 select:
+  # Config entities
   - platform: template
     name: "Operation Mode"
     id: operation_mode
