@@ -26,7 +26,7 @@ uart:
   tx_pin: GPIO22
   rx_pin: GPIO19
   baud_rate: 115200
-  
+
 text_sensor:
   - platform: custom
     lambda: |-
@@ -35,7 +35,7 @@ text_sensor:
     text_sensors:
       name: "Barcode"
       id: barcode_sensor
-  
+
   - platform: custom
     lambda: |-
       auto version_sensor = new text_sensor::TextSensor();
@@ -211,4 +211,4 @@ logger:
 
 ## License
 
-This component is licensed under the MIT License. 
+This component is licensed under the MIT License.

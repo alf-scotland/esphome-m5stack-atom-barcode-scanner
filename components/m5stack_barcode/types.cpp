@@ -1,10 +1,9 @@
 #include "types.h"
 
-namespace esphome {
-namespace m5stack_barcode {
+namespace esphome::m5stack_barcode {
 
 // String conversion helpers for logging
-const char* operation_mode_to_string(OperationMode mode) {
+auto operation_mode_to_string(OperationMode mode) -> const char* {
   switch (mode) {
     case OperationMode::HOST:
       return "Host Mode";
@@ -21,7 +20,7 @@ const char* operation_mode_to_string(OperationMode mode) {
   }
 }
 
-const char* terminator_to_string(Terminator term) {
+auto terminator_to_string(Terminator term) -> const char* {
   switch (term) {
     case Terminator::NONE:
       return "None";
@@ -40,7 +39,7 @@ const char* terminator_to_string(Terminator term) {
   }
 }
 
-const char* light_mode_to_string(LightMode mode) {
+auto light_mode_to_string(LightMode mode) -> const char* {
   switch (mode) {
     case LightMode::ON_WHEN_READING:
       return "On When Reading";
@@ -53,7 +52,7 @@ const char* light_mode_to_string(LightMode mode) {
   }
 }
 
-const char* locate_light_mode_to_string(LocateLightMode mode) {
+auto locate_light_mode_to_string(LocateLightMode mode) -> const char* {
   switch (mode) {
     case LocateLightMode::ON_WHEN_READING:
       return "On When Reading";
@@ -66,7 +65,7 @@ const char* locate_light_mode_to_string(LocateLightMode mode) {
   }
 }
 
-const char* sound_mode_to_string(SoundMode mode) {
+auto sound_mode_to_string(SoundMode mode) -> const char* {
   switch (mode) {
     case SoundMode::SOUND_DISABLED:
       return "Disabled";
@@ -77,7 +76,7 @@ const char* sound_mode_to_string(SoundMode mode) {
   }
 }
 
-const char* buzzer_volume_to_string(BuzzerVolume volume) {
+auto buzzer_volume_to_string(BuzzerVolume volume) -> const char* {
   switch (volume) {
     case BuzzerVolume::VOLUME_HIGH:
       return "High";
@@ -90,5 +89,4 @@ const char* buzzer_volume_to_string(BuzzerVolume volume) {
   }
 }
 
-}  // namespace m5stack_barcode
-}  // namespace esphome 
+}  // namespace esphome::m5stack_barcode

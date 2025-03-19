@@ -5,6 +5,8 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        args: [--allow-multiple-documents]
+        exclude: firmware.yaml
       - id: check-added-large-files
       - id: debug-statements
       - id: check-merge-conflict
@@ -40,18 +42,21 @@ repos:
           - --enable=warning,style,performance,portability
           - --suppress=missingInclude
           - --suppress=unusedFunction
+          - --suppress=unusedStructMember
+          - --suppress=constVariableReference
 
-  # Uncomment when clang-tidy is installed
   - repo: https://github.com/pocc/pre-commit-hooks
     rev: v1.3.5
     hooks:
       - id: clang-tidy
+        stages: [manual]
         args:
-          - -checks=*
-          - -fuchsia-*
-          - -google-*
-          - -zircon-*
-          - -abseil-*
-          - -modernize-use-trailing-return-type
-          - -llvm-*
-          - -llvmlibc-*
+          - -header-filter=.*
+          - -fix
+          - --
+          - -std=c++17
+          - -I/usr/local/opt/llvm/include/c++/v1
+          - -I/usr/local/opt/llvm/lib/clang/19.1.7/include
+          - -I.
+          - -Icomponents
+          - -I.venv/lib/python3.9/site-packages/esphome

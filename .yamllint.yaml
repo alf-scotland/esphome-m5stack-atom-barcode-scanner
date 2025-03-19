@@ -13,3 +13,17 @@ rules:
   indentation:
     spaces: 2
     indent-sequences: true
+
+yaml-files:
+  - '*.yaml'
+  - '*.yml'
+
+ignore: |
+  .github/
+  .venv/
+
+yaml-schemas:
+  custom-schema:
+    - firmware.yaml
+    - secrets.yaml
+    - '*.yaml'

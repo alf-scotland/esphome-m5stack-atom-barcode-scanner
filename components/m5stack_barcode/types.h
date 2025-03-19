@@ -1,35 +1,33 @@
+#ifndef USERS_SCOTLAND_WORKSPACE_HA_ESPHOME_M5STACK_ATOM_BARCODE_SCANNER_COMPONENTS_M5STACK_BARCODE_TYPES_H
+#define USERS_SCOTLAND_WORKSPACE_HA_ESPHOME_M5STACK_ATOM_BARCODE_SCANNER_COMPONENTS_M5STACK_BARCODE_TYPES_H
+
 #pragma once
 
-#include <cstdint>
+#include <cstdint>  // For uint8_t
 
-namespace esphome {
-namespace m5stack_barcode {
+namespace esphome::m5stack_barcode {
 
 // Scanner operation modes
 enum class OperationMode : uint8_t {
-  HOST = 0x08,      // Host mode - requires explicit start/stop commands
-  LEVEL = 0x00,     // Level trigger mode
-  PULSE = 0x02,     // Pulse trigger mode
-  CONTINUOUS = 0x04, // Continuous mode
-  AUTO_SENSE = 0x09 // Auto-sense mode
+  HOST = 0x08,        // Host mode - requires explicit start/stop commands
+  LEVEL = 0x00,       // Level trigger mode
+  PULSE = 0x02,       // Pulse trigger mode
+  CONTINUOUS = 0x04,  // Continuous mode
+  AUTO_SENSE = 0x09   // Auto-sense mode
 };
 
 // Terminator settings
 enum class Terminator : uint8_t {
-  NONE = 0x00,    // No terminator (prohibit)
-  CRLF = 0x01,    // CR LF (carriage return, line feed)
-  CR = 0x02,      // CR (Enter)
-  TAB = 0x03,     // TAB
-  CRCR = 0x04,    // CR CR
-  CRLFCRLF = 0x05 // CR LF CR LF
+  NONE = 0x00,     // No terminator (prohibit)
+  CRLF = 0x01,     // CR LF (carriage return, line feed)
+  CR = 0x02,       // CR (Enter)
+  TAB = 0x03,      // TAB
+  CRCR = 0x04,     // CR CR
+  CRLFCRLF = 0x05  // CR LF CR LF
 };
 
 // Response types for command handling
-enum class ResponseType : uint8_t {
-  NONE = 0x00,
-  VERSION = 0x01,
-  BARCODE = 0x02
-};
+enum class ResponseType : uint8_t { NONE = 0x00, VERSION = 0x01, BARCODE = 0x02 };
 
 // Command processing states
 enum class CommandState : uint8_t {
@@ -66,12 +64,13 @@ enum class BuzzerVolume : uint8_t {
 };
 
 // String conversion helpers for logging
-const char* operation_mode_to_string(OperationMode mode);
-const char* terminator_to_string(Terminator term);
-const char* light_mode_to_string(LightMode mode);
-const char* locate_light_mode_to_string(LocateLightMode mode);
-const char* sound_mode_to_string(SoundMode mode);
-const char* buzzer_volume_to_string(BuzzerVolume volume);
+auto operation_mode_to_string(OperationMode mode) -> const char*;
+auto terminator_to_string(Terminator term) -> const char*;
+auto light_mode_to_string(LightMode mode) -> const char*;
+auto locate_light_mode_to_string(LocateLightMode mode) -> const char*;
+auto sound_mode_to_string(SoundMode mode) -> const char*;
+auto buzzer_volume_to_string(BuzzerVolume volume) -> const char*;
 
-}  // namespace m5stack_barcode
-}  // namespace esphome 
+}  // namespace esphome::m5stack_barcode
+
+#endif
