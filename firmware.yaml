@@ -86,7 +86,7 @@ output:
   - platform: gpio
     pin: GPIO23
     id: scanner_trig_pin
-    inverted: true  # Inverted because LOW activates the scanner
+    inverted: true # Inverted because LOW activates the scanner
 
 # Scripts for LED status indications
 script:
@@ -127,7 +127,6 @@ script:
           flash_length: 500ms
       - delay: 500ms
       - script.execute: led_off
-
 
 binary_sensor:
   - platform: gpio
@@ -174,7 +173,7 @@ switch:
     icon: "mdi:barcode-scan"
     entity_category: "diagnostic"
     restore_mode: ALWAYS_OFF
-    internal: true  # Make this switch internal
+    internal: true # Make this switch internal
     on_turn_on:
       then:
         - logger.log: "Hardware trigger activated"
@@ -201,7 +200,6 @@ text_sensor:
     id: scanner_version
     entity_category: "diagnostic"
     icon: "mdi:information-outline"
-
 
 button:
   # Main scanning buttons using software-based scanning
@@ -256,7 +254,7 @@ select:
     on_value:
       - m5stack_barcode.set_mode:
           id: barcode_scanner
-          mode: !lambda 'return x;'
+          mode: !lambda "return x;"
 
   - platform: template
     name: "Terminator"
@@ -275,7 +273,7 @@ select:
     on_value:
       - m5stack_barcode.set_terminator:
           id: barcode_scanner
-          terminator: !lambda 'return x;'
+          terminator: !lambda "return x;"
 
   - platform: template
     name: "Light Mode"
@@ -291,7 +289,38 @@ select:
     on_value:
       - m5stack_barcode.set_light_mode:
           id: barcode_scanner
-          light_mode: !lambda 'return x;'
+          light_mode: !lambda "return x;"
+
+  - platform: template
+    name: "Locate Light Mode"
+    id: locate_light_mode
+    entity_category: "config"
+    icon: "mdi:crosshairs"
+    options:
+      - "on_when_reading"
+      - "always_on"
+      - "always_off"
+    initial_option: "on_when_reading"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_locate_light_mode:
+          id: barcode_scanner
+          locate_light_mode: !lambda "return x;"
+
+  - platform: template
+    name: "Decoding Success Light"
+    id: decoding_success_light
+    entity_category: "config"
+    icon: "mdi:led-on"
+    options:
+      - "enabled"
+      - "disabled"
+    initial_option: "enabled"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_decoding_success_light_mode:
+          id: barcode_scanner
+          decoding_success_light_mode: !lambda "return x;"
 
   - platform: template
     name: "Sound Mode"
@@ -306,7 +335,132 @@ select:
     on_value:
       - m5stack_barcode.set_sound_mode:
           id: barcode_scanner
-          sound_mode: !lambda 'return x;'
+          sound_mode: !lambda "return x;"
+
+  - platform: template
+    name: "Boot Sound"
+    id: boot_sound
+    entity_category: "config"
+    icon: "mdi:power"
+    options:
+      - "enabled"
+      - "disabled"
+    initial_option: "enabled"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_boot_sound_mode:
+          id: barcode_scanner
+          boot_sound_mode: !lambda "return x;"
+
+  - platform: template
+    name: "Decode Sound"
+    id: decode_sound
+    entity_category: "config"
+    icon: "mdi:volume-source"
+    options:
+      - "enabled"
+      - "disabled"
+    initial_option: "enabled"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_decode_sound_mode:
+          id: barcode_scanner
+          decode_sound_mode: !lambda "return x;"
+
+  - platform: template
+    name: "Volume"
+    id: volume
+    entity_category: "config"
+    icon: "mdi:volume-medium"
+    options:
+      - "high"
+      - "medium"
+      - "low"
+    initial_option: "medium"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_buzzer_volume:
+          id: barcode_scanner
+          volume: !lambda "return x;"
+
+  - platform: template
+    name: "Scan Duration"
+    id: scan_duration
+    entity_category: "config"
+    icon: "mdi:timer"
+    options:
+      - "500ms"
+      - "1s"
+      - "3s"
+      - "5s"
+      - "10s"
+      - "15s"
+      - "20s"
+      - "unlimited"
+    initial_option: "3s"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_scan_duration:
+          id: barcode_scanner
+          scan_duration: !lambda "return x;"
+
+  - platform: template
+    name: "Stable Induction Time"
+    id: stable_induction_time
+    entity_category: "config"
+    icon: "mdi:timer-sand"
+    options:
+      - "0ms"
+      - "100ms"
+      - "300ms"
+      - "500ms"
+      - "1s"
+    initial_option: "500ms"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_stable_induction_time:
+          id: barcode_scanner
+          stable_induction_time: !lambda "return x;"
+
+  - platform: template
+    name: "Reading Interval"
+    id: reading_interval
+    entity_category: "config"
+    icon: "mdi:timer-outline"
+    options:
+      - "0ms"
+      - "100ms"
+      - "300ms"
+      - "500ms"
+      - "1s"
+      - "1.5s"
+      - "2s"
+    initial_option: "500ms"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_reading_interval:
+          id: barcode_scanner
+          reading_interval: !lambda "return x;"
+
+  - platform: template
+    name: "Same Code Interval"
+    id: same_code_interval
+    entity_category: "config"
+    icon: "mdi:timer-refresh"
+    options:
+      - "0ms"
+      - "100ms"
+      - "300ms"
+      - "500ms"
+      - "1s"
+      - "1.5s"
+      - "2s"
+    initial_option: "500ms"
+    optimistic: true
+    on_value:
+      - m5stack_barcode.set_same_code_interval:
+          id: barcode_scanner
+          same_code_interval: !lambda "return x;"
 
 m5stack_barcode:
   id: barcode_scanner

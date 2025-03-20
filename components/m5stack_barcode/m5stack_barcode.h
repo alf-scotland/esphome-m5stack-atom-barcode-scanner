@@ -54,7 +54,7 @@ constexpr auto CRLF = Terminator::CRLF;
  * ```
  */
 class BarcodeScanner : public Component, public uart::UARTDevice {
-public:
+ public:
   /**
    * @brief Initialize the barcode scanner component.
    *
@@ -92,15 +92,13 @@ public:
    * @brief Set the text sensor for barcode output.
    * @param text_sensor Pointer to the text sensor component
    */
-  void set_text_sensor(text_sensor::TextSensor* text_sensor) { this->text_sensor_ = text_sensor; }
+  void set_text_sensor(text_sensor::TextSensor *text_sensor) { this->text_sensor_ = text_sensor; }
 
   /**
    * @brief Set the text sensor for firmware version.
    * @param version_sensor Pointer to the text sensor component
    */
-  void set_version_sensor(text_sensor::TextSensor* version_sensor) {
-    this->version_sensor_ = version_sensor;
-  }
+  void set_version_sensor(text_sensor::TextSensor *version_sensor) { this->version_sensor_ = version_sensor; }
 
   // Scanner Control Methods
   /**
@@ -160,6 +158,55 @@ public:
    */
   bool set_buzzer_volume(BuzzerVolume volume);
 
+  /**
+   * @brief Set the decoding success light mode of the scanner.
+   * @param mode The desired decoding success light mode
+   * @return bool True if command was queued successfully
+   */
+  bool set_decoding_success_light_mode(DecodingSuccessLightMode mode);
+
+  /**
+   * @brief Set the boot sound mode of the scanner.
+   * @param mode The desired boot sound mode
+   * @return bool True if command was queued successfully
+   */
+  bool set_boot_sound_mode(BootSoundMode mode);
+
+  /**
+   * @brief Set the decode sound mode of the scanner.
+   * @param mode The desired decode sound mode
+   * @return bool True if command was queued successfully
+   */
+  bool set_decode_sound_mode(DecodeSoundMode mode);
+
+  /**
+   * @brief Set the scan duration of the scanner.
+   * @param duration The desired scan duration
+   * @return bool True if command was queued successfully
+   */
+  bool set_scan_duration(ScanDuration duration);
+
+  /**
+   * @brief Set the stable induction time of the scanner.
+   * @param time The desired stable induction time
+   * @return bool True if command was queued successfully
+   */
+  bool set_stable_induction_time(StableInductionTime time);
+
+  /**
+   * @brief Set the reading interval of the scanner.
+   * @param interval The desired reading interval
+   * @return bool True if command was queued successfully
+   */
+  bool set_reading_interval(ReadingInterval interval);
+
+  /**
+   * @brief Set the same code interval of the scanner.
+   * @param interval The desired same code interval
+   * @return bool True if command was queued successfully
+   */
+  bool set_same_code_interval(SameCodeInterval interval);
+
   // State Accessors
   /**
    * @brief Check if the scanner is currently scanning.
@@ -209,58 +256,144 @@ public:
    */
   BuzzerVolume get_buzzer_volume() const { return this->buzzer_volume_; }
 
+  /**
+   * @brief Get the current decoding success light mode.
+   * @return DecodingSuccessLightMode Current decoding success light mode
+   */
+  DecodingSuccessLightMode get_decoding_success_light_mode() const { return this->decoding_success_light_mode_; }
+
+  /**
+   * @brief Get the current boot sound mode.
+   * @return BootSoundMode Current boot sound mode
+   */
+  BootSoundMode get_boot_sound_mode() const { return this->boot_sound_mode_; }
+
+  /**
+   * @brief Get the current decode sound mode.
+   * @return DecodeSoundMode Current decode sound mode
+   */
+  DecodeSoundMode get_decode_sound_mode() const { return this->decode_sound_mode_; }
+
+  /**
+   * @brief Get the current scan duration.
+   * @return ScanDuration Current scan duration
+   */
+  ScanDuration get_scan_duration() const { return this->scan_duration_; }
+
+  /**
+   * @brief Get the current stable induction time.
+   * @return StableInductionTime Current stable induction time
+   */
+  StableInductionTime get_stable_induction_time() const { return this->stable_induction_time_; }
+
+  /**
+   * @brief Get the current reading interval.
+   * @return ReadingInterval Current reading interval
+   */
+  ReadingInterval get_reading_interval() const { return this->reading_interval_; }
+
+  /**
+   * @brief Get the current same code interval.
+   * @return SameCodeInterval Current same code interval
+   */
+  SameCodeInterval get_same_code_interval() const { return this->same_code_interval_; }
+
   // Action Creators for ESPHome Automations
   /**
    * @brief Create a start scanning action.
    * @return StartAction<>* Pointer to the created action
    */
-  StartAction<>* make_start_action() { return new StartAction<>(this); }
+  StartAction<> *make_start_action() { return new StartAction<>(this); }
 
   /**
    * @brief Create a stop scanning action.
    * @return StopAction<>* Pointer to the created action
    */
-  StopAction<>* make_stop_action() { return new StopAction<>(this); }
+  StopAction<> *make_stop_action() { return new StopAction<>(this); }
 
   /**
    * @brief Create a set operation mode action.
    * @return SetModeAction<>* Pointer to the created action
    */
-  SetModeAction<>* make_mode_action() { return new SetModeAction<>(this); }
+  SetModeAction<> *make_mode_action() { return new SetModeAction<>(this); }
 
   /**
    * @brief Create a set terminator action.
    * @return SetTerminatorAction<>* Pointer to the created action
    */
-  SetTerminatorAction<>* make_terminator_action() { return new SetTerminatorAction<>(this); }
+  SetTerminatorAction<> *make_terminator_action() { return new SetTerminatorAction<>(this); }
 
   /**
    * @brief Create a set light mode action.
    * @return SetLightModeAction<>* Pointer to the created action
    */
-  SetLightModeAction<>* make_light_mode_action() { return new SetLightModeAction<>(this); }
+  SetLightModeAction<> *make_light_mode_action() { return new SetLightModeAction<>(this); }
 
   /**
    * @brief Create a set locate light mode action.
    * @return SetLocateLightModeAction<>* Pointer to the created action
    */
-  SetLocateLightModeAction<>* make_locate_light_mode_action() {
-    return new SetLocateLightModeAction<>(this);
-  }
+  SetLocateLightModeAction<> *make_locate_light_mode_action() { return new SetLocateLightModeAction<>(this); }
 
   /**
    * @brief Create a set sound mode action.
    * @return SetSoundModeAction<>* Pointer to the created action
    */
-  SetSoundModeAction<>* make_sound_mode_action() { return new SetSoundModeAction<>(this); }
+  SetSoundModeAction<> *make_sound_mode_action() { return new SetSoundModeAction<>(this); }
 
   /**
    * @brief Create a set buzzer volume action.
    * @return SetBuzzerVolumeAction<>* Pointer to the created action
    */
-  SetBuzzerVolumeAction<>* make_buzzer_volume_action() { return new SetBuzzerVolumeAction<>(this); }
+  SetBuzzerVolumeAction<> *make_buzzer_volume_action() { return new SetBuzzerVolumeAction<>(this); }
 
-protected:
+  /**
+   * @brief Create a set decoding success light mode action.
+   * @return SetDecodingSuccessLightModeAction<>* Pointer to the created action
+   */
+  SetDecodingSuccessLightModeAction<> *make_decoding_success_light_mode_action() {
+    return new SetDecodingSuccessLightModeAction<>(this);
+  }
+
+  /**
+   * @brief Create a set boot sound mode action.
+   * @return SetBootSoundModeAction<>* Pointer to the created action
+   */
+  SetBootSoundModeAction<> *make_boot_sound_mode_action() { return new SetBootSoundModeAction<>(this); }
+
+  /**
+   * @brief Create a set decode sound mode action.
+   * @return SetDecodeSoundModeAction<>* Pointer to the created action
+   */
+  SetDecodeSoundModeAction<> *make_decode_sound_mode_action() { return new SetDecodeSoundModeAction<>(this); }
+
+  /**
+   * @brief Create a set scan duration action.
+   * @return SetScanDurationAction<>* Pointer to the created action
+   */
+  SetScanDurationAction<> *make_scan_duration_action() { return new SetScanDurationAction<>(this); }
+
+  /**
+   * @brief Create a set stable induction time action.
+   * @return SetStableInductionTimeAction<>* Pointer to the created action
+   */
+  SetStableInductionTimeAction<> *make_stable_induction_time_action() {
+    return new SetStableInductionTimeAction<>(this);
+  }
+
+  /**
+   * @brief Create a set reading interval action.
+   * @return SetReadingIntervalAction<>* Pointer to the created action
+   */
+  SetReadingIntervalAction<> *make_reading_interval_action() { return new SetReadingIntervalAction<>(this); }
+
+  /**
+   * @brief Create a set same code interval action.
+   * @return SetSameCodeIntervalAction<>* Pointer to the created action
+   */
+  SetSameCodeIntervalAction<> *make_same_code_interval_action() { return new SetSameCodeIntervalAction<>(this); }
+
+ protected:
   friend class CommandBase;
   friend class Command<OperationMode>;
   friend class Command<Terminator>;
@@ -268,6 +401,13 @@ protected:
   friend class Command<LocateLightMode>;
   friend class Command<SoundMode>;
   friend class Command<BuzzerVolume>;
+  friend class Command<DecodingSuccessLightMode>;
+  friend class Command<BootSoundMode>;
+  friend class Command<DecodeSoundMode>;
+  friend class Command<ScanDuration>;
+  friend class Command<StableInductionTime>;
+  friend class Command<ReadingInterval>;
+  friend class Command<SameCodeInterval>;
   friend class SimpleCommand;
 
   // Command Processing Methods
@@ -294,7 +434,7 @@ protected:
    * @param offset Offset into the data to start checking
    * @return bool True if an ACK sequence is found
    */
-  bool is_ack_sequence_(const uint8_t* data, size_t len, size_t offset = 0) const;
+  bool is_ack_sequence_(const uint8_t *data, size_t len, size_t offset = 0) const;
 
   // Response Processing Methods
   /**
@@ -363,26 +503,33 @@ protected:
   std::unique_ptr<CommandBase> create_version_command();
 
   // Component State
-  text_sensor::TextSensor* text_sensor_{nullptr};     ///< Sensor for barcode output
-  text_sensor::TextSensor* version_sensor_{nullptr};  ///< Sensor for firmware version
+  text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
+  text_sensor::TextSensor *version_sensor_{nullptr};  ///< Sensor for firmware version
 
   std::vector<uint8_t> rx_buffer_;                           ///< Buffer for received data
   std::vector<std::unique_ptr<CommandBase>> command_queue_;  ///< Queue of pending commands
 
-  bool scanning_{false};                            ///< Current scanning state
-  bool waiting_for_ack_{false};                     ///< Whether waiting for command acknowledgment
-  uint32_t last_command_time_{0};                   ///< Timestamp of last command sent
-  CommandState command_state_{CommandState::IDLE};  ///< Current command processing state
+  bool scanning_{false};                                ///< Current scanning state
+  bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
+  uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
+  CommandState command_state_{CommandState::IDLE};      ///< Current command processing state
   ResponseType expected_response_{ResponseType::NONE};  ///< Expected response type
 
   // Scanner Settings
-  OperationMode operation_mode_{OperationMode::HOST};  ///< Current operation mode
-  Terminator terminator_{Terminator::NONE};            ///< Current terminator setting
-  LightMode light_mode_{LightMode::ON_WHEN_READING};   ///< Current light mode
-  LocateLightMode locate_light_mode_{
-      LocateLightMode::ON_WHEN_READING};                   ///< Current locate light mode
-  SoundMode sound_mode_{SoundMode::SOUND_DISABLED};        ///< Current sound mode
-  BuzzerVolume buzzer_volume_{BuzzerVolume::VOLUME_HIGH};  ///< Current buzzer volume
+  OperationMode operation_mode_{OperationMode::HOST};                    ///< Current operation mode
+  Terminator terminator_{Terminator::NONE};                              ///< Current terminator setting
+  LightMode light_mode_{LightMode::ON_WHEN_READING};                     ///< Current light mode
+  LocateLightMode locate_light_mode_{LocateLightMode::ON_WHEN_READING};  ///< Current locate light mode
+  SoundMode sound_mode_{SoundMode::SOUND_DISABLED};                      ///< Current sound mode
+  BuzzerVolume buzzer_volume_{BuzzerVolume::VOLUME_HIGH};                ///< Current buzzer volume
+  DecodingSuccessLightMode decoding_success_light_mode_{
+      DecodingSuccessLightMode::LIGHT_ENABLED};                               ///< Current decoding success light mode
+  BootSoundMode boot_sound_mode_{BootSoundMode::BOOT_SOUND_ENABLED};          ///< Current boot sound mode
+  DecodeSoundMode decode_sound_mode_{DecodeSoundMode::DECODE_SOUND_ENABLED};  ///< Current decode sound mode
+  ScanDuration scan_duration_{ScanDuration::MS_3000};                         ///< Current scan duration
+  StableInductionTime stable_induction_time_{StableInductionTime::MS_500};    ///< Current stable induction time
+  ReadingInterval reading_interval_{ReadingInterval::MS_500};                 ///< Current reading interval
+  SameCodeInterval same_code_interval_{SameCodeInterval::MS_500};             ///< Current same code interval
 };
 
 }  // namespace m5stack_barcode

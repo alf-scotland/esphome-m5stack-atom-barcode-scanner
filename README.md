@@ -60,6 +60,37 @@ sensor:
    - VCC -> 3.3V
    - GND -> GND
 
+## Implementation Details
+
+### Component Architecture
+
+The component follows a modular architecture with several key classes:
+
+- `BarcodeScanner`: Main component class that handles UART communication with the scanner
+- `Commands`: Defines byte arrays for all command codes to control the scanner
+- `CommandBase`: Abstract base class for all command implementations
+- `Command<T>`: Template class for type-specific commands
+- `CommandFactory`: Creates appropriate command instances based on requested actions
+- Actions (like `SetModeAction`): Provide ESPHome-compatible actions for automations
+
+### Command Flow
+
+1. **Initialization**: When configured, the scanner is initialized with default settings
+2. **Command Creation**: When a setting change is requested, a Command object is created
+3. **Command Queueing**: Commands are queued and sent to the scanner
+4. **Command Execution**: Commands are sent with proper protocols (wake-up sequence + command)
+5. **Acknowledgment**: Scanner responds with ACK, which is verified
+6. **State Update**: Internal state is updated to reflect new settings
+
+### Configuration Pipeline
+
+The configuration process follows this pipeline:
+1. User defines scanner settings in ESPHome YAML
+2. Settings are parsed and converted to typed enum values
+3. Type-safe commands are generated from these enum values
+4. Commands are queued and executed sequentially
+5. Scanner state is updated to reflect the new settings
+
 ## Development
 
 ### Prerequisites

@@ -36,12 +36,59 @@ constexpr uint8_t Commands::LocateLight::ALWAYS_OFF[];
 
 // Sound control commands
 constexpr uint8_t Commands::Sound::SOUND_DISABLED[];
-constexpr uint8_t Commands::Sound::ENABLED[];
+constexpr uint8_t Commands::Sound::SOUND_ENABLED[];
 
 // Volume settings
 constexpr uint8_t Commands::Volume::VOLUME_HIGH[];
-constexpr uint8_t Commands::Volume::MEDIUM[];
+constexpr uint8_t Commands::Volume::VOLUME_MEDIUM[];
 constexpr uint8_t Commands::Volume::VOLUME_LOW[];
+
+// Decoding Success Light control commands
+constexpr uint8_t Commands::DecodingSuccessLight::LIGHT_ENABLED[];
+constexpr uint8_t Commands::DecodingSuccessLight::LIGHT_DISABLED[];
+
+// Boot Sound control commands
+constexpr uint8_t Commands::BootSound::BOOT_SOUND_ENABLED[];
+constexpr uint8_t Commands::BootSound::BOOT_SOUND_DISABLED[];
+
+// Decode Sound control commands
+constexpr uint8_t Commands::DecodeSound::DECODE_SOUND_ENABLED[];
+constexpr uint8_t Commands::DecodeSound::DECODE_SOUND_DISABLED[];
+
+// Scan Duration commands
+constexpr uint8_t Commands::ScanDuration::MS_500[];
+constexpr uint8_t Commands::ScanDuration::MS_1000[];
+constexpr uint8_t Commands::ScanDuration::MS_3000[];
+constexpr uint8_t Commands::ScanDuration::MS_5000[];
+constexpr uint8_t Commands::ScanDuration::MS_10000[];
+constexpr uint8_t Commands::ScanDuration::MS_15000[];
+constexpr uint8_t Commands::ScanDuration::MS_20000[];
+constexpr uint8_t Commands::ScanDuration::UNLIMITED[];
+
+// Stable Induction Time commands
+constexpr uint8_t Commands::StableInductionTime::MS_0[];
+constexpr uint8_t Commands::StableInductionTime::MS_100[];
+constexpr uint8_t Commands::StableInductionTime::MS_300[];
+constexpr uint8_t Commands::StableInductionTime::MS_500[];
+constexpr uint8_t Commands::StableInductionTime::MS_1000[];
+
+// Reading Interval commands
+constexpr uint8_t Commands::ReadingInterval::MS_0[];
+constexpr uint8_t Commands::ReadingInterval::MS_100[];
+constexpr uint8_t Commands::ReadingInterval::MS_300[];
+constexpr uint8_t Commands::ReadingInterval::MS_500[];
+constexpr uint8_t Commands::ReadingInterval::MS_1000[];
+constexpr uint8_t Commands::ReadingInterval::MS_1500[];
+constexpr uint8_t Commands::ReadingInterval::MS_2000[];
+
+// Same Code Interval commands
+constexpr uint8_t Commands::SameCodeInterval::MS_0[];
+constexpr uint8_t Commands::SameCodeInterval::MS_100[];
+constexpr uint8_t Commands::SameCodeInterval::MS_300[];
+constexpr uint8_t Commands::SameCodeInterval::MS_500[];
+constexpr uint8_t Commands::SameCodeInterval::MS_1000[];
+constexpr uint8_t Commands::SameCodeInterval::MS_1500[];
+constexpr uint8_t Commands::SameCodeInterval::MS_2000[];
 
 // Response codes
 constexpr uint8_t Commands::Responses::ACK[];

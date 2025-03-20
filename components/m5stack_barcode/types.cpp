@@ -1,9 +1,15 @@
 #include "types.h"
 
+// Handle potential conflicts with Arduino's DISABLED macro
+#ifdef DISABLED
+#define DISABLED_TEMP DISABLED
+#undef DISABLED
+#endif
+
 namespace esphome::m5stack_barcode {
 
 // String conversion helpers for logging
-auto operation_mode_to_string(OperationMode mode) -> const char* {
+auto operation_mode_to_string(OperationMode mode) -> const char * {
   switch (mode) {
     case OperationMode::HOST:
       return "Host Mode";
@@ -20,7 +26,7 @@ auto operation_mode_to_string(OperationMode mode) -> const char* {
   }
 }
 
-auto terminator_to_string(Terminator term) -> const char* {
+auto terminator_to_string(Terminator term) -> const char * {
   switch (term) {
     case Terminator::NONE:
       return "None";
@@ -39,7 +45,7 @@ auto terminator_to_string(Terminator term) -> const char* {
   }
 }
 
-auto light_mode_to_string(LightMode mode) -> const char* {
+auto light_mode_to_string(LightMode mode) -> const char * {
   switch (mode) {
     case LightMode::ON_WHEN_READING:
       return "On When Reading";
@@ -52,7 +58,7 @@ auto light_mode_to_string(LightMode mode) -> const char* {
   }
 }
 
-auto locate_light_mode_to_string(LocateLightMode mode) -> const char* {
+auto locate_light_mode_to_string(LocateLightMode mode) -> const char * {
   switch (mode) {
     case LocateLightMode::ON_WHEN_READING:
       return "On When Reading";
@@ -65,22 +71,55 @@ auto locate_light_mode_to_string(LocateLightMode mode) -> const char* {
   }
 }
 
-auto sound_mode_to_string(SoundMode mode) -> const char* {
+auto decoding_success_light_mode_to_string(DecodingSuccessLightMode mode) -> const char * {
+  switch (mode) {
+    case DecodingSuccessLightMode::LIGHT_ENABLED:
+      return "Enabled";
+    case DecodingSuccessLightMode::LIGHT_DISABLED:
+      return "Disabled";
+    default:
+      return "Unknown Decoding Success Light Mode";
+  }
+}
+
+auto sound_mode_to_string(SoundMode mode) -> const char * {
   switch (mode) {
     case SoundMode::SOUND_DISABLED:
       return "Disabled";
-    case SoundMode::ENABLED:
+    case SoundMode::SOUND_ENABLED:
       return "Enabled";
     default:
       return "Unknown Sound Mode";
   }
 }
 
-auto buzzer_volume_to_string(BuzzerVolume volume) -> const char* {
+auto boot_sound_mode_to_string(BootSoundMode mode) -> const char * {
+  switch (mode) {
+    case BootSoundMode::BOOT_SOUND_ENABLED:
+      return "Enabled";
+    case BootSoundMode::BOOT_SOUND_DISABLED:
+      return "Disabled";
+    default:
+      return "Unknown Boot Sound Mode";
+  }
+}
+
+auto decode_sound_mode_to_string(DecodeSoundMode mode) -> const char * {
+  switch (mode) {
+    case DecodeSoundMode::DECODE_SOUND_ENABLED:
+      return "Enabled";
+    case DecodeSoundMode::DECODE_SOUND_DISABLED:
+      return "Disabled";
+    default:
+      return "Unknown Decode Sound Mode";
+  }
+}
+
+auto buzzer_volume_to_string(BuzzerVolume volume) -> const char * {
   switch (volume) {
     case BuzzerVolume::VOLUME_HIGH:
       return "High";
-    case BuzzerVolume::MEDIUM:
+    case BuzzerVolume::VOLUME_MEDIUM:
       return "Medium";
     case BuzzerVolume::VOLUME_LOW:
       return "Low";
@@ -89,4 +128,92 @@ auto buzzer_volume_to_string(BuzzerVolume volume) -> const char* {
   }
 }
 
+auto scan_duration_to_string(ScanDuration duration) -> const char * {
+  switch (duration) {
+    case ScanDuration::MS_500:
+      return "500 ms";
+    case ScanDuration::MS_1000:
+      return "1 second";
+    case ScanDuration::MS_3000:
+      return "3 seconds";
+    case ScanDuration::MS_5000:
+      return "5 seconds";
+    case ScanDuration::MS_10000:
+      return "10 seconds";
+    case ScanDuration::MS_15000:
+      return "15 seconds";
+    case ScanDuration::MS_20000:
+      return "20 seconds";
+    case ScanDuration::UNLIMITED:
+      return "Unlimited";
+    default:
+      return "Unknown Duration";
+  }
+}
+
+auto stable_induction_time_to_string(StableInductionTime time) -> const char * {
+  switch (time) {
+    case StableInductionTime::MS_0:
+      return "0 ms";
+    case StableInductionTime::MS_100:
+      return "100 ms";
+    case StableInductionTime::MS_300:
+      return "300 ms";
+    case StableInductionTime::MS_500:
+      return "500 ms";
+    case StableInductionTime::MS_1000:
+      return "1 second";
+    default:
+      return "Unknown Induction Time";
+  }
+}
+
+auto reading_interval_to_string(ReadingInterval interval) -> const char * {
+  switch (interval) {
+    case ReadingInterval::MS_0:
+      return "0 ms";
+    case ReadingInterval::MS_100:
+      return "100 ms";
+    case ReadingInterval::MS_300:
+      return "300 ms";
+    case ReadingInterval::MS_500:
+      return "500 ms";
+    case ReadingInterval::MS_1000:
+      return "1 second";
+    case ReadingInterval::MS_1500:
+      return "1.5 seconds";
+    case ReadingInterval::MS_2000:
+      return "2 seconds";
+    default:
+      return "Unknown Reading Interval";
+  }
+}
+
+auto same_code_interval_to_string(SameCodeInterval interval) -> const char * {
+  switch (interval) {
+    case SameCodeInterval::MS_0:
+      return "0 ms";
+    case SameCodeInterval::MS_100:
+      return "100 ms";
+    case SameCodeInterval::MS_300:
+      return "300 ms";
+    case SameCodeInterval::MS_500:
+      return "500 ms";
+    case SameCodeInterval::MS_1000:
+      return "1 second";
+    case SameCodeInterval::MS_1500:
+      return "1.5 seconds";
+    case SameCodeInterval::MS_2000:
+      return "2 seconds";
+    default:
+      return "Unknown Same Code Interval";
+  }
+}
+
 }  // namespace esphome::m5stack_barcode
+
+// Restore Arduino's DISABLED macro if it was defined
+#ifdef DISABLED_TEMP
+#define DISABLED DISABLED_TEMP
+#undef DISABLED_TEMP
+#endif
