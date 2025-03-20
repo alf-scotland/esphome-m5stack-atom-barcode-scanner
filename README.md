@@ -91,6 +91,16 @@ The configuration process follows this pipeline:
 4. Commands are queued and executed sequentially
 5. Scanner state is updated to reflect the new settings
 
+## Documentation
+
+The following official M5Stack documentation is included in this repository under `components/m5stack_barcode/docs/`:
+
+1. **ATOM_QRCODE_CMD_EN.pdf** - Official command reference for the M5Stack Atom QR Code Scanner, containing detailed information about all available command protocols, command byte sequences, and response formats.
+
+2. **AtomicQR_Reader_EN.pdf** - Configuration guide for the scanner, including QR codes that can be scanned to configure various scanner settings without writing code. Useful for testing and initial setup.
+
+These documents are referenced by the implementation and can be helpful for troubleshooting or extending the component's functionality.
+
 ## Development
 
 This component uses ESPHome's standard development tools.

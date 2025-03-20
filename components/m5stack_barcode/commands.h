@@ -3,6 +3,12 @@
 
 #pragma once
 
+/**
+ * Command reference for M5Stack ATOM QR Code Scanner
+ * Based on official documentation:
+ * https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/datasheet/atombase/AtomicQR/ATOM_QRCODE_CMD_EN.pdf
+ */
+
 #include <cstddef>  // For size_t
 #include <cstdint>  // For uint8_t, etc.
 
