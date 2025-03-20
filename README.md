@@ -93,6 +93,10 @@ The configuration process follows this pipeline:
 
 ## Development
 
+This component uses ESPHome's standard development tools.
+
+The pre-commit configuration includes code formatting and static analysis tools.
+
 ### Prerequisites
 
 - Python 3.13 or higher
