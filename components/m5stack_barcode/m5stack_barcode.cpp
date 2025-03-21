@@ -12,6 +12,10 @@ namespace m5stack_barcode {
 // Logging tag for this component
 static const char *const TAG_SCANNER = "m5stack_barcode";
 
+// Time constants (in milliseconds)
+static const uint32_t WAKEUP_DELAY_MS = 50;       // Delay between wake-up and command send
+static const uint32_t COMMAND_TIMEOUT_MS = 2000;  // Timeout for command acknowledgment
+
 // Custom implementation of make_unique for C++11 compatibility
 template<typename T, typename... Args> std::unique_ptr<T> make_unique(Args &&...args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
@@ -71,8 +75,8 @@ void BarcodeScanner::loop() {
         this->clear_buffer_();
       }
     }
-    // Check for command timeout (2 seconds)
-    else if (millis() - this->last_command_time_ > 2000) {
+    // Check for command timeout (COMMAND_TIMEOUT_MS)
+    else if (millis() - this->last_command_time_ > COMMAND_TIMEOUT_MS) {
       ESP_LOGW(TAG_SCANNER, "Command timed out");
 
       // Get the current command
@@ -97,8 +101,8 @@ void BarcodeScanner::loop() {
 
   // Process version information if requested
   if (this->expected_response_ == ResponseType::VERSION) {
-    // If we have data and we're not waiting for more (increase timeout from 500ms to 2000ms)
-    if (!this->rx_buffer_.empty() && millis() - this->last_command_time_ > 2000) {
+    // If we have data and we're not waiting for more (wait for COMMAND_TIMEOUT_MS)
+    if (!this->rx_buffer_.empty() && millis() - this->last_command_time_ > COMMAND_TIMEOUT_MS) {
       // Process any data received as version information
       this->process_version_();
       this->expected_response_ = ResponseType::NONE;
@@ -181,33 +185,16 @@ void BarcodeScanner::process_command_queue_() {
   // Check current state to determine actions
   switch (this->command_state_) {
     case CommandState::IDLE: {
-      // First, send wake-up command to wake up the scanner from sleep state
-      ESP_LOGD(TAG_SCANNER, "Sending wake-up command");
-
       // Wake up the scanner
       this->wake_up_();
 
-      // Move to WAKEUP_SENT state
-      this->command_state_ = CommandState::WAKEUP_SENT;
       break;
     }
 
     case CommandState::WAKEUP_SENT: {
-      // Check if we've waited at least 50ms since wake-up was sent
-      if (millis() - this->last_command_time_ >= 50) {
-        // Now we can send the actual command
-        ESP_LOGD(TAG_SCANNER, "Sending command: %s", command->get_description());
-        command->log_command_data(TAG_SCANNER, "Sending");
-
-        // Set the expected response type based on the command
-        this->set_expected_response_(command->get_expected_response());
-
-        this->write_array(command->get_data(), command->get_length());
-
-        // Update state tracking
-        this->waiting_for_ack_ = true;
-        this->last_command_time_ = millis();
-        this->command_state_ = CommandState::COMMAND_SENT;
+      // Check if we've waited at least WAKEUP_DELAY_MS since wake-up was sent
+      if (millis() - this->last_command_time_ >= WAKEUP_DELAY_MS) {
+        this->write_command_(command);
       }
       break;
     }
@@ -219,23 +206,35 @@ void BarcodeScanner::process_command_queue_() {
   }
 }
 
-// Implement wake_up_ function
+// Add new method implementation before wake_up_
+void BarcodeScanner::write_command_(const std::unique_ptr<CommandBase> &command) {
+  // Now we can send the actual command
+  ESP_LOGD(TAG_SCANNER, "Sending command: %s", command->get_description());
+  command->log_command_data(TAG_SCANNER, "Sending");
+
+  // Set the expected response type based on the command
+  this->set_expected_response_(command->get_expected_response());
+
+  this->write_array(command->get_data(), command->get_length());
+
+  // Update state tracking
+  this->waiting_for_ack_ = true;
+  this->last_command_time_ = millis();
+  this->command_state_ = CommandState::COMMAND_SENT;
+}
+
 void BarcodeScanner::wake_up_() {
-  // Debug log for wakeup command
-  if (ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG) {
-    constexpr size_t MAX_LOG_LENGTH = 32;
-    char hex_buffer[MAX_LOG_LENGTH] = {0};
-    for (size_t i = 0; i < Commands::WAKEUP_SIZE; i++) {
-      snprintf(hex_buffer + (i * 3), 4, "%02X ", Commands::WAKEUP[i]);
-    }
-    ESP_LOGD(TAG_SCANNER, "Wakeup command data: %s", hex_buffer);
-  }
+  // First, send wake-up command to wake up the scanner from sleep state
+  ESP_LOGD(TAG_SCANNER, "Sending wake-up command");
 
   // Send the wakeup command
   this->write_array(Commands::WAKEUP, Commands::WAKEUP_SIZE);
 
   // Record when we sent the wake-up command
   this->last_command_time_ = millis();
+
+  // Move to WAKEUP_SENT state
+  this->command_state_ = CommandState::WAKEUP_SENT;
 }
 
 void BarcodeScanner::queue_command(std::unique_ptr<CommandBase> command) {
@@ -349,9 +348,6 @@ void BarcodeScanner::process_version_() {
 
   // Clear the buffer
   this->clear_buffer_();
-
-  // Mark version as received and reset expected response
-  this->expected_response_ = ResponseType::NONE;
 }
 
 void BarcodeScanner::request_version_() {

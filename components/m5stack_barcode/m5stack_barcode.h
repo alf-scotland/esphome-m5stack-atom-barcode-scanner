@@ -474,6 +474,12 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    */
   void set_expected_response_(ResponseType type);
 
+  /**
+   * @brief Write a command to the scanner and update state.
+   * @param command Reference to the command to write
+   */
+  void write_command_(const std::unique_ptr<CommandBase> &command);
+
   // Command Factories
   /**
    * @brief Create a mode command.
