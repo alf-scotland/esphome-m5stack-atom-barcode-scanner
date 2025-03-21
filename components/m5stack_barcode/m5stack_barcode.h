@@ -464,6 +464,11 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void clear_buffer_();
 
   /**
+   * @brief Reads available data from UART and adds it to the rx_buffer_
+   */
+  void read_buffer_();
+
+  /**
    * @brief Set the expected response type for the current command.
    * @param type The expected response type
    */

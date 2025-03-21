@@ -45,10 +45,7 @@ void BarcodeScanner::loop() {
   this->process_command_queue_();
 
   // Read available data
-  while (this->available()) {
-    uint8_t byte = this->read();
-    this->rx_buffer_.push_back(byte);
-  }
+  this->read_buffer_();
 
   // Handle command acknowledgments
   if (this->waiting_for_ack_) {
@@ -154,6 +151,14 @@ void BarcodeScanner::dump_config() {
 
 // Buffer Management Methods
 void BarcodeScanner::clear_buffer_() { this->rx_buffer_.clear(); }
+
+void BarcodeScanner::read_buffer_() {
+  // Read available data
+  while (this->available()) {
+    uint8_t byte = this->read();
+    this->rx_buffer_.push_back(byte);
+  }
+}
 
 void BarcodeScanner::set_expected_response_(ResponseType type) { this->expected_response_ = type; }
 
