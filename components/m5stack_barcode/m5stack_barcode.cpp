@@ -122,6 +122,12 @@ void BarcodeScanner::loop() {
 
     if (should_process && !this->rx_buffer_.empty()) {
       this->process_barcode_();
+
+      // Reset scanning state after barcode is processed
+      this->scanning_ = false;
+
+      // Set expected response type to NONE
+      this->expected_response_ = ResponseType::NONE;
     }
   }
 }
@@ -315,12 +321,6 @@ void BarcodeScanner::process_barcode_() {
 
   // Clear the buffer for the next barcode
   this->clear_buffer_();
-
-  // Reset scanning state when barcode is processed
-  this->scanning_ = false;
-
-  // Set expected response type to NONE
-  this->expected_response_ = ResponseType::NONE;
 }
 
 void BarcodeScanner::process_version_() {
