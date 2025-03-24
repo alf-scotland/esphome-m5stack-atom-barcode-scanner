@@ -211,9 +211,11 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
 
   /**
    * @brief Check if the scanner is in continuous mode.
-   * @return bool True if in continuous mode
+   * @return bool True if in continuous mode or auto sense mode
    */
-  bool is_continuous_mode() const { return this->operation_mode_ == OperationMode::CONTINUOUS; }
+  bool is_continuous_mode() const {
+    return this->operation_mode_ == OperationMode::CONTINUOUS || this->operation_mode_ == OperationMode::AUTO_SENSE;
+  }
 
   // State Accessors
   /**
