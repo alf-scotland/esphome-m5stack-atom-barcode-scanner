@@ -4,12 +4,6 @@
 #include "esphome/core/log.h"
 #include "m5stack_barcode.h"
 
-// Handle potential conflicts with Arduino's DISABLED macro
-#ifdef DISABLED
-#define DISABLED_TEMP DISABLED
-#undef DISABLED
-#endif
-
 namespace esphome {
 namespace m5stack_barcode {
 
@@ -96,21 +90,20 @@ template<typename... Ts> void SetLightModeAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  std::string mode_str = this->mode_.value(x...);
   LightMode mode;
-
-  if (mode_str == "on_when_reading")
-    mode = LightMode::ON_WHEN_READING;
-  else if (mode_str == "always_on")
-    mode = LightMode::ALWAYS_ON;
-  else if (mode_str == "always_off")
-    mode = LightMode::ALWAYS_OFF;
-  else {
-    ESP_LOGW(TAG_ACTION, "Unknown light mode: %s", mode_str.c_str());
-    return;
+  if (this->mode_.has_value()) {
+    auto val = this->mode_.value(x...);
+    if (val == "on_when_reading") {
+      mode = LightMode::LIGHT_ON_WHEN_READING;
+    } else if (val == "always_on") {
+      mode = LightMode::LIGHT_ALWAYS_ON;
+    } else if (val == "always_off") {
+      mode = LightMode::LIGHT_ALWAYS_OFF;
+    } else {
+      ESP_LOGW(TAG_ACTION, "Invalid light mode: %s", val.c_str());
+      return;
+    }
   }
-
-  ESP_LOGD(TAG_ACTION, "Setting light mode to: %s", mode_str.c_str());
   this->scanner_->set_light_mode(mode);
 }
 
@@ -120,21 +113,20 @@ template<typename... Ts> void SetLocateLightModeAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  std::string mode_str = this->mode_.value(x...);
   LocateLightMode mode;
-
-  if (mode_str == "on_when_reading")
-    mode = LocateLightMode::ON_WHEN_READING;
-  else if (mode_str == "always_on")
-    mode = LocateLightMode::ALWAYS_ON;
-  else if (mode_str == "always_off")
-    mode = LocateLightMode::ALWAYS_OFF;
-  else {
-    ESP_LOGW(TAG_ACTION, "Unknown locate light mode: %s", mode_str.c_str());
-    return;
+  if (this->mode_.has_value()) {
+    auto val = this->mode_.value(x...);
+    if (val == "on_when_reading") {
+      mode = LocateLightMode::LOCATE_LIGHT_ON_WHEN_READING;
+    } else if (val == "always_on") {
+      mode = LocateLightMode::LOCATE_LIGHT_ALWAYS_ON;
+    } else if (val == "always_off") {
+      mode = LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF;
+    } else {
+      ESP_LOGW(TAG_ACTION, "Invalid locate light mode: %s", val.c_str());
+      return;
+    }
   }
-
-  ESP_LOGD(TAG_ACTION, "Setting locate light mode to: %s", mode_str.c_str());
   this->scanner_->set_locate_light_mode(mode);
 }
 
@@ -166,21 +158,20 @@ template<typename... Ts> void SetBuzzerVolumeAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  std::string volume_str = this->volume_.value(x...);
   BuzzerVolume volume;
-
-  if (volume_str == "high")
-    volume = BuzzerVolume::VOLUME_HIGH;
-  else if (volume_str == "medium")
-    volume = BuzzerVolume::VOLUME_MEDIUM;
-  else if (volume_str == "low")
-    volume = BuzzerVolume::VOLUME_LOW;
-  else {
-    ESP_LOGW(TAG_ACTION, "Unknown buzzer volume: %s", volume_str.c_str());
-    return;
+  if (this->volume_.has_value()) {
+    auto val = this->volume_.value(x...);
+    if (val == "high") {
+      volume = BuzzerVolume::BUZZER_VOLUME_HIGH;
+    } else if (val == "medium") {
+      volume = BuzzerVolume::BUZZER_VOLUME_MEDIUM;
+    } else if (val == "low") {
+      volume = BuzzerVolume::BUZZER_VOLUME_LOW;
+    } else {
+      ESP_LOGW(TAG_ACTION, "Invalid buzzer volume: %s", val.c_str());
+      return;
+    }
   }
-
-  ESP_LOGD(TAG_ACTION, "Setting buzzer volume to: %s", volume_str.c_str());
   this->scanner_->set_buzzer_volume(volume);
 }
 
@@ -192,19 +183,18 @@ template<typename... Ts> void SetDecodingSuccessLightModeAction<Ts...>::play(Ts.
     return;
   }
 
-  std::string mode_str = this->mode_.value(x...);
   DecodingSuccessLightMode mode;
-
-  if (mode_str == "enabled")
-    mode = DecodingSuccessLightMode::LIGHT_ENABLED;
-  else if (mode_str == "disabled")
-    mode = DecodingSuccessLightMode::LIGHT_DISABLED;
-  else {
-    ESP_LOGW(TAG_ACTION, "Unknown decoding success light mode: %s", mode_str.c_str());
-    return;
+  if (this->mode_.has_value()) {
+    auto val = this->mode_.value(x...);
+    if (val == "enabled") {
+      mode = DecodingSuccessLightMode::DECODING_LIGHT_ENABLED;
+    } else if (val == "disabled") {
+      mode = DecodingSuccessLightMode::DECODING_LIGHT_DISABLED;
+    } else {
+      ESP_LOGW(TAG_ACTION, "Invalid decoding success light mode: %s", val.c_str());
+      return;
+    }
   }
-
-  ESP_LOGD(TAG_ACTION, "Setting decoding success light mode to: %s", mode_str.c_str());
   this->scanner_->set_decoding_success_light_mode(mode);
 }
 
@@ -414,9 +404,3 @@ template class SetSameCodeIntervalAction<std::string, unsigned int>;
 
 }  // namespace m5stack_barcode
 }  // namespace esphome
-
-// Restore Arduino's DISABLED macro if it was defined
-#ifdef DISABLED_TEMP
-#define DISABLED DISABLED_TEMP
-#undef DISABLED_TEMP
-#endif

@@ -1,11 +1,4 @@
 #include "types.h"
-
-// Handle potential conflicts with Arduino's DISABLED macro
-#ifdef DISABLED
-#define DISABLED_TEMP DISABLED
-#undef DISABLED
-#endif
-
 namespace esphome::m5stack_barcode {
 
 // String conversion helpers for logging
@@ -47,12 +40,12 @@ auto terminator_to_string(Terminator term) -> const char * {
 
 auto light_mode_to_string(LightMode mode) -> const char * {
   switch (mode) {
-    case LightMode::ON_WHEN_READING:
-      return "On When Reading";
-    case LightMode::ALWAYS_ON:
-      return "Always On";
-    case LightMode::ALWAYS_OFF:
-      return "Always Off";
+    case LightMode::LIGHT_ON_WHEN_READING:
+      return "On when reading";
+    case LightMode::LIGHT_ALWAYS_ON:
+      return "Always on";
+    case LightMode::LIGHT_ALWAYS_OFF:
+      return "Always off";
     default:
       return "Unknown Light Mode";
   }
@@ -60,12 +53,12 @@ auto light_mode_to_string(LightMode mode) -> const char * {
 
 auto locate_light_mode_to_string(LocateLightMode mode) -> const char * {
   switch (mode) {
-    case LocateLightMode::ON_WHEN_READING:
-      return "On When Reading";
-    case LocateLightMode::ALWAYS_ON:
-      return "Always On";
-    case LocateLightMode::ALWAYS_OFF:
-      return "Always Off";
+    case LocateLightMode::LOCATE_LIGHT_ON_WHEN_READING:
+      return "On when reading";
+    case LocateLightMode::LOCATE_LIGHT_ALWAYS_ON:
+      return "Always on";
+    case LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF:
+      return "Always off";
     default:
       return "Unknown Locate Light Mode";
   }
@@ -73,9 +66,9 @@ auto locate_light_mode_to_string(LocateLightMode mode) -> const char * {
 
 auto decoding_success_light_mode_to_string(DecodingSuccessLightMode mode) -> const char * {
   switch (mode) {
-    case DecodingSuccessLightMode::LIGHT_ENABLED:
+    case DecodingSuccessLightMode::DECODING_LIGHT_ENABLED:
       return "Enabled";
-    case DecodingSuccessLightMode::LIGHT_DISABLED:
+    case DecodingSuccessLightMode::DECODING_LIGHT_DISABLED:
       return "Disabled";
     default:
       return "Unknown Decoding Success Light Mode";
@@ -117,14 +110,14 @@ auto decode_sound_mode_to_string(DecodeSoundMode mode) -> const char * {
 
 auto buzzer_volume_to_string(BuzzerVolume volume) -> const char * {
   switch (volume) {
-    case BuzzerVolume::VOLUME_HIGH:
+    case BuzzerVolume::BUZZER_VOLUME_HIGH:
       return "High";
-    case BuzzerVolume::VOLUME_MEDIUM:
+    case BuzzerVolume::BUZZER_VOLUME_MEDIUM:
       return "Medium";
-    case BuzzerVolume::VOLUME_LOW:
+    case BuzzerVolume::BUZZER_VOLUME_LOW:
       return "Low";
     default:
-      return "Unknown Volume";
+      return "Unknown Buzzer Volume";
   }
 }
 
@@ -211,9 +204,3 @@ auto same_code_interval_to_string(SameCodeInterval interval) -> const char * {
 }
 
 }  // namespace esphome::m5stack_barcode
-
-// Restore Arduino's DISABLED macro if it was defined
-#ifdef DISABLED_TEMP
-#define DISABLED DISABLED_TEMP
-#undef DISABLED_TEMP
-#endif

@@ -16,6 +16,9 @@ static const char *const TAG_SCANNER = "m5stack_barcode";
 static const uint32_t WAKEUP_DELAY_MS = 50;       // Delay between wake-up and command send
 static const uint32_t COMMAND_TIMEOUT_MS = 2000;  // Timeout for command acknowledgment
 
+// Command queue size
+static const size_t MAX_QUEUE_SIZE = 20;  // Maximum number of commands queued at once
+
 // Custom implementation of make_unique for C++11 compatibility
 template<typename T, typename... Args> std::unique_ptr<T> make_unique(Args &&...args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
@@ -35,13 +38,57 @@ void BarcodeScanner::setup() {
 }
 
 void BarcodeScanner::configure_defaults_() {
-  // Set operation mode to HOST
-  auto mode_command = CommandFactory::create_mode_command(OperationMode::HOST);
+  // Set operation mode
+  auto mode_command = CommandFactory::create_mode_command(this->operation_mode_);
   this->queue_command(std::move(mode_command));
 
-  // Set terminator to NONE
-  auto term_command = CommandFactory::create_terminator_command(Terminator::NONE);
+  // Set terminator
+  auto term_command = CommandFactory::create_terminator_command(this->terminator_);
   this->queue_command(std::move(term_command));
+
+  // Set light mode
+  auto light_command = CommandFactory::create_light_command(this->light_mode_);
+  this->queue_command(std::move(light_command));
+
+  // Set locate light mode
+  auto locate_light_command = CommandFactory::create_locate_light_command(this->locate_light_mode_);
+  this->queue_command(std::move(locate_light_command));
+
+  // Set sound mode
+  auto sound_command = CommandFactory::create_sound_command(this->sound_mode_);
+  this->queue_command(std::move(sound_command));
+
+  // Set buzzer volume
+  auto volume_command = CommandFactory::create_volume_command(this->buzzer_volume_);
+  this->queue_command(std::move(volume_command));
+
+  // Set decoding success light mode
+  auto decode_light_command = CommandFactory::create_decoding_success_light_command(this->decoding_success_light_mode_);
+  this->queue_command(std::move(decode_light_command));
+
+  // Set boot sound mode
+  auto boot_sound_command = CommandFactory::create_boot_sound_command(this->boot_sound_mode_);
+  this->queue_command(std::move(boot_sound_command));
+
+  // Set decode sound mode
+  auto decode_sound_command = CommandFactory::create_decode_sound_command(this->decode_sound_mode_);
+  this->queue_command(std::move(decode_sound_command));
+
+  // Set scan duration
+  auto scan_duration_command = CommandFactory::create_scan_duration_command(this->scan_duration_);
+  this->queue_command(std::move(scan_duration_command));
+
+  // Set stable induction time
+  auto induction_time_command = CommandFactory::create_stable_induction_time_command(this->stable_induction_time_);
+  this->queue_command(std::move(induction_time_command));
+
+  // Set reading interval
+  auto reading_interval_command = CommandFactory::create_reading_interval_command(this->reading_interval_);
+  this->queue_command(std::move(reading_interval_command));
+
+  // Set same code interval
+  auto same_code_interval_command = CommandFactory::create_same_code_interval_command(this->same_code_interval_);
+  this->queue_command(std::move(same_code_interval_command));
 }
 
 void BarcodeScanner::loop() {
@@ -243,8 +290,7 @@ void BarcodeScanner::queue_command(std::unique_ptr<CommandBase> command) {
     return;
   }
 
-  // Add maximum queue size to prevent memory issues
-  static const size_t MAX_QUEUE_SIZE = 10;
+  // Check if queue is full
   if (this->command_queue_.size() >= MAX_QUEUE_SIZE) {
     ESP_LOGW(TAG_SCANNER, "Command queue full (size=%u), dropping command: %s", this->command_queue_.size(),
              command->get_description());

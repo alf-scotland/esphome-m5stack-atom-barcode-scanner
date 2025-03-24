@@ -4,6 +4,7 @@
 #include "esphome/core/log.h"
 #include "m5stack_barcode.h"
 #include "types.h"
+#include <memory>
 
 namespace esphome {
 namespace m5stack_barcode {
@@ -95,46 +96,45 @@ std::unique_ptr<CommandBase> CommandFactory::create_terminator_command(Terminato
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_light_command(LightMode mode) {
-  const uint8_t *cmd_data = nullptr;
+  uint8_t cmd_data[] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, 0x0A, 0x01, 0x00};
+  uint8_t value = 0x00;
 
   switch (mode) {
-    case LightMode::ON_WHEN_READING:
-      cmd_data = Commands::Light::ON_WHEN_READING;
+    case LightMode::LIGHT_ON_WHEN_READING:
+      value = 0x00;
       break;
-    case LightMode::ALWAYS_ON:
-      cmd_data = Commands::Light::ALWAYS_ON;
+    case LightMode::LIGHT_ALWAYS_ON:
+      value = 0x01;
       break;
-    case LightMode::ALWAYS_OFF:
-      cmd_data = Commands::Light::ALWAYS_OFF;
+    case LightMode::LIGHT_ALWAYS_OFF:
+      value = 0x02;
       break;
-    default:
-      ESP_LOGW(TAG_CMD, "Invalid light mode: %d", static_cast<uint8_t>(mode));
-      return nullptr;
   }
 
-  return make_unique<Command<LightMode>>(cmd_data, Commands::Light::SIZE, mode, light_mode_to_string(mode), nullptr);
+  cmd_data[7] = value;
+  return std::unique_ptr<Command<LightMode>>(
+      new Command<LightMode>(cmd_data, sizeof(cmd_data), mode, "Set light mode", nullptr, nullptr));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_locate_light_command(LocateLightMode mode) {
-  const uint8_t *cmd_data = nullptr;
+  uint8_t cmd_data[] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, 0x0A, 0x02, 0x00};
+  uint8_t value = 0x00;
 
   switch (mode) {
-    case LocateLightMode::ON_WHEN_READING:
-      cmd_data = Commands::LocateLight::ON_WHEN_READING;
+    case LocateLightMode::LOCATE_LIGHT_ON_WHEN_READING:
+      value = 0x00;
       break;
-    case LocateLightMode::ALWAYS_ON:
-      cmd_data = Commands::LocateLight::ALWAYS_ON;
+    case LocateLightMode::LOCATE_LIGHT_ALWAYS_ON:
+      value = 0x01;
       break;
-    case LocateLightMode::ALWAYS_OFF:
-      cmd_data = Commands::LocateLight::ALWAYS_OFF;
+    case LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF:
+      value = 0x02;
       break;
-    default:
-      ESP_LOGW(TAG_CMD, "Invalid locate light mode: %d", static_cast<uint8_t>(mode));
-      return nullptr;
   }
 
-  return make_unique<Command<LocateLightMode>>(cmd_data, Commands::LocateLight::SIZE, mode,
-                                               locate_light_mode_to_string(mode), nullptr);
+  cmd_data[7] = value;
+  return std::unique_ptr<Command<LocateLightMode>>(
+      new Command<LocateLightMode>(cmd_data, sizeof(cmd_data), mode, "Set locate light mode", nullptr, nullptr));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_sound_command(SoundMode mode) {
@@ -156,46 +156,44 @@ std::unique_ptr<CommandBase> CommandFactory::create_sound_command(SoundMode mode
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_volume_command(BuzzerVolume volume) {
-  const uint8_t *cmd_data = nullptr;
+  uint8_t cmd_data[] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, 0x0A, 0x04, 0x00};
+  uint8_t value = 0x00;
 
   switch (volume) {
-    case BuzzerVolume::VOLUME_HIGH:
-      cmd_data = Commands::Volume::VOLUME_HIGH;
+    case BuzzerVolume::BUZZER_VOLUME_HIGH:
+      value = 0x00;
       break;
-    case BuzzerVolume::VOLUME_MEDIUM:
-      cmd_data = Commands::Volume::VOLUME_MEDIUM;
+    case BuzzerVolume::BUZZER_VOLUME_MEDIUM:
+      value = 0x01;
       break;
-    case BuzzerVolume::VOLUME_LOW:
-      cmd_data = Commands::Volume::VOLUME_LOW;
+    case BuzzerVolume::BUZZER_VOLUME_LOW:
+      value = 0x02;
       break;
-    default:
-      ESP_LOGW(TAG_CMD, "Invalid buzzer volume: %d", static_cast<uint8_t>(volume));
-      return nullptr;
   }
 
-  return make_unique<Command<BuzzerVolume>>(cmd_data, Commands::Volume::SIZE, volume, buzzer_volume_to_string(volume),
-                                            nullptr);
+  cmd_data[7] = value;
+  return std::unique_ptr<Command<BuzzerVolume>>(
+      new Command<BuzzerVolume>(cmd_data, sizeof(cmd_data), volume, "Set buzzer volume", nullptr, nullptr));
 }
 
 // New command factory methods for additional settings
 
 std::unique_ptr<CommandBase> CommandFactory::create_decoding_success_light_command(DecodingSuccessLightMode mode) {
-  const uint8_t *cmd_data = nullptr;
+  uint8_t cmd_data[] = {0x7E, 0x00, 0x08, 0x01, 0x00, 0x00, 0x0A, 0x05, 0x00};
+  uint8_t value = 0x00;
 
   switch (mode) {
-    case DecodingSuccessLightMode::LIGHT_ENABLED:
-      cmd_data = Commands::DecodingSuccessLight::LIGHT_ENABLED;
+    case DecodingSuccessLightMode::DECODING_LIGHT_ENABLED:
+      value = 0x01;
       break;
-    case DecodingSuccessLightMode::LIGHT_DISABLED:
-      cmd_data = Commands::DecodingSuccessLight::LIGHT_DISABLED;
+    case DecodingSuccessLightMode::DECODING_LIGHT_DISABLED:
+      value = 0x00;
       break;
-    default:
-      ESP_LOGW(TAG_CMD, "Invalid decoding success light mode: %d", static_cast<uint8_t>(mode));
-      return nullptr;
   }
 
-  return make_unique<Command<DecodingSuccessLightMode>>(cmd_data, Commands::DecodingSuccessLight::SIZE, mode,
-                                                        decoding_success_light_mode_to_string(mode), nullptr);
+  cmd_data[7] = value;
+  return std::unique_ptr<Command<DecodingSuccessLightMode>>(new Command<DecodingSuccessLightMode>(
+      cmd_data, sizeof(cmd_data), mode, "Set decoding success light mode", nullptr, nullptr));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_boot_sound_command(BootSoundMode mode) {

@@ -75,6 +75,7 @@ light:
       - flicker:
 
 uart:
+  id: uart_bus
   baud_rate: 9600
   tx_pin: 19
   rx_pin: 22
@@ -254,7 +255,7 @@ select:
     on_value:
       - m5stack_barcode.set_mode:
           id: barcode_scanner
-          mode: !lambda "return x;"
+          operation_mode: !lambda "return x;"
 
   - platform: template
     name: "Terminator"
@@ -381,7 +382,7 @@ select:
     on_value:
       - m5stack_barcode.set_buzzer_volume:
           id: barcode_scanner
-          volume: !lambda "return x;"
+          buzzer_volume: !lambda "return x;"
 
   - platform: template
     name: "Scan Duration"
@@ -466,5 +467,6 @@ m5stack_barcode:
   id: barcode_scanner
   barcode_id: last_barcode
   version_id: scanner_version
-  mode: host
+  operation_mode: host
   terminator: crlf
+  uart_id: uart_bus

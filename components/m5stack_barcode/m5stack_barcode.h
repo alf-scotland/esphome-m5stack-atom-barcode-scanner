@@ -14,10 +14,6 @@
 namespace esphome {
 namespace m5stack_barcode {
 
-// Add constants for direct use in main.cpp
-constexpr auto HOST = OperationMode::HOST;
-constexpr auto CRLF = Terminator::CRLF;
-
 /**
  * @brief M5Stack Barcode Scanner component for ESPHome.
  *
@@ -527,14 +523,14 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   ResponseType expected_response_{ResponseType::NONE};  ///< Expected response type
 
   // Scanner Settings
-  OperationMode operation_mode_{OperationMode::HOST};                    ///< Current operation mode
-  Terminator terminator_{Terminator::NONE};                              ///< Current terminator setting
-  LightMode light_mode_{LightMode::ON_WHEN_READING};                     ///< Current light mode
-  LocateLightMode locate_light_mode_{LocateLightMode::ON_WHEN_READING};  ///< Current locate light mode
-  SoundMode sound_mode_{SoundMode::SOUND_DISABLED};                      ///< Current sound mode
-  BuzzerVolume buzzer_volume_{BuzzerVolume::VOLUME_HIGH};                ///< Current buzzer volume
+  OperationMode operation_mode_{OperationMode::HOST};                                 ///< Current operation mode
+  Terminator terminator_{Terminator::NONE};                                           ///< Current terminator setting
+  LightMode light_mode_{LightMode::LIGHT_ON_WHEN_READING};                            ///< Current light mode
+  LocateLightMode locate_light_mode_{LocateLightMode::LOCATE_LIGHT_ON_WHEN_READING};  ///< Current locate light mode
+  SoundMode sound_mode_{SoundMode::SOUND_DISABLED};                                   ///< Current sound mode
+  BuzzerVolume buzzer_volume_{BuzzerVolume::BUZZER_VOLUME_LOW};                       ///< Current buzzer volume
   DecodingSuccessLightMode decoding_success_light_mode_{
-      DecodingSuccessLightMode::LIGHT_ENABLED};                               ///< Current decoding success light mode
+      DecodingSuccessLightMode::DECODING_LIGHT_ENABLED};                      ///< Current decoding success light mode
   BootSoundMode boot_sound_mode_{BootSoundMode::BOOT_SOUND_ENABLED};          ///< Current boot sound mode
   DecodeSoundMode decode_sound_mode_{DecodeSoundMode::DECODE_SOUND_ENABLED};  ///< Current decode sound mode
   ScanDuration scan_duration_{ScanDuration::MS_3000};                         ///< Current scan duration
