@@ -203,6 +203,18 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    */
   bool set_same_code_interval(SameCodeInterval interval);
 
+  /**
+   * @brief Process the current buffer as a barcode.
+   * This is useful for continuous mode where we want to process intermediate results.
+   */
+  void process_current_buffer();
+
+  /**
+   * @brief Check if the scanner is in continuous mode.
+   * @return bool True if in continuous mode
+   */
+  bool is_continuous_mode() const { return this->operation_mode_ == OperationMode::CONTINUOUS; }
+
   // State Accessors
   /**
    * @brief Check if the scanner is currently scanning.
@@ -294,117 +306,27 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    */
   SameCodeInterval get_same_code_interval() const { return this->same_code_interval_; }
 
-  // Action Creators for ESPHome Automations
-  /**
-   * @brief Create a start scanning action.
-   * @return StartAction<>* Pointer to the created action
-   */
-  StartAction<> *make_start_action() { return new StartAction<>(this); }
-
-  /**
-   * @brief Create a stop scanning action.
-   * @return StopAction<>* Pointer to the created action
-   */
-  StopAction<> *make_stop_action() { return new StopAction<>(this); }
-
-  /**
-   * @brief Create a set operation mode action.
-   * @return SetModeAction<>* Pointer to the created action
-   */
-  SetModeAction<> *make_mode_action() { return new SetModeAction<>(this); }
-
-  /**
-   * @brief Create a set terminator action.
-   * @return SetTerminatorAction<>* Pointer to the created action
-   */
-  SetTerminatorAction<> *make_terminator_action() { return new SetTerminatorAction<>(this); }
-
-  /**
-   * @brief Create a set light mode action.
-   * @return SetLightModeAction<>* Pointer to the created action
-   */
-  SetLightModeAction<> *make_light_mode_action() { return new SetLightModeAction<>(this); }
-
-  /**
-   * @brief Create a set locate light mode action.
-   * @return SetLocateLightModeAction<>* Pointer to the created action
-   */
-  SetLocateLightModeAction<> *make_locate_light_mode_action() { return new SetLocateLightModeAction<>(this); }
-
-  /**
-   * @brief Create a set sound mode action.
-   * @return SetSoundModeAction<>* Pointer to the created action
-   */
-  SetSoundModeAction<> *make_sound_mode_action() { return new SetSoundModeAction<>(this); }
-
-  /**
-   * @brief Create a set buzzer volume action.
-   * @return SetBuzzerVolumeAction<>* Pointer to the created action
-   */
-  SetBuzzerVolumeAction<> *make_buzzer_volume_action() { return new SetBuzzerVolumeAction<>(this); }
-
-  /**
-   * @brief Create a set decoding success light mode action.
-   * @return SetDecodingSuccessLightModeAction<>* Pointer to the created action
-   */
-  SetDecodingSuccessLightModeAction<> *make_decoding_success_light_mode_action() {
-    return new SetDecodingSuccessLightModeAction<>(this);
-  }
-
-  /**
-   * @brief Create a set boot sound mode action.
-   * @return SetBootSoundModeAction<>* Pointer to the created action
-   */
-  SetBootSoundModeAction<> *make_boot_sound_mode_action() { return new SetBootSoundModeAction<>(this); }
-
-  /**
-   * @brief Create a set decode sound mode action.
-   * @return SetDecodeSoundModeAction<>* Pointer to the created action
-   */
-  SetDecodeSoundModeAction<> *make_decode_sound_mode_action() { return new SetDecodeSoundModeAction<>(this); }
-
-  /**
-   * @brief Create a set scan duration action.
-   * @return SetScanDurationAction<>* Pointer to the created action
-   */
-  SetScanDurationAction<> *make_scan_duration_action() { return new SetScanDurationAction<>(this); }
-
-  /**
-   * @brief Create a set stable induction time action.
-   * @return SetStableInductionTimeAction<>* Pointer to the created action
-   */
-  SetStableInductionTimeAction<> *make_stable_induction_time_action() {
-    return new SetStableInductionTimeAction<>(this);
-  }
-
-  /**
-   * @brief Create a set reading interval action.
-   * @return SetReadingIntervalAction<>* Pointer to the created action
-   */
-  SetReadingIntervalAction<> *make_reading_interval_action() { return new SetReadingIntervalAction<>(this); }
-
-  /**
-   * @brief Create a set same code interval action.
-   * @return SetSameCodeIntervalAction<>* Pointer to the created action
-   */
-  SetSameCodeIntervalAction<> *make_same_code_interval_action() { return new SetSameCodeIntervalAction<>(this); }
-
  protected:
   friend class CommandBase;
-  friend class Command<OperationMode>;
-  friend class Command<Terminator>;
-  friend class Command<LightMode>;
-  friend class Command<LocateLightMode>;
-  friend class Command<SoundMode>;
-  friend class Command<BuzzerVolume>;
-  friend class Command<DecodingSuccessLightMode>;
-  friend class Command<BootSoundMode>;
-  friend class Command<DecodeSoundMode>;
-  friend class Command<ScanDuration>;
-  friend class Command<StableInductionTime>;
-  friend class Command<ReadingInterval>;
-  friend class Command<SameCodeInterval>;
+  template<typename T> friend class Command;
   friend class SimpleCommand;
+  template<typename... Ts> friend class IsContinuousModeCondition;
+  template<typename... Ts> friend class ProcessCurrentBufferAction;
+  template<typename... Ts> friend class StartAction;
+  template<typename... Ts> friend class StopAction;
+  template<typename... Ts> friend class SetModeAction;
+  template<typename... Ts> friend class SetTerminatorAction;
+  template<typename... Ts> friend class SetLightModeAction;
+  template<typename... Ts> friend class SetLocateLightModeAction;
+  template<typename... Ts> friend class SetSoundModeAction;
+  template<typename... Ts> friend class SetBuzzerVolumeAction;
+  template<typename... Ts> friend class SetDecodingSuccessLightModeAction;
+  template<typename... Ts> friend class SetBootSoundModeAction;
+  template<typename... Ts> friend class SetDecodeSoundModeAction;
+  template<typename... Ts> friend class SetScanDurationAction;
+  template<typename... Ts> friend class SetStableInductionTimeAction;
+  template<typename... Ts> friend class SetReadingIntervalAction;
+  template<typename... Ts> friend class SetSameCodeIntervalAction;
 
   // Command Processing Methods
   /**

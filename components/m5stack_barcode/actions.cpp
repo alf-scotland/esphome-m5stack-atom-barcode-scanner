@@ -368,8 +368,26 @@ template<typename... Ts> void SetSameCodeIntervalAction<Ts...>::play(Ts... x) {
   this->scanner_->set_same_code_interval(interval);
 }
 
+template<typename... Ts> void ProcessCurrentBufferAction<Ts...>::play(Ts... x) {
+  if (this->scanner_ != nullptr) {
+    ESP_LOGD(TAG_ACTION, "Processing current buffer");
+    this->scanner_->process_current_buffer();
+  }
+}
+
+template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(Ts... x) {
+  if (this->scanner_ != nullptr) {
+    return this->scanner_->is_continuous_mode();
+  }
+  return false;
+}
+
 // Explicit template instantiations
 template class StartAction<>;
+template class StartAction<bool>;
+template class StartAction<int>;
+template class StartAction<std::string>;
+template class StartAction<std::string, int>;
 template class StopAction<>;
 template class SetModeAction<>;
 template class SetTerminatorAction<>;
@@ -384,6 +402,16 @@ template class SetScanDurationAction<>;
 template class SetStableInductionTimeAction<>;
 template class SetReadingIntervalAction<>;
 template class SetSameCodeIntervalAction<>;
+template class ProcessCurrentBufferAction<>;
+template class ProcessCurrentBufferAction<bool>;
+template class ProcessCurrentBufferAction<int>;
+template class ProcessCurrentBufferAction<std::string>;
+template class ProcessCurrentBufferAction<std::string, int>;
+template class IsContinuousModeCondition<>;
+template class IsContinuousModeCondition<bool>;
+template class IsContinuousModeCondition<int>;
+template class IsContinuousModeCondition<std::string>;
+template class IsContinuousModeCondition<std::string, int>;
 
 // Explicit template instantiations for the types used in YAML
 template class StartAction<std::string, unsigned int>;
@@ -401,6 +429,8 @@ template class SetScanDurationAction<std::string, unsigned int>;
 template class SetStableInductionTimeAction<std::string, unsigned int>;
 template class SetReadingIntervalAction<std::string, unsigned int>;
 template class SetSameCodeIntervalAction<std::string, unsigned int>;
+template class ProcessCurrentBufferAction<std::string, unsigned int>;
+template class IsContinuousModeCondition<std::string, unsigned int>;
 
 }  // namespace m5stack_barcode
 }  // namespace esphome

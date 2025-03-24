@@ -145,6 +145,13 @@ binary_sensor:
       then:
         - logger.log: "QR code detected via DLED pin"
         - script.execute: led_scan_success
+        - if:
+            condition:
+              m5stack_barcode.is_continuous_mode:
+                id: barcode_scanner
+            then:
+              - m5stack_barcode.process_current_buffer:
+                  id: barcode_scanner
         - switch.turn_off: scanner_trigger_internal
 
   # Atom Lite built-in button on GPIO39

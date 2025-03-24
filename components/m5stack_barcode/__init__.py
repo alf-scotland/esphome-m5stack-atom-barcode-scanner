@@ -210,6 +210,17 @@ SetSameCodeIntervalAction = m5stack_barcode_ns.class_(
     automation.Action,
 )
 
+ProcessCurrentBufferAction = m5stack_barcode_ns.class_(
+    "ProcessCurrentBufferAction",
+    automation.Action,
+)
+
+# Conditions
+IsContinuousModeCondition = m5stack_barcode_ns.class_(
+    "IsContinuousModeCondition",
+    automation.Condition,
+)
+
 # Configuration schema
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -713,3 +724,33 @@ async def barcode_set_same_code_interval_to_code(
     )
     cg.add(var.set_interval(template_))
     return var
+
+
+@automation.register_action(
+    "m5stack_barcode.process_current_buffer",
+    ProcessCurrentBufferAction,
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+)
+async def barcode_process_current_buffer_to_code(
+    config: dict[str, Any],
+    action_id: str,
+    template_arg: Any,
+    args: Any,  # noqa: ARG001
+) -> ProcessCurrentBufferAction:
+    """Register process current buffer action."""
+    return cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
+
+
+@automation.register_condition(
+    "m5stack_barcode.is_continuous_mode",
+    IsContinuousModeCondition,
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+)
+async def barcode_is_continuous_mode_to_code(
+    config: dict[str, Any],
+    condition_id: str,
+    template_arg: Any,
+    args: Any,  # noqa: ARG001
+) -> IsContinuousModeCondition:
+    """Register is continuous mode condition."""
+    return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))

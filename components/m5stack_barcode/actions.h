@@ -39,12 +39,8 @@ template<typename... Ts> class SetModeAction : public Action<Ts...> {
    * @param scanner Reference to the barcode scanner instance
    */
   explicit SetModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-
   TEMPLATABLE_VALUE(std::string, mode)
 
-  /**
-   * Execute the action
-   */
   void play(Ts... x) override;
 
  protected:
@@ -58,12 +54,8 @@ template<typename... Ts> class SetTerminatorAction : public Action<Ts...> {
    * @param scanner Reference to the barcode scanner instance
    */
   explicit SetTerminatorAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-
   TEMPLATABLE_VALUE(std::string, terminator)
 
-  /**
-   * Execute the action
-   */
   void play(Ts... x) override;
 
  protected:
@@ -78,12 +70,8 @@ template<typename... Ts> class SetLightModeAction : public Action<Ts...> {
    * @param scanner Reference to the barcode scanner instance
    */
   explicit SetLightModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-
   TEMPLATABLE_VALUE(std::string, mode)
 
-  /**
-   * Execute the action
-   */
   void play(Ts... x) override;
 
  protected:
@@ -108,12 +96,8 @@ template<typename... Ts> class SetSoundModeAction : public Action<Ts...> {
    * @param scanner Reference to the barcode scanner instance
    */
   explicit SetSoundModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-
   TEMPLATABLE_VALUE(std::string, mode)
 
-  /**
-   * Execute the action
-   */
   void play(Ts... x) override;
 
  protected:
@@ -204,6 +188,24 @@ template<typename... Ts> class SetSameCodeIntervalAction : public Action<Ts...> 
   explicit SetSameCodeIntervalAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, interval)
   void play(Ts... x) override;
+
+ protected:
+  BarcodeScanner *scanner_;
+};
+
+template<typename... Ts> class ProcessCurrentBufferAction : public Action<Ts...> {
+ public:
+  explicit ProcessCurrentBufferAction(BarcodeScanner *scanner) : scanner_(scanner) {}
+  void play(Ts... x) override;
+
+ protected:
+  BarcodeScanner *scanner_;
+};
+
+template<typename... Ts> class IsContinuousModeCondition : public Condition<Ts...> {
+ public:
+  explicit IsContinuousModeCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
+  bool check(Ts... x) override;
 
  protected:
   BarcodeScanner *scanner_;

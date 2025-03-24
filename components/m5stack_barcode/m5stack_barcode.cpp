@@ -335,13 +335,45 @@ void BarcodeScanner::process_barcode_() {
     return;
   }
 
-  // If we're in non-host mode, we need to remove the acknowledgment sequence from the end
+  // If we're in continuous mode and have a terminator, we need to handle it
   size_t data_length = this->rx_buffer_.size();
-
-  if (this->operation_mode_ != OperationMode::HOST) {
-    // Remove the ACK sequence (7 bytes) at the end
-    if (data_length >= 7 && this->is_ack_sequence_(this->rx_buffer_.data(), data_length, data_length - 7)) {
-      data_length -= 7;
+  if (this->is_continuous_mode() && this->terminator_ != Terminator::NONE) {
+    // Find the terminator sequence
+    size_t term_pos = 0;
+    switch (this->terminator_) {
+      case Terminator::CRLF:
+        term_pos = data_length - 2;
+        if (data_length >= 2 && this->rx_buffer_[term_pos] == '\r' && this->rx_buffer_[term_pos + 1] == '\n') {
+          data_length = term_pos;
+        }
+        break;
+      case Terminator::CR:
+        term_pos = data_length - 1;
+        if (data_length >= 1 && this->rx_buffer_[term_pos] == '\r') {
+          data_length = term_pos;
+        }
+        break;
+      case Terminator::TAB:
+        term_pos = data_length - 1;
+        if (data_length >= 1 && this->rx_buffer_[term_pos] == '\t') {
+          data_length = term_pos;
+        }
+        break;
+      case Terminator::CRCR:
+        term_pos = data_length - 2;
+        if (data_length >= 2 && this->rx_buffer_[term_pos] == '\r' && this->rx_buffer_[term_pos + 1] == '\r') {
+          data_length = term_pos;
+        }
+        break;
+      case Terminator::CRLFCRLF:
+        term_pos = data_length - 4;
+        if (data_length >= 4 && this->rx_buffer_[term_pos] == '\r' && this->rx_buffer_[term_pos + 1] == '\n' &&
+            this->rx_buffer_[term_pos + 2] == '\r' && this->rx_buffer_[term_pos + 3] == '\n') {
+          data_length = term_pos;
+        }
+        break;
+      default:
+        break;
     }
   }
 
@@ -700,6 +732,14 @@ std::unique_ptr<CommandBase> BarcodeScanner::create_stop_command() { return Comm
 
 std::unique_ptr<CommandBase> BarcodeScanner::create_version_command() {
   return CommandFactory::create_version_command();
+}
+
+void BarcodeScanner::process_current_buffer() {
+  // First ensure we have the latest data
+  this->read_buffer_();
+
+  // Then process the barcode using existing logic
+  this->process_barcode_();
 }
 
 }  // namespace m5stack_barcode
