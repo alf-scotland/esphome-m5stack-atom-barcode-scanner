@@ -67,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pr-firmware-${{ steps.set_ref.outputs.ref_name }}
-          path: .esphome/build/*/*.bin
+          path: .esphome/build/*/.pioenvs/*/firmware*.bin
           retention-days: 30
 
       - name: Add PR comment with firmware link
