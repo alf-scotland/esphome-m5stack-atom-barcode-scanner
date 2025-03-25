@@ -38,10 +38,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install esphome==2025.2.2
 
-      - name: Create secrets.yaml for CI
-        run: |
-          cp secrets.yaml.example secrets.yaml
-
       - name: Validate configuration
         run: |
           esphome config firmware.yaml
