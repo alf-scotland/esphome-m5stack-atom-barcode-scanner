@@ -1,0 +1,71 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'components/**'
+      - 'tests/**'
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'components/**'
+      - 'tests/**'
+      - '.github/workflows/test.yml'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run Python tests
+        run: |
+          pytest tests/
+
+  component-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install esphome==2025.2.2
+
+      - name: Validate component build
+        run: |
+          if [ -d "tests/test_components" ]; then
+            for file in tests/test_components/*.yaml; do
+              if [ -f "$file" ]; then
+                echo "Testing $file"
+                esphome config "$file"
+                esphome compile "$file"
+              fi
+            done
+          else
+            echo "No component test files found"
+          fi

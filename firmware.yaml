@@ -12,7 +12,7 @@ esphome:
     name: scotland.${project_name}
     version: ${project_version}
   # Uncomment the line below if you're using a custom dashboard URL
-  # dashboard_import_url: github://scotland/esphome-m5stack-atom-barcode-scanner/atom-barcode.yaml@main
+  dashboard_import_url: github://scotland/esphome-m5stack-atom-barcode-scanner/firmware.yaml@main
 
 external_components:
   - source: components
@@ -38,6 +38,15 @@ ota:
     password: !secret ota_password
   # Enable HTTP OTA updates
   - platform: http_request
+  # Enable GitHub repository updates
+  - platform: repository
+    password: !secret ota_password
+    repository:
+      type: git
+      url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner
+      ref: main
+      path: firmware.yaml
+      refresh: 24h  # Check for updates once per day
 
 http_request:
   verify_ssl: false
