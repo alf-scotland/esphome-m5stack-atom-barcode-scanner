@@ -49,26 +49,6 @@ jobs:
         run: |
           esphome compile firmware.yaml
 
-      - name: Build firmware with OTA artifact URLs
-        if: steps.extract_version.outputs.is_prerelease == 'true'
-        run: |
-          # Create special build with GitHub OTA URLs for testing
-          cp firmware.yaml firmware-ota.yaml
-          sed -i "s|# dashboard_import_url:.*|dashboard_import_url: github://scotland/esphome-m5stack-atom-barcode-scanner/firmware.yaml@main|" firmware-ota.yaml
-          echo "ota:" >> firmware-ota.yaml
-          echo "  password: \"!secret ota_password\"" >> firmware-ota.yaml
-          echo "  safe_mode: false" >> firmware-ota.yaml
-          echo "  # Add OTA URL for GitHub releases" >> firmware-ota.yaml
-          echo "  repository:" >> firmware-ota.yaml
-          echo "    type: git" >> firmware-ota.yaml
-          echo "    url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner" >> firmware-ota.yaml
-          echo "    ref: ${{ github.ref_name }}" >> firmware-ota.yaml
-          echo "    path: firmware.yaml" >> firmware-ota.yaml
-          esphome compile firmware-ota.yaml
-
-          # Rename the built firmware for clarity
-          mv .esphome/build/*/firmware.bin .esphome/build/*/firmware-ota.bin
-
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2

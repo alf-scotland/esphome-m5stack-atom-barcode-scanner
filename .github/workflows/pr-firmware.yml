@@ -51,13 +51,11 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             echo "ref_name=pr-${{ steps.get_pr.outputs.pr_number }}" >> $GITHUB_OUTPUT
-            echo "branch_name=${{ steps.get_pr.outputs.pr_branch }}" >> $GITHUB_OUTPUT
           else
             echo "ref_name=${{ github.event.inputs.ref || github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "branch_name=${{ github.event.inputs.ref || github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create OTA-enabled firmware for testing
+      - name: Update version in firmware
         run: |
           # Create a version with PR or branch info
           PR_VERSION="${{ steps.set_ref.outputs.ref_name }}"
@@ -65,14 +63,9 @@ jobs:
           # Update version in firmware.yaml
           sed -i "s/project_version: \".*\"/project_version: \"$PR_VERSION\"/" firmware.yaml
 
-          # Create OTA-enabled firmware config
-          cp firmware.yaml firmware-ota.yaml
-
-          # Update repository config to point to the correct branch
-          sed -i "s/ref: main/ref: ${{ steps.set_ref.outputs.branch_name }}/" firmware-ota.yaml
-
-          # Build the firmware
-          esphome compile firmware-ota.yaml
+      - name: Compile firmware
+        run: |
+          esphome compile firmware.yaml
 
       - name: Upload PR firmware artifact
         uses: actions/upload-artifact@v4
@@ -91,9 +84,9 @@ jobs:
             const runId = context.runId;
             const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
-            const comment = `## OTA Firmware Build
+            const comment = `## Firmware Build
 
-            🔄 OTA-enabled firmware has been built for this PR for testing.
+            ✅ Firmware has been built for this PR for testing.
 
             Download the firmware from the [workflow artifacts](${workflowUrl}).
 
@@ -101,7 +94,6 @@ jobs:
 
             1. Download the firmware binary from the workflow artifacts
             2. Flash it to your device using ESPHome dashboard or Home Assistant
-            3. The device will be configured to automatically update from this PR branch
 
             This allows for easy testing of changes without rebuilding firmware.`;
 
