@@ -260,7 +260,7 @@ select:
     on_value:
       - m5stack_barcode.set_mode:
           id: barcode_scanner
-          operation_mode: "host"
+          operation_mode: !lambda "return x;"
 
   - platform: template
     name: "Terminator"
@@ -279,7 +279,7 @@ select:
     on_value:
       - m5stack_barcode.set_terminator:
           id: barcode_scanner
-          terminator: "crlf"
+          terminator: !lambda "return x;"
 
   - platform: template
     name: "Light Mode"
@@ -295,7 +295,7 @@ select:
     on_value:
       - m5stack_barcode.set_light_mode:
           id: barcode_scanner
-          light_mode: "on_when_reading"
+          light_mode: !lambda "return x;"
 
   - platform: template
     name: "Locate Light Mode"
@@ -311,7 +311,7 @@ select:
     on_value:
       - m5stack_barcode.set_locate_light_mode:
           id: barcode_scanner
-          locate_light_mode: "on_when_reading"
+          locate_light_mode: !lambda "return x;"
 
   - platform: template
     name: "Decoding Success Light"
@@ -326,7 +326,7 @@ select:
     on_value:
       - m5stack_barcode.set_decoding_success_light_mode:
           id: barcode_scanner
-          decoding_success_light_mode: "enabled"
+          decoding_success_light_mode: !lambda "return x;"
 
   - platform: template
     name: "Sound Mode"
@@ -341,7 +341,7 @@ select:
     on_value:
       - m5stack_barcode.set_sound_mode:
           id: barcode_scanner
-          sound_mode: "disabled"
+          sound_mode: !lambda "return x;"
 
   - platform: template
     name: "Boot Sound"
@@ -356,7 +356,7 @@ select:
     on_value:
       - m5stack_barcode.set_boot_sound_mode:
           id: barcode_scanner
-          boot_sound_mode: "enabled"
+          boot_sound_mode: !lambda "return x;"
 
   - platform: template
     name: "Decode Sound"
@@ -371,7 +371,7 @@ select:
     on_value:
       - m5stack_barcode.set_decode_sound_mode:
           id: barcode_scanner
-          decode_sound_mode: "enabled"
+          decode_sound_mode: !lambda "return x;"
 
   - platform: template
     name: "Volume"
@@ -387,7 +387,7 @@ select:
     on_value:
       - m5stack_barcode.set_buzzer_volume:
           id: barcode_scanner
-          buzzer_volume: "medium"
+          buzzer_volume: !lambda "return x;"
 
   - platform: template
     name: "Scan Duration"
@@ -408,7 +408,7 @@ select:
     on_value:
       - m5stack_barcode.set_scan_duration:
           id: barcode_scanner
-          scan_duration: "3s"
+          scan_duration: !lambda "return x;"
 
   - platform: template
     name: "Stable Induction Time"
@@ -426,7 +426,7 @@ select:
     on_value:
       - m5stack_barcode.set_stable_induction_time:
           id: barcode_scanner
-          stable_induction_time: "500ms"
+          stable_induction_time: !lambda "return x;"
 
   - platform: template
     name: "Reading Interval"
@@ -446,7 +446,7 @@ select:
     on_value:
       - m5stack_barcode.set_reading_interval:
           id: barcode_scanner
-          reading_interval: "500ms"
+          reading_interval: !lambda "return x;"
 
   - platform: template
     name: "Same Code Interval"
@@ -466,7 +466,7 @@ select:
     on_value:
       - m5stack_barcode.set_same_code_interval:
           id: barcode_scanner
-          same_code_interval: "500ms"
+          same_code_interval: !lambda "return x;"
 
 m5stack_barcode:
   id: barcode_scanner
