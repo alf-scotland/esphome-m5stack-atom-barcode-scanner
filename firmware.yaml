@@ -4,8 +4,9 @@ substitutions:
   project_name: esphome-m5stack-atom-barcode-scanner
   project_version: "2025.3.0-beta.1"
 
-# This should be at the root level, not under esphome
-dashboard_import_url: github://scotland/esphome-m5stack-atom-barcode-scanner/firmware.yaml@main
+dashboard_import:
+  package_import_url: github://scotland/esphome-m5stack-atom-barcode-scanner/firmware.yaml@main
+  import_full_config: true
 
 esphome:
   name: ${name}
