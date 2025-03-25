@@ -1,0 +1,6 @@
+esphome>=2025.2.2
+pre-commit>=4.1.0
+ruff>=0.3.0
+yamllint>=1.32.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
