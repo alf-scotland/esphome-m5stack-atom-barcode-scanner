@@ -83,17 +83,11 @@ jobs:
       - name: Find and copy firmware files
         id: find_firmware
         run: |
-          echo "Listing build directory structure:"
-          find .esphome -type f -name "*.bin" | sort
-
           # Create a directory for the firmware files
           mkdir -p firmware-files
 
           # Copy all firmware files to the firmware-files directory
           find .esphome -type f -name "*.bin" -exec cp {} firmware-files/ \;
-
-          # List the files in the firmware-files directory
-          ls -la firmware-files/
 
       - name: Upload firmware artifacts
         id: upload_artifacts
@@ -137,17 +131,20 @@ jobs:
           script: |
             const artifactName = `pr-firmware-pr-${{ steps.get_pr.outputs.pr_number }}`;
             const runId = context.runId;
-            const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+            const workflowUrl = `${repoUrl}/actions/runs/${runId}`;
+
+            // The direct artifact download link pattern
             const artifactsUrl = `${workflowUrl}/artifacts`;
 
-            // Generate links for individual firmware files
+            // Generate description of firmware files
             const firmwareFiles = [
-              {name: "Main Firmware (firmware.bin)", description: "For standard flashing via ESPHome dashboard"},
-              {name: "Factory Firmware (firmware.factory.bin)", description: "For first-time flashing or complete reset"},
-              {name: "OTA Firmware (firmware.ota.bin)", description: "For OTA updates"}
+              {name: "firmware.bin", description: "Main firmware - For standard flashing via ESPHome dashboard"},
+              {name: "firmware.factory.bin", description: "Factory firmware - For first-time flashing or complete reset"},
+              {name: "firmware.ota.bin", description: "OTA firmware - For OTA updates"}
             ];
 
-            let firmwareLinksHtml = firmwareFiles.map(file =>
+            let firmwareFilesHtml = firmwareFiles.map(file =>
               `- **${file.name}** - ${file.description}`
             ).join('\n');
 
@@ -157,14 +154,16 @@ jobs:
 
             ### Download Firmware Files
 
-            [📥 Download Firmware Artifacts](${artifactsUrl})
+            [📥 **Download All Firmware Files**](${artifactsUrl})
 
-            ${firmwareLinksHtml}
+            The download includes:
+            ${firmwareFilesHtml}
 
             ### How to flash
 
-            1. Download the appropriate firmware binary from the artifacts link above
-            2. Flash it using one of these methods:
+            1. Download and extract the firmware zip from the link above
+            2. Select the appropriate firmware file based on your needs
+            3. Flash it using one of these methods:
                - ESPHome dashboard in Home Assistant
                - Web flasher at [web.esphome.io](https://web.esphome.io/)
                - ESPHome command line tool
