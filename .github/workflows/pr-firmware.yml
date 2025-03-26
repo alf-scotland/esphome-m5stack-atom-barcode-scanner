@@ -80,21 +80,29 @@ jobs:
         run: |
           uv run esphome compile firmware.yaml
 
-      - name: Find and list firmware files
+      - name: Find and copy firmware files
         id: find_firmware
         run: |
           echo "Listing build directory structure:"
-          find .esphome -name "*.bin" -type f | sort
+          find .esphome -type f -name "*.bin" | sort
+
+          # Create a directory for the firmware files
+          mkdir -p firmware-files
+
+          # Copy all firmware files to the firmware-files directory
+          find .esphome -type f -name "*.bin" -exec cp {} firmware-files/ \;
+
+          # List the files in the firmware-files directory
+          ls -la firmware-files/
 
       - name: Upload firmware artifacts
         id: upload_artifacts
         uses: actions/upload-artifact@v4
         with:
           name: pr-firmware-${{ steps.set_ref.outputs.ref_name }}
-          path: .esphome/build/*/*/*.bin
+          path: firmware-files/*.bin
           retention-days: 30
           if-no-files-found: error
-          include-hidden-files: true
           overwrite: true
 
       - name: Delete previous workflow comments
