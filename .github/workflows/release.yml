@@ -30,7 +30,7 @@ jobs:
           version: "0.6.10"
 
       - name: Install dependencies
-        run: uv pip install -e .
+        run: uv sync --all-extras
 
       - name: Create secrets.yaml for CI
         run: |
