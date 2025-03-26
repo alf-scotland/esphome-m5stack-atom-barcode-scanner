@@ -55,6 +55,6 @@ jobs:
         with:
           name: firmware
           path: |
-            .esphome/build/*/*.bin
-            .esphome/build/*/*.elf
+            .esphome/build/*/.pioenvs/*/firmware*.bin
+            .esphome/build/*/.pioenvs/*/firmware.elf
           retention-days: 90
