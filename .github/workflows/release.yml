@@ -72,5 +72,4 @@ jobs:
           prerelease: ${{ steps.extract_version.outputs.is_prerelease }}
           generate_release_notes: true
           files: |
-            .esphome/build/*/.pioenvs/*/firmware*.bin
-            .esphome/build/*/firmware*.bin
+            .esphome/build/*/*/*.bin

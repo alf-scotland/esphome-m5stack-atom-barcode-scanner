@@ -87,12 +87,11 @@ jobs:
           find .esphome -name "*.bin" -type f | sort
 
       - name: Upload firmware artifacts
+        id: upload_artifacts
         uses: actions/upload-artifact@v4
         with:
           name: pr-firmware-${{ steps.set_ref.outputs.ref_name }}
-          path: |
-            .esphome/build/*/.pioenvs/*/firmware*.bin
-            .esphome/build/*/firmware*.bin
+          path: .esphome/build/*/*/*.bin
           retention-days: 30
 
       - name: Add PR comment with firmware link
@@ -103,16 +102,32 @@ jobs:
             const artifactName = `pr-firmware-pr-${{ steps.get_pr.outputs.pr_number }}`;
             const runId = context.runId;
             const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}/artifacts/${artifactName}`;
+
+            // Generate links for individual firmware files
+            const firmwareLinks = [
+              {name: "Main Firmware", path: "firmware.bin"},
+              {name: "Factory Firmware", path: "firmware.factory.bin"},
+              {name: "OTA Firmware", path: "firmware.ota.bin"}
+            ];
+
+            let firmwareLinksHtml = firmwareLinks.map(file =>
+              `- [${file.name}](${workflowUrl}/artifacts)`
+            ).join('\n');
 
             const comment = `## Firmware Build
 
             ✅ Firmware has been built for this PR for testing.
 
-            Download the firmware from the [workflow artifacts](${workflowUrl}).
+            ### Download Firmware Files:
+
+            ${firmwareLinksHtml}
+
+            You can also download all files from the [workflow artifacts page](${workflowUrl}).
 
             ### How to flash:
 
-            1. Download the firmware binary from the workflow artifacts
+            1. Download the appropriate firmware binary
             2. Flash it using one of these methods:
                - ESPHome dashboard in Home Assistant
                - Web flasher at [web.esphome.io](https://web.esphome.io/)
