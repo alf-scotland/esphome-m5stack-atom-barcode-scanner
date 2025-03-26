@@ -8,6 +8,7 @@ on:
     paths:
       - 'firmware.yaml'
       - 'components/**'
+      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       ref:
