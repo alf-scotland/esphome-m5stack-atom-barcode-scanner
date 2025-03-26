@@ -8,6 +8,7 @@ on:
     paths:
       - 'firmware.yaml'
       - 'components/**'
+      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       ref:
@@ -35,12 +36,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-          cache: 'pip'
+          python-version-file: 'pyproject.toml'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+          version: "0.6.10"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install esphome==2025.2.2
+        run: uv sync --all-extras
 
       - name: Create secrets.yaml for CI
         run: |
@@ -72,29 +78,55 @@ jobs:
 
       - name: Compile firmware
         run: |
-          esphome compile firmware.yaml
+          uv run esphome compile firmware.yaml
 
-      - name: Find firmware files
+      - name: Find and copy firmware files
         id: find_firmware
         run: |
-          echo "Listing build directory structure:"
-          find .esphome -type f -name "*.bin" | sort
-
           # Create a directory for the firmware files
           mkdir -p firmware-files
 
           # Copy all firmware files to the firmware-files directory
           find .esphome -type f -name "*.bin" -exec cp {} firmware-files/ \;
 
-          # List the files in the firmware-files directory
+          # List the firmware files and log them
+          echo "Available firmware files:"
           ls -la firmware-files/
 
-      - name: Upload PR firmware artifact
+      - name: Upload firmware artifacts
+        id: upload_artifacts
         uses: actions/upload-artifact@v4
         with:
           name: pr-firmware-${{ steps.set_ref.outputs.ref_name }}
           path: firmware-files/*.bin
           retention-days: 30
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Delete previous workflow comments
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get all comments on the PR
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            // Find and delete previous workflow comments that start with "## Firmware Build"
+            for (const comment of comments.data) {
+              if (comment.body.trim().startsWith('## Firmware Build') &&
+                  comment.user.login === 'github-actions[bot]') {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id
+                });
+                console.log(`Deleted comment ${comment.id}`);
+              }
+            }
 
       - name: Add PR comment with firmware link
         if: github.event_name == 'pull_request'
@@ -103,18 +135,56 @@ jobs:
           script: |
             const artifactName = `pr-firmware-pr-${{ steps.get_pr.outputs.pr_number }}`;
             const runId = context.runId;
-            const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+
+            // Direct download URL for the artifacts page
+            const downloadUrl = `${repoUrl}/actions/runs/${runId}/artifacts`;
+
+            // Get artifacts info to provide the exact artifact URL if possible
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId
+            });
+
+            // Try to find our specific artifact
+            const artifact = artifacts.data.artifacts.find(a => a.name === artifactName);
+
+            // If we found the artifact, use its direct URL, otherwise use the artifacts page
+            const artifactUrl = artifact
+              ? `${downloadUrl}/${artifact.id}`
+              : downloadUrl;
+
+            // Generate description of firmware files
+            const firmwareFiles = [
+              {name: "firmware.bin", description: "Main firmware - For standard flashing via ESPHome dashboard"},
+              {name: "firmware.factory.bin", description: "Factory firmware - For first-time flashing or complete reset"},
+              {name: "firmware.ota.bin", description: "OTA firmware - For OTA updates"}
+            ];
+
+            let firmwareFilesHtml = firmwareFiles.map(file =>
+              `- **${file.name}** - ${file.description}`
+            ).join('\n');
 
             const comment = `## Firmware Build
 
             ✅ Firmware has been built for this PR for testing.
 
-            Download the firmware from the [workflow artifacts](${workflowUrl}).
+            ### Download Firmware Files
 
-            ### How to use:
+            [📥 **Download Firmware Artifacts**](${artifactUrl})
 
-            1. Download the firmware binary from the workflow artifacts
-            2. Flash it to your device using ESPHome dashboard or Home Assistant
+            The download includes:
+            ${firmwareFilesHtml}
+
+            ### How to flash
+
+            1. Download and extract the firmware zip from the link above
+            2. Select the appropriate firmware file based on your needs
+            3. Flash it using one of these methods:
+               - ESPHome dashboard in Home Assistant
+               - Web flasher at [web.esphome.io](https://web.esphome.io/)
+               - ESPHome command line tool
 
             This allows for easy testing of changes without rebuilding firmware.`;
 

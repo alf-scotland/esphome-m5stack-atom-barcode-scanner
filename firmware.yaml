@@ -35,7 +35,6 @@ api:
 # Enable OTA updates
 ota:
   - platform: esphome
-  # Enable HTTP OTA updates
   - platform: http_request
 
 http_request:
@@ -47,15 +46,9 @@ safe_mode:
 wifi:
   # Set up a WiFi access point for initial configuration
   ap:
-    ssid: "${friendly_name}"
-    password: "12345678"
 
 # Enable captive portal for easy WiFi setup
 captive_portal:
-
-# Enable BLE-based WiFi configuration
-esp32_improv:
-  authorizer: none
 
 # Status LED - Atom's built-in LED
 light:
@@ -85,7 +78,7 @@ output:
   - platform: gpio
     pin: GPIO23
     id: scanner_trig_pin
-    inverted: true # Inverted because LOW activates the scanner
+    inverted: true  # Inverted because LOW activates the scanner
 
 # Scripts for LED status indications
 script:
