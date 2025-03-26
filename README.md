@@ -1,19 +1,14 @@
 # ESPHome M5Stack Atom Barcode Scanner Component
 
-This repository provides an external component for ESPHome that enables support for the [M5Stack Atom QR Code Scanner development kit](https://docs.m5stack.com/en/atom/atomic_qr). The component allows you to integrate the barcode scanner's capabilities into your ESPHome configuration, enabling both 1D and 2D barcode scanning functionality via UART communication.
+This repository provides an external component for ESPHome that enables support for the [M5Stack Atom QR Code Scanner development kit](https://docs.m5stack.com/en/atom/atomic_qr). It allows you to integrate the barcode scanner's capabilities into your ESPHome configuration, enabling both 1D and 2D barcode scanning functionality via UART communication.
 
-## Features
+## Repository Structure
 
-- Full support for M5Stack Atom QR Code Scanner hardware
-- UART-based communication with the scanner module
-- Support for multiple barcode formats:
-  - 2D: QR Code, Micro QR, Data Matrix, PDF417, Micro PDF417, Aztec
-  - 1D: EAN, UPC, Code 39, Code 93, Code 128, UCC/EAN 128, Codabar, and more
-- Scanner configuration via ESPHome
-- Real-time barcode data as sensor values
-- Trigger scanning via ESPHome actions
-- Configurable scan modes (manual/automatic)
-- LED and buzzer control
+This repository contains:
+
+- **Component** (`components/m5stack_barcode/`): The ESPHome external component
+- **Firmware** (`firmware.yaml`): A complete firmware example for the M5Stack Atom Barcode Scanner
+- **Documentation** (`components/m5stack_barcode/index.rst`): Detailed component usage documentation
 
 ## Installation
 
@@ -25,87 +20,48 @@ external_components:
     components: [ m5stack_barcode ]
 ```
 
-## Configuration
+## Quick Start Configuration
 
-Example configuration:
+Here's a minimal working configuration:
 
 ```yaml
+# Configure UART for communication with the scanner
 uart:
-  tx_pin: GPIO23
-  rx_pin: GPIO33
+  id: uart_bus
   baud_rate: 9600
+  tx_pin: GPIO19
+  rx_pin: GPIO22
 
-sensor:
-  - platform: m5stack_barcode
-    name: "Barcode Scanner"
-    trigger_pin: GPIO23
-    led_pin: GPIO33
-    scan_mode: manual
-    # Optional configurations
-    scan_interval: 1s
-    prefix: ""
-    suffix: ""
-    on_barcode:
-      then:
-        - logger.log:
-            format: "Scanned barcode: %s"
-            args: [ 'x' ]
+# Define text sensors for barcode data
+text_sensor:
+  - platform: template
+    name: "Last Barcode"
+    id: last_barcode
+    icon: "mdi:barcode"
+
+# Configure the barcode scanner component
+m5stack_barcode:
+  id: barcode_scanner
+  barcode_id: last_barcode
+  operation_mode: host
+  uart_id: uart_bus
 ```
 
-## Hardware Setup
+For complete documentation on all available options, actions, and conditions, see the [component documentation](components/m5stack_barcode/index.rst).
 
-1. Connect your M5Stack Atom QR Code Scanner to your ESP device:
-   - UART TX -> GPIO23
-   - UART RX -> GPIO33
-   - VCC -> 3.3V
-   - GND -> GND
+## Hardware Connection
 
-## Implementation Details
-
-### Component Architecture
-
-The component follows a modular architecture with several key classes:
-
-- `BarcodeScanner`: Main component class that handles UART communication with the scanner
-- `Commands`: Defines byte arrays for all command codes to control the scanner
-- `CommandBase`: Abstract base class for all command implementations
-- `Command<T>`: Template class for type-specific commands
-- `CommandFactory`: Creates appropriate command instances based on requested actions
-- Actions (like `SetModeAction`): Provide ESPHome-compatible actions for automations
-
-### Command Flow
-
-1. **Initialization**: When configured, the scanner is initialized with default settings
-2. **Command Creation**: When a setting change is requested, a Command object is created
-3. **Command Queueing**: Commands are queued and sent to the scanner
-4. **Command Execution**: Commands are sent with proper protocols (wake-up sequence + command)
-5. **Acknowledgment**: Scanner responds with ACK, which is verified
-6. **State Update**: Internal state is updated to reflect new settings
-
-### Configuration Pipeline
-
-The configuration process follows this pipeline:
-1. User defines scanner settings in ESPHome YAML
-2. Settings are parsed and converted to typed enum values
-3. Type-safe commands are generated from these enum values
-4. Commands are queued and executed sequentially
-5. Scanner state is updated to reflect the new settings
-
-## Documentation
-
-The following official M5Stack documentation is included in this repository under `components/m5stack_barcode/docs/`:
-
-1. **ATOM_QRCODE_CMD_EN.pdf** - Official command reference for the M5Stack Atom QR Code Scanner, containing detailed information about all available command protocols, command byte sequences, and response formats.
-
-2. **AtomicQR_Reader_EN.pdf** - Configuration guide for the scanner, including QR codes that can be scanned to configure various scanner settings without writing code. Useful for testing and initial setup.
-
-These documents are referenced by the implementation and can be helpful for troubleshooting or extending the component's functionality.
+Connect your M5Stack Atom QR Code Scanner to your ESP device:
+- UART TX (Scanner) -> RX GPIO22 (ESP)
+- UART RX (Scanner) -> TX GPIO19 (ESP)
+- TRIG Pin -> GPIO23 (ESP)
+- DLED Pin -> GPIO33 (ESP)
+- VCC -> 3.3V
+- GND -> GND
 
 ## Development
 
 This component uses ESPHome's standard development tools.
-
-The pre-commit configuration includes code formatting and static analysis tools.
 
 ### Prerequisites
 
@@ -147,7 +103,6 @@ This project uses ruff for all Python code quality checks:
 - Import sorting
 - Code linting
 - Type checking
-- And more!
 
 Run all linting checks:
 ```bash
@@ -180,6 +135,10 @@ pytest tests/
 - Ensure all tests pass and linting checks succeed
 - Keep commits focused and atomic
 - Write clear commit messages
+
+## Documentation
+
+The official M5Stack documentation for the scanner module is included in `components/m5stack_barcode/docs/`.
 
 ## License
 
