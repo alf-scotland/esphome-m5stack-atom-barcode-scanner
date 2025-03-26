@@ -89,6 +89,10 @@ jobs:
           # Copy all firmware files to the firmware-files directory
           find .esphome -type f -name "*.bin" -exec cp {} firmware-files/ \;
 
+          # List the firmware files and log them
+          echo "Available firmware files:"
+          ls -la firmware-files/
+
       - name: Upload firmware artifacts
         id: upload_artifacts
         uses: actions/upload-artifact@v4
@@ -132,10 +136,24 @@ jobs:
             const artifactName = `pr-firmware-pr-${{ steps.get_pr.outputs.pr_number }}`;
             const runId = context.runId;
             const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
-            const workflowUrl = `${repoUrl}/actions/runs/${runId}`;
 
-            // The direct artifact download link pattern
-            const artifactsUrl = `${workflowUrl}/artifacts`;
+            // Direct download URL for the artifacts page
+            const downloadUrl = `${repoUrl}/actions/runs/${runId}/artifacts`;
+
+            // Get artifacts info to provide the exact artifact URL if possible
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId
+            });
+
+            // Try to find our specific artifact
+            const artifact = artifacts.data.artifacts.find(a => a.name === artifactName);
+
+            // If we found the artifact, use its direct URL, otherwise use the artifacts page
+            const artifactUrl = artifact
+              ? `${downloadUrl}/${artifact.id}`
+              : downloadUrl;
 
             // Generate description of firmware files
             const firmwareFiles = [
@@ -154,7 +172,7 @@ jobs:
 
             ### Download Firmware Files
 
-            [📥 **Download All Firmware Files**](${artifactsUrl})
+            [📥 **Download Firmware Artifacts**](${artifactUrl})
 
             The download includes:
             ${firmwareFilesHtml}
