@@ -6,35 +6,45 @@ M5Stack Barcode Scanner Component
     :image: m5stack_barcode.jpg
     :keywords: M5Stack, Atom, QR, Barcode, Scanner, ESP32
 
-The ``m5stack_barcode`` component provides an interface to the M5Stack 2D/QR Barcode Scanner Module.
+The ``m5stack_barcode`` component provides an interface to the M5Stack 2D/QR Barcode Scanner Module, enabling you to read various types of barcodes, including QR codes, Data Matrix, and traditional barcodes.
+
+.. figure:: images/m5stack_barcode.jpg
+    :align: center
+    :width: 50.0%
+
+    M5Stack Atom Barcode Scanner Module.
 
 .. code-block:: yaml
 
     # Example minimal configuration
     uart:
-      tx_pin: GPIO22
-      rx_pin: GPIO19
+      id: uart_bus
+      tx_pin: GPIO19
+      rx_pin: GPIO22
       baud_rate: 9600
 
+    # Text sensor for barcode output
     text_sensor:
-      - platform: custom
-        lambda: |-
-          auto barcode_sensor = new text_sensor::TextSensor();
-          return {barcode_sensor};
-        text_sensors:
-          name: "Barcode"
-          id: barcode_sensor
+      - platform: template
+        name: "Last Barcode"
+        id: barcode_sensor
+        icon: "mdi:barcode"
 
+    # Configure the barcode scanner
     m5stack_barcode:
       id: barcode_scanner
-      text_sensor: barcode_sensor
+      barcode_id: barcode_sensor
+      operation_mode: host
+      uart_id: uart_bus
 
 Component Options
 ----------------
 
-- **text_sensor** (**Required**, :ref:`config-id`): The text sensor to output the scanned barcode data.
-- **version_sensor** (*Optional*, :ref:`config-id`): A text sensor to display the scanner firmware version.
-- **id** (*Optional*, :ref:`config-id`): Manually set the ID for this component.
+- **barcode_id** (**Required**, :ref:`config-id`): The ID of a template text sensor that will show the scanned barcode data.
+- **uart_id** (*Optional*, :ref:`config-id`): The ID of the UART bus if you need to specify a particular UART bus.
+- **version_id** (*Optional*, :ref:`config-id`): The ID of a template text sensor that will display the scanner firmware version.
+- **id** (*Optional*, :ref:`config-id`): Manually specify the ID for this component.
+
 - **operation_mode** (*Optional*): Set the scanner operation mode.
 
   - ``host`` (Default): Scanner waits for explicit start/stop commands
@@ -45,8 +55,8 @@ Component Options
 
 - **terminator** (*Optional*): Character(s) to append to barcode output.
 
-  - ``none`` (Default): No termination character
-  - ``crlf``: Carriage Return + Line Feed
+  - ``crlf`` (Default): Carriage Return + Line Feed
+  - ``none``: No termination character
   - ``cr``: Carriage Return
   - ``tab``: Tab character
   - ``crcr``: Two Carriage Returns
@@ -86,48 +96,48 @@ Component Options
 
 - **buzzer_volume** (*Optional*): Buzzer volume level.
 
-  - ``high`` (Default): High volume
-  - ``medium``: Medium volume
+  - ``medium`` (Default): Medium volume
+  - ``high``: High volume
   - ``low``: Low volume
 
 - **scan_duration** (*Optional*): How long scanner attempts to read a barcode.
 
-  - ``ms_3000`` (Default): 3 seconds
-  - ``ms_500``: 500 milliseconds
-  - ``ms_1000``: 1 second
-  - ``ms_5000``: 5 seconds
-  - ``ms_10000``: 10 seconds
-  - ``ms_15000``: 15 seconds
-  - ``ms_20000``: 20 seconds
+  - ``3s`` (Default): 3 seconds
+  - ``500ms``: 500 milliseconds
+  - ``1s``: 1 second
+  - ``5s``: 5 seconds
+  - ``10s``: 10 seconds
+  - ``15s``: 15 seconds
+  - ``20s``: 20 seconds
   - ``unlimited``: Continuous scanning
 
 - **stable_induction_time** (*Optional*): Time scanner needs to detect a stable code.
 
-  - ``ms_500`` (Default): 500 milliseconds
-  - ``ms_0``: 0 milliseconds
-  - ``ms_100``: 100 milliseconds
-  - ``ms_300``: 300 milliseconds
-  - ``ms_1000``: 1 second
+  - ``500ms`` (Default): 500 milliseconds
+  - ``0ms``: 0 milliseconds
+  - ``100ms``: 100 milliseconds
+  - ``300ms``: 300 milliseconds
+  - ``1s``: 1 second
 
 - **reading_interval** (*Optional*): Time between reading attempts.
 
-  - ``ms_500`` (Default): 500 milliseconds
-  - ``ms_0``: 0 milliseconds
-  - ``ms_100``: 100 milliseconds
-  - ``ms_300``: 300 milliseconds
-  - ``ms_1000``: 1 second
-  - ``ms_1500``: 1.5 seconds
-  - ``ms_2000``: 2 seconds
+  - ``500ms`` (Default): 500 milliseconds
+  - ``0ms``: 0 milliseconds
+  - ``100ms``: 100 milliseconds
+  - ``300ms``: 300 milliseconds
+  - ``1s``: 1 second
+  - ``1.5s``: 1.5 seconds
+  - ``2s``: 2 seconds
 
 - **same_code_interval** (*Optional*): Delay before reading the same code again.
 
-  - ``ms_500`` (Default): 500 milliseconds
-  - ``ms_0``: 0 milliseconds
-  - ``ms_100``: 100 milliseconds
-  - ``ms_300``: 300 milliseconds
-  - ``ms_1000``: 1 second
-  - ``ms_1500``: 1.5 seconds
-  - ``ms_2000``: 2 seconds
+  - ``500ms`` (Default): 500 milliseconds
+  - ``0ms``: 0 milliseconds
+  - ``100ms``: 100 milliseconds
+  - ``300ms``: 300 milliseconds
+  - ``1s``: 1 second
+  - ``1.5s``: 1.5 seconds
+  - ``2s``: 2 seconds
 
 Actions
 -------
@@ -143,7 +153,7 @@ Start barcode scanning. Only works in "host" mode.
 
     on_...:
       then:
-        - m5stack_barcode.start: my_barcode_scanner
+        - m5stack_barcode.start: barcode_scanner
 
 .. _m5stack_barcode-stop_action:
 
@@ -156,7 +166,21 @@ Stop barcode scanning. Only works in "host" mode.
 
     on_...:
       then:
-        - m5stack_barcode.stop: my_barcode_scanner
+        - m5stack_barcode.stop: barcode_scanner
+
+.. _m5stack_barcode-process_current_buffer_action:
+
+``m5stack_barcode.process_current_buffer``
+*****************************************
+
+Process the current scanner buffer. Useful when in continuous mode and the scanner
+has detected a barcode.
+
+.. code-block:: yaml
+
+    on_...:
+      then:
+        - m5stack_barcode.process_current_buffer: barcode_scanner
 
 .. _m5stack_barcode-set_mode_action:
 
@@ -170,8 +194,15 @@ Set the barcode scanner operation mode.
     on_...:
       then:
         - m5stack_barcode.set_mode:
-            id: my_barcode_scanner
-            mode: host  # One of host, level, pulse, continuous, auto_sense
+            id: barcode_scanner
+            operation_mode: host
+
+    # For dynamic values from a select component
+    on_...:
+      then:
+        - m5stack_barcode.set_mode:
+            id: barcode_scanner
+            operation_mode: !lambda "return x;"
 
 .. _m5stack_barcode-set_terminator_action:
 
@@ -185,8 +216,8 @@ Set the barcode output terminator.
     on_...:
       then:
         - m5stack_barcode.set_terminator:
-            id: my_barcode_scanner
-            terminator: crlf  # One of none, crlf, cr, tab, crcr, crlfcrlf
+            id: barcode_scanner
+            terminator: crlf
 
 .. _m5stack_barcode-set_light_mode_action:
 
@@ -200,8 +231,8 @@ Set the main illumination light mode.
     on_...:
       then:
         - m5stack_barcode.set_light_mode:
-            id: my_barcode_scanner
-            light_mode: always_on  # One of on_when_reading, always_on, always_off
+            id: barcode_scanner
+            light_mode: always_on
 
 .. _m5stack_barcode-set_locate_light_mode_action:
 
@@ -215,8 +246,8 @@ Set the locate (aiming) light mode.
     on_...:
       then:
         - m5stack_barcode.set_locate_light_mode:
-            id: my_barcode_scanner
-            locate_light_mode: always_off  # One of on_when_reading, always_on, always_off
+            id: barcode_scanner
+            locate_light_mode: always_off
 
 .. _m5stack_barcode-set_decoding_success_light_mode_action:
 
@@ -230,8 +261,8 @@ Control whether the scanner flashes a light on successful decode.
     on_...:
       then:
         - m5stack_barcode.set_decoding_success_light_mode:
-            id: my_barcode_scanner
-            decoding_success_light_mode: enabled  # One of enabled, disabled
+            id: barcode_scanner
+            decoding_success_light_mode: enabled
 
 .. _m5stack_barcode-set_sound_mode_action:
 
@@ -245,8 +276,8 @@ Set general sound control.
     on_...:
       then:
         - m5stack_barcode.set_sound_mode:
-            id: my_barcode_scanner
-            sound_mode: enabled  # One of enabled, disabled
+            id: barcode_scanner
+            sound_mode: enabled
 
 .. _m5stack_barcode-set_boot_sound_mode_action:
 
@@ -260,8 +291,8 @@ Control whether the scanner beeps when powered on.
     on_...:
       then:
         - m5stack_barcode.set_boot_sound_mode:
-            id: my_barcode_scanner
-            boot_sound_mode: enabled  # One of enabled, disabled
+            id: barcode_scanner
+            boot_sound_mode: enabled
 
 .. _m5stack_barcode-set_decode_sound_mode_action:
 
@@ -275,8 +306,8 @@ Control whether the scanner beeps on successful decode.
     on_...:
       then:
         - m5stack_barcode.set_decode_sound_mode:
-            id: my_barcode_scanner
-            decode_sound_mode: enabled  # One of enabled, disabled
+            id: barcode_scanner
+            decode_sound_mode: enabled
 
 .. _m5stack_barcode-set_buzzer_volume_action:
 
@@ -290,8 +321,8 @@ Set the buzzer volume.
     on_...:
       then:
         - m5stack_barcode.set_buzzer_volume:
-            id: my_barcode_scanner
-            volume: medium  # One of high, medium, low
+            id: barcode_scanner
+            buzzer_volume: medium
 
 .. _m5stack_barcode-set_scan_duration_action:
 
@@ -305,8 +336,8 @@ Set how long scanner attempts to read a barcode.
     on_...:
       then:
         - m5stack_barcode.set_scan_duration:
-            id: my_barcode_scanner
-            scan_duration: ms_3000  # One of ms_500, ms_1000, ms_3000, ms_5000, ms_10000, ms_15000, ms_20000, unlimited
+            id: barcode_scanner
+            scan_duration: 3s
 
 .. _m5stack_barcode-set_stable_induction_time_action:
 
@@ -320,8 +351,8 @@ Set time scanner needs to detect a stable code.
     on_...:
       then:
         - m5stack_barcode.set_stable_induction_time:
-            id: my_barcode_scanner
-            stable_induction_time: ms_500  # One of ms_0, ms_100, ms_300, ms_500, ms_1000
+            id: barcode_scanner
+            stable_induction_time: 500ms
 
 .. _m5stack_barcode-set_reading_interval_action:
 
@@ -335,8 +366,8 @@ Set time between reading attempts.
     on_...:
       then:
         - m5stack_barcode.set_reading_interval:
-            id: my_barcode_scanner
-            reading_interval: ms_500  # One of ms_0, ms_100, ms_300, ms_500, ms_1000, ms_1500, ms_2000
+            id: barcode_scanner
+            reading_interval: 500ms
 
 .. _m5stack_barcode-set_same_code_interval_action:
 
@@ -350,38 +381,129 @@ Set delay before reading the same code again.
     on_...:
       then:
         - m5stack_barcode.set_same_code_interval:
-            id: my_barcode_scanner
-            same_code_interval: ms_500  # One of ms_0, ms_100, ms_300, ms_500, ms_1000, ms_1500, ms_2000
+            id: barcode_scanner
+            same_code_interval: 500ms
+
+Conditions
+----------
+
+.. _m5stack_barcode-is_continuous_mode_condition:
+
+``m5stack_barcode.is_continuous_mode``
+*************************************
+
+Check if the scanner is in continuous mode. Useful for conditional logic.
+
+.. code-block:: yaml
+
+    # Example: Process buffer when a barcode is detected via DLED pin in continuous mode
+    binary_sensor:
+      - platform: gpio
+        pin: GPIO33  # DLED pin
+        on_press:
+          then:
+            - if:
+                condition:
+                  m5stack_barcode.is_continuous_mode:
+                    id: barcode_scanner
+                then:
+                  - m5stack_barcode.process_current_buffer: barcode_scanner
 
 Hardware Connection
 ------------------
 
-Connect the M5Stack Barcode Scanner to your ESP device using a UART connection:
+Connect the M5Stack Barcode Scanner to your ESP device using the following connections:
 
 +---------------+-------------+
 | ESP32 Pin     | Scanner Pin |
 +===============+=============+
-| TX (GPIO22*)  | RX          |
+| TX (GPIO19)   | RX          |
 +---------------+-------------+
-| RX (GPIO19*)  | TX          |
+| RX (GPIO22)   | TX          |
++---------------+-------------+
+| GPIO23        | TRIG        |
++---------------+-------------+
+| GPIO33        | DLED        |
++---------------+-------------+
+| 3.3V          | VCC         |
 +---------------+-------------+
 | GND           | GND         |
 +---------------+-------------+
-| 5V            | VCC         |
-+---------------+-------------+
-
-\* GPIO pins are examples, adjust according to your setup
 
 .. note::
 
-   Make sure to check your wiring carefully. The RX on the ESP connects to TX on the scanner, and vice versa.
+   Make sure to check your wiring carefully. The TX on the ESP connects to RX on the scanner, and vice versa.
+   The TRIG pin is used to activate the scanner (LOW active) and the DLED pin goes HIGH when a barcode is detected.
+
+Supported Barcode Types
+----------------------
+
+The M5Stack Barcode Scanner supports a wide range of barcode types:
+
+**2D Barcodes:**
+  - QR Code
+  - Micro QR Code
+  - Data Matrix
+  - PDF417
+  - Micro PDF417
+  - Aztec
+
+**1D Barcodes:**
+  - EAN-13, EAN-8
+  - UPC-A, UPC-E
+  - Code 39
+  - Code 93
+  - Code 128
+  - Interleaved 2 of 5
+  - Industrial 2 of 5
+  - Matrix 2 of 5
+  - Codabar
+  - UCC/EAN 128
+  - GS1 DataBar
+  - MSI Plessey
+
+Control with Home Assistant
+--------------------------
+
+You can create UI controls in Home Assistant to change scanner settings:
+
+.. code-block:: yaml
+
+    # Button to start scanning
+    button:
+      - platform: template
+        name: "Start Scan"
+        icon: "mdi:play-circle-outline"
+        on_press:
+          - m5stack_barcode.start:
+              id: barcode_scanner
+
+    # Select to change the operation mode
+    select:
+      - platform: template
+        name: "Operation Mode"
+        icon: "mdi:tune"
+        options:
+          - "host"
+          - "level"
+          - "pulse"
+          - "continuous"
+          - "auto_sense"
+        initial_option: "host"
+        optimistic: true
+        on_value:
+          - m5stack_barcode.set_mode:
+              id: barcode_scanner
+              operation_mode: !lambda "return x;"
 
 Troubleshooting
 --------------
 
 1. Make sure the baud rate in your UART configuration matches the scanner's baud rate (default: 9600).
-2. Check your wiring - RX on ESP connects to TX on scanner, and vice versa.
-3. Enable logs for more detailed debugging:
+2. Check your wiring - TX on ESP connects to RX on scanner, and vice versa.
+3. When using hardware trigger, ensure the TRIG pin is correctly connected (LOW to activate).
+4. If using the DLED pin for detection, make sure it's properly connected as an input.
+5. Enable logs for more detailed debugging:
 
 .. code-block:: yaml
 
@@ -394,5 +516,5 @@ See Also
 --------
 
 - :doc:`/components/uart`
-- :doc:`/components/text_sensor/custom`
+- :doc:`/components/text_sensor/template`
 - :ghedit:`Edit`
