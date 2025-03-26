@@ -74,26 +74,11 @@ jobs:
         run: |
           esphome compile firmware.yaml
 
-      - name: Find firmware files
-        id: find_firmware
-        run: |
-          echo "Listing build directory structure:"
-          find .esphome -type f -name "*.bin" | sort
-
-          # Create a directory for the firmware files
-          mkdir -p firmware-files
-
-          # Copy all firmware files to the firmware-files directory
-          find .esphome -type f -name "*.bin" -exec cp {} firmware-files/ \;
-
-          # List the files in the firmware-files directory
-          ls -la firmware-files/
-
-      - name: Upload PR firmware artifact
+      - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
           name: pr-firmware-${{ steps.set_ref.outputs.ref_name }}
-          path: firmware-files/*.bin
+          path: .esphome/build/*/.pioenvs/*/firmware*.bin
           retention-days: 30
 
       - name: Add PR comment with firmware link
@@ -111,10 +96,13 @@ jobs:
 
             Download the firmware from the [workflow artifacts](${workflowUrl}).
 
-            ### How to use:
+            ### How to flash:
 
             1. Download the firmware binary from the workflow artifacts
-            2. Flash it to your device using ESPHome dashboard or Home Assistant
+            2. Flash it using one of these methods:
+               - ESPHome dashboard in Home Assistant
+               - Web flasher at [web.esphome.io](https://web.esphome.io/)
+               - ESPHome command line tool
 
             This allows for easy testing of changes without rebuilding firmware.`;
 
