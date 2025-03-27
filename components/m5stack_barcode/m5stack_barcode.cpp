@@ -175,7 +175,7 @@ void BarcodeScanner::loop() {
       this->process_barcode_();
 
       // Reset scanning state after barcode is processed
-      this->scanning_ = false;
+      this->set_scan_state(ScanState::IDLE);
 
       // Set expected response type to NONE
       this->expected_response_ = ResponseType::NONE;
@@ -398,7 +398,6 @@ void BarcodeScanner::process_barcode_() {
 
   // Update scan state in HOST mode only - continuous modes keep scanning
   if (this->operation_mode_ == OperationMode::HOST) {
-    this->scanning_ = false;
     this->set_scan_state(ScanState::IDLE);
   }
 
@@ -449,7 +448,7 @@ void BarcodeScanner::start_scan() {
     return;
   }
 
-  if (this->scanning_) {
+  if (this->is_scanning()) {
     ESP_LOGD(TAG_SCANNER, "Scan already in progress");
     return;
   }
@@ -461,7 +460,6 @@ void BarcodeScanner::start_scan() {
   this->queue_command(std::move(command));
 
   // Update state
-  this->scanning_ = true;
   this->set_scan_state(ScanState::MANUAL_SCANNING);
 
   // Set expected response type to BARCODE
@@ -474,7 +472,7 @@ void BarcodeScanner::stop_scan() {
     return;
   }
 
-  if (!this->scanning_) {
+  if (!this->is_scanning()) {
     ESP_LOGD(TAG_SCANNER, "No scan in progress");
     return;
   }
@@ -486,7 +484,6 @@ void BarcodeScanner::stop_scan() {
   this->queue_command(std::move(command));
 
   // Update state
-  this->scanning_ = false;
   this->set_scan_state(ScanState::IDLE);
 }
 
@@ -505,11 +502,9 @@ bool BarcodeScanner::set_operation_mode(OperationMode mode) {
 
   // Update scan state based on new mode
   if (mode == OperationMode::CONTINUOUS || mode == OperationMode::AUTO_SENSE) {
-    this->scanning_ = true;
     this->set_scan_state(ScanState::CONTINUOUS_SCANNING);
-  } else if (this->scan_state_ == ScanState::CONTINUOUS_SCANNING) {
+  } else if (this->get_scan_state() == ScanState::CONTINUOUS_SCANNING) {
     // If we're leaving continuous mode, reset the scan state
-    this->scanning_ = false;
     this->set_scan_state(ScanState::IDLE);
   }
 

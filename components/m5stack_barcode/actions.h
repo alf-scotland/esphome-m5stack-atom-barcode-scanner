@@ -205,7 +205,43 @@ template<typename... Ts> class ProcessCurrentBufferAction : public Action<Ts...>
 template<typename... Ts> class IsContinuousModeCondition : public Condition<Ts...> {
  public:
   explicit IsContinuousModeCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
-  bool check(Ts... x) override;
+
+  bool check(Ts... x) override { return this->scanner_->is_continuous_mode(); }
+
+ protected:
+  BarcodeScanner *scanner_;
+};
+
+template<typename... Ts> class IsManualScanningCondition : public Condition<Ts...> {
+ public:
+  explicit IsManualScanningCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
+
+  bool check(Ts... x) override { return this->scanner_->get_scan_state() == ScanState::MANUAL_SCANNING; }
+
+ protected:
+  BarcodeScanner *scanner_;
+};
+
+template<typename... Ts> class IsNotScanningCondition : public Condition<Ts...> {
+ public:
+  explicit IsNotScanningCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
+
+  bool check(Ts... x) override { return !this->scanner_->is_scanning(); }
+
+ protected:
+  BarcodeScanner *scanner_;
+};
+
+template<typename... Ts> class GetScanDurationMsAction : public Action<Ts...> {
+ public:
+  explicit GetScanDurationMsAction(BarcodeScanner *scanner) : scanner_(scanner) {}
+
+  void play(Ts... x) override {
+    auto duration_ms = this->scanner_->get_scan_duration_ms();
+    // Return duration in milliseconds
+    x... = duration_ms;
+    ESP_LOGD("m5stack_barcode", "Scan duration: %u ms", duration_ms);
+  }
 
  protected:
   BarcodeScanner *scanner_;

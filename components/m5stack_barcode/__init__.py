@@ -221,6 +221,21 @@ IsContinuousModeCondition = m5stack_barcode_ns.class_(
     automation.Condition,
 )
 
+IsManualScanningCondition = m5stack_barcode_ns.class_(
+    "IsManualScanningCondition",
+    automation.Condition,
+)
+
+IsNotScanningCondition = m5stack_barcode_ns.class_(
+    "IsNotScanningCondition",
+    automation.Condition,
+)
+
+GetScanDurationMsAction = m5stack_barcode_ns.class_(
+    "GetScanDurationMsAction",
+    automation.Action,
+)
+
 # Configuration schema
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -754,3 +769,52 @@ async def barcode_is_continuous_mode_to_code(
 ) -> IsContinuousModeCondition:
     """Register is continuous mode condition."""
     return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
+
+
+@automation.register_condition(
+    "m5stack_barcode.is_manual_scanning",
+    IsManualScanningCondition,
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+)
+async def barcode_is_manual_scanning_to_code(
+    config: dict[str, Any],
+    condition_id: str,
+    template_arg: Any,
+    args: Any,  # noqa: ARG001
+) -> IsManualScanningCondition:
+    """Register is manual scanning condition."""
+    return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
+
+
+@automation.register_condition(
+    "m5stack_barcode.is_not_scanning",
+    IsNotScanningCondition,
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+)
+async def barcode_is_not_scanning_to_code(
+    config: dict[str, Any],
+    condition_id: str,
+    template_arg: Any,
+    args: Any,  # noqa: ARG001
+) -> IsNotScanningCondition:
+    """Register is not scanning condition."""
+    return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
+
+
+@automation.register_action(
+    "m5stack_barcode.get_scan_duration_ms",
+    GetScanDurationMsAction,
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.use_id(BarcodeScanner),
+        },
+    ),
+)
+async def barcode_get_scan_duration_ms_to_code(
+    config: dict[str, Any],
+    action_id: str,
+    template_arg: Any,
+    args: Any,  # noqa: ARG001
+) -> GetScanDurationMsAction:
+    """Register get scan duration ms action."""
+    return cg.new_Pvariable(action_id, template_arg, await get_scanner(config))

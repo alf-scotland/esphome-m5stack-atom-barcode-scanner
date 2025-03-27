@@ -225,13 +225,24 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @brief Check if the scanner is currently scanning.
    * @return bool True if scanning is active
    */
-  bool is_scanning() const { return this->scanning_; }
+  bool is_scanning() const { return this->scan_state_ != ScanState::IDLE; }
 
   /**
    * @brief Set the scanning state.
    * @param scanning True to indicate scanning is active
+   * @deprecated Use set_scan_state() instead
    */
-  void set_scanning(bool scanning) { this->scanning_ = scanning; }
+  void set_scanning(bool scanning) {
+    if (scanning) {
+      if (this->scan_state_ == ScanState::IDLE) {
+        this->set_scan_state(ScanState::MANUAL_SCANNING);
+      }
+    } else {
+      if (this->scan_state_ != ScanState::IDLE) {
+        this->set_scan_state(ScanState::IDLE);
+      }
+    }
+  }
 
   /**
    * @brief Get the current scan state.
@@ -326,6 +337,40 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @return SameCodeInterval Current same code interval
    */
   SameCodeInterval get_same_code_interval() const { return this->same_code_interval_; }
+
+  /**
+   * @brief Convert scan duration enum to milliseconds
+   * @param duration The scan duration enum to convert
+   * @return uint32_t Duration in milliseconds (0 for unlimited)
+   */
+  uint32_t scan_duration_to_ms(ScanDuration duration) const {
+    switch (duration) {
+      case ScanDuration::MS_500:
+        return 500;
+      case ScanDuration::MS_1000:
+        return 1000;
+      case ScanDuration::MS_3000:
+        return 3000;
+      case ScanDuration::MS_5000:
+        return 5000;
+      case ScanDuration::MS_10000:
+        return 10000;
+      case ScanDuration::MS_15000:
+        return 15000;
+      case ScanDuration::MS_20000:
+        return 20000;
+      case ScanDuration::UNLIMITED:
+        return 0;
+      default:
+        return 3000;  // Default to 3 seconds
+    }
+  }
+
+  /**
+   * @brief Get the current scan duration in milliseconds
+   * @return uint32_t Current scan duration in milliseconds (0 for unlimited)
+   */
+  uint32_t get_scan_duration_ms() const { return scan_duration_to_ms(this->scan_duration_); }
 
  protected:
   friend class CommandBase;
@@ -459,7 +504,6 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   std::vector<uint8_t> rx_buffer_;                           ///< Buffer for received data
   std::vector<std::unique_ptr<CommandBase>> command_queue_;  ///< Queue of pending commands
 
-  bool scanning_{false};                                ///< Current scanning state
   ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
   bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
   uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
