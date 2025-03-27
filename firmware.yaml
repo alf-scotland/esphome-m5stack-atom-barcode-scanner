@@ -145,8 +145,8 @@ script:
       - lambda: 'ESP_LOGD("timeout", "Using timeout: %.1f seconds", id(timeout_ms) / 1000.0);'
       # Turn on the hardware trigger
       - switch.turn_on: scanner_trigger_internal
-      # Add a delay using the timeout_ms global variable
-      - delay: !lambda 'return id(timeout_ms) / 1000.0;'
+      # Add a delay using the timeout_ms global variable - return milliseconds directly
+      - delay: !lambda 'return id(timeout_ms);'
       # After the delay, check if the switch is still on (was not turned off by a successful scan)
       - if:
           condition:
