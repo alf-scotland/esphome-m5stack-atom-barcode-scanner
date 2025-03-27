@@ -548,4 +548,3 @@ m5stack_barcode:
   operation_mode: host
   terminator: crlf
   uart_id: uart_bus
-  setup_priority: 600
