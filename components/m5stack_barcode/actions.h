@@ -154,6 +154,7 @@ template<typename... Ts> class SetScanDurationAction : public Action<Ts...> {
  public:
   explicit SetScanDurationAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, duration)
+  TEMPLATABLE_VALUE(std::string, global_ms_var)
   void play(Ts... x) override;
 
  protected:

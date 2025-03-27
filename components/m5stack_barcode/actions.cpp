@@ -274,6 +274,16 @@ template<typename... Ts> void SetScanDurationAction<Ts...>::play(Ts... x) {
 
   ESP_LOGD(TAG_ACTION, "Setting scan duration to: %s", duration_str.c_str());
   this->scanner_->set_scan_duration(duration);
+
+  // Update the global variable with the duration in milliseconds
+  if (this->global_ms_var_.has_value()) {
+    std::string var_name = this->global_ms_var_.value(x...);
+    if (!var_name.empty()) {
+      uint32_t duration_ms = this->scanner_->get_scan_duration_ms();
+      ESP_LOGD(TAG_ACTION, "Updating global variable %s with duration %u ms", var_name.c_str(), duration_ms);
+      id(var_name) = static_cast<int>(duration_ms);
+    }
+  }
 }
 
 template<typename... Ts> void SetStableInductionTimeAction<Ts...>::play(Ts... x) {
