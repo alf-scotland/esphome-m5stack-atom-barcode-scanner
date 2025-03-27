@@ -68,6 +68,7 @@ light:
     num_leds: 1
     rgb_order: grb
     rmt_channel: 0
+    setup_priority: 900
     effects:
       - pulse:
       - flicker:
@@ -89,18 +90,20 @@ output:
 script:
   - id: led_off
     then:
+      - delay: 10ms
       - if:
           condition:
             lambda: |-
-              if (id(barcode_scanner) == nullptr) {
-                return false;
-              }
-              return id(barcode_scanner).is_continuous_mode();
+              return (id(barcode_scanner) != nullptr) && id(barcode_scanner).is_continuous_mode() && (id(atom_status_led) != nullptr);
           then:
             - script.execute: led_continuous_scan_active
           else:
-            - light.turn_off:
-                id: atom_status_led
+            - if:
+                condition:
+                  lambda: 'return id(atom_status_led) != nullptr;'
+                then:
+                  - light.turn_off:
+                      id: atom_status_led
 
   - id: led_manual_scan_start
     then:
@@ -303,6 +306,7 @@ select:
     id: operation_mode
     entity_category: "config"
     icon: "mdi:tune"
+    setup_priority: 100
     options:
       - "host"
       - "level"
@@ -324,6 +328,7 @@ select:
     id: terminator
     entity_category: "config"
     icon: "mdi:keyboard-return"
+    setup_priority: 100
     options:
       - "none"
       - "crlf"
@@ -343,6 +348,7 @@ select:
     id: light_mode
     entity_category: "config"
     icon: "mdi:lightbulb"
+    setup_priority: 100
     options:
       - "on_when_reading"
       - "always_on"
@@ -359,6 +365,7 @@ select:
     id: locate_light_mode
     entity_category: "config"
     icon: "mdi:crosshairs"
+    setup_priority: 100
     options:
       - "on_when_reading"
       - "always_on"
@@ -375,6 +382,7 @@ select:
     id: decoding_success_light
     entity_category: "config"
     icon: "mdi:led-on"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -390,6 +398,7 @@ select:
     id: sound_mode
     entity_category: "config"
     icon: "mdi:volume-high"
+    setup_priority: 100
     options:
       - "disabled"
       - "enabled"
@@ -405,6 +414,7 @@ select:
     id: boot_sound
     entity_category: "config"
     icon: "mdi:power"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -420,6 +430,7 @@ select:
     id: decode_sound
     entity_category: "config"
     icon: "mdi:volume-source"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -435,6 +446,7 @@ select:
     id: volume
     entity_category: "config"
     icon: "mdi:volume-medium"
+    setup_priority: 100
     options:
       - "high"
       - "medium"
@@ -451,6 +463,7 @@ select:
     id: scan_duration
     entity_category: "config"
     icon: "mdi:timer"
+    setup_priority: 100
     options:
       - "500ms"
       - "1s"
@@ -473,6 +486,7 @@ select:
     id: stable_induction_time
     entity_category: "config"
     icon: "mdi:timer-sand"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"
@@ -491,6 +505,7 @@ select:
     id: reading_interval
     entity_category: "config"
     icon: "mdi:timer-outline"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"
@@ -511,6 +526,7 @@ select:
     id: same_code_interval
     entity_category: "config"
     icon: "mdi:timer-refresh"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"
@@ -533,3 +549,4 @@ m5stack_barcode:
   operation_mode: host
   terminator: crlf
   uart_id: uart_bus
+  setup_priority: 600
