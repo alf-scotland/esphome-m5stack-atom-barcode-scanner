@@ -479,7 +479,7 @@ select:
       - m5stack_barcode.set_scan_duration:
           id: barcode_scanner
           scan_duration: !lambda "return x;"
-          global_ms_var: "timeout_ms"
+          global_ms_var: timeout_ms
 
   - platform: template
     name: "Stable Induction Time"
