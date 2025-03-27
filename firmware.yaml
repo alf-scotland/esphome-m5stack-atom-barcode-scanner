@@ -57,6 +57,11 @@ globals:
     restore_value: no
     initial_value: '3000'
 
+  - id: timeout_seconds
+    type: float
+    restore_value: no
+    initial_value: '3.0'
+
 # Status LED - Atom's built-in LED
 light:
   - platform: esp32_rmt_led_strip
@@ -147,19 +152,6 @@ script:
           variable: "timeout_ms"
       # Turn on the hardware trigger
       - switch.turn_on: scanner_trigger_internal
-      # Only set up a timeout if the configured duration is not unlimited
-      - if:
-          condition:
-            lambda: 'return id(timeout_ms) > 0;'
-          then:
-            - delay: ${timeout_ms}ms
-            - if:
-                condition:
-                  switch.is_on: scanner_trigger_internal
-                then:
-                  - logger.log: "Scan timeout reached"
-                  - script.execute: led_scan_timeout
-                  - switch.turn_off: scanner_trigger_internal
 
   # Script to handle operation mode changes
   - id: update_mode_led
@@ -195,9 +187,12 @@ binary_sensor:
               m5stack_barcode.is_continuous_mode:
                 id: barcode_scanner
             then:
+              # For continuous mode, process the buffer but leave scanner active
               - m5stack_barcode.process_current_buffer:
                   id: barcode_scanner
-        - switch.turn_off: scanner_trigger_internal
+            else:
+              # For manual mode, process and turn off the trigger
+              - switch.turn_off: scanner_trigger_internal
 
   # Atom Lite built-in button on GPIO39
   - platform: gpio
