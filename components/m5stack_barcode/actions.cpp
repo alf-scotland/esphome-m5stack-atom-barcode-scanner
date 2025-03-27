@@ -369,31 +369,31 @@ template<typename... Ts> void SetSameCodeIntervalAction<Ts...>::play(Ts... x) {
 }
 
 template<typename... Ts> void ProcessCurrentBufferAction<Ts...>::play(Ts... x) {
+  ESP_LOGD(TAG_ACTION, "Processing current buffer");
   if (this->scanner_ != nullptr) {
-    ESP_LOGD(TAG_ACTION, "Processing current buffer");
     this->scanner_->process_current_buffer();
   }
 }
 
-template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(Ts... x) {
-  if (this->scanner_ != nullptr) {
-    return this->scanner_->is_continuous_mode();
-  }
-  return false;
-}
-
 template<typename... Ts> bool IsManualScanningCondition<Ts...>::check(Ts... x) {
-  if (this->scanner_ != nullptr) {
-    return this->scanner_->get_scan_state() == ScanState::MANUAL_SCANNING;
+  if (this->scanner_ == nullptr) {
+    return false;
   }
-  return false;
+  return this->scanner_->get_scan_state() == ScanState::MANUAL_SCANNING;
 }
 
 template<typename... Ts> bool IsIdleCondition<Ts...>::check(Ts... x) {
-  if (this->scanner_ != nullptr) {
-    return this->scanner_->get_scan_state() == ScanState::IDLE;
+  if (this->scanner_ == nullptr) {
+    return false;
   }
-  return false;
+  return this->scanner_->get_scan_state() == ScanState::IDLE;
+}
+
+template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(Ts... x) {
+  if (this->scanner_ == nullptr) {
+    return false;
+  }
+  return this->scanner_->is_continuous_mode();
 }
 
 template<typename... Ts> void GetScanDurationMsAction<Ts...>::play(Ts... x) {
@@ -402,15 +402,15 @@ template<typename... Ts> void GetScanDurationMsAction<Ts...>::play(Ts... x) {
     return;
   }
 
-  auto duration_ms = this->scanner_->get_scan_duration_ms();
-  // Log the duration
+  uint32_t duration_ms = this->scanner_->get_scan_duration_ms();
   ESP_LOGD(TAG_ACTION, "Scan duration: %u ms", duration_ms);
 
-  // Get the variable name if provided
-  std::string var = this->variable_.has_value() ? this->variable_.value(x...) : "scan_duration_ms";
-
-  // Set the global variable using lambda
-  esphome::id(var) = duration_ms;
+  if (this->variable_.has_value()) {
+    std::string var_name = this->variable_.value(x...);
+    if (!var_name.empty()) {
+      id(var_name) = static_cast<int>(duration_ms);
+    }
+  }
 }
 
 // Explicit template instantiations
@@ -438,11 +438,10 @@ template class ProcessCurrentBufferAction<bool>;
 template class ProcessCurrentBufferAction<int>;
 template class ProcessCurrentBufferAction<std::string>;
 template class ProcessCurrentBufferAction<std::string, int>;
+template class IsManualScanningCondition<>;
+template class IsIdleCondition<>;
 template class IsContinuousModeCondition<>;
-template class IsContinuousModeCondition<bool>;
-template class IsContinuousModeCondition<int>;
-template class IsContinuousModeCondition<std::string>;
-template class IsContinuousModeCondition<std::string, int>;
+template class GetScanDurationMsAction<>;
 
 // Explicit template instantiations for the types used in YAML
 template class StartAction<std::string, unsigned int>;

@@ -10,7 +10,7 @@ namespace esphome {
 namespace m5stack_barcode {
 
 // Logging tag for this component
-static const char *const TAG_SCANNER = "m5stack_barcode";
+const char *const TAG_SCANNER = "m5stack_barcode";
 
 // Time constants (in milliseconds)
 static const uint32_t WAKEUP_DELAY_MS = 50;       // Delay between wake-up and command send
