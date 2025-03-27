@@ -68,7 +68,6 @@ light:
     num_leds: 1
     rgb_order: grb
     rmt_channel: 0
-    setup_priority: 900
     effects:
       - pulse:
       - flicker:
