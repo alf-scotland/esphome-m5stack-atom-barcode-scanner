@@ -136,6 +136,44 @@ script:
       - delay: 500ms
       - script.execute: led_off
 
+  # Script to handle hardware trigger with proper timeout behavior
+  - id: hardware_trigger_with_timeout
+    then:
+      - logger.log: "Hardware trigger activated"
+      - script.execute: led_manual_scan_start
+      # Get the scan duration in milliseconds directly from the component
+      - m5stack_barcode.get_scan_duration_ms:
+          id: barcode_scanner
+          variable: "timeout_ms"
+      # Turn on the hardware trigger
+      - switch.turn_on: scanner_trigger_internal
+      # Only set up a timeout if the configured duration is not unlimited
+      - if:
+          condition:
+            lambda: 'return id(timeout_ms) > 0;'
+          then:
+            - delay: ${timeout_ms}ms
+            - if:
+                condition:
+                  switch.is_on: scanner_trigger_internal
+                then:
+                  - logger.log: "Scan timeout reached"
+                  - script.execute: led_scan_timeout
+                  - switch.turn_off: scanner_trigger_internal
+
+  # Script to handle operation mode changes
+  - id: update_mode_led
+    parameters:
+      mode: string
+    then:
+      - if:
+          condition:
+            lambda: 'return mode == "continuous" || mode == "auto_sense";'
+          then:
+            - script.execute: led_continuous_scan_active
+          else:
+            - script.execute: led_off
+
 binary_sensor:
   - platform: gpio
     pin:
@@ -161,13 +199,6 @@ binary_sensor:
                   id: barcode_scanner
         - switch.turn_off: scanner_trigger_internal
 
-  # Track continuous mode state
-  - platform: template
-    name: "Continuous Mode Active"
-    id: continuous_mode_active
-    icon: "mdi:barcode-scan"
-    entity_category: "diagnostic"
-
   # Atom Lite built-in button on GPIO39
   - platform: gpio
     pin:
@@ -186,7 +217,7 @@ binary_sensor:
         - logger.log: "Atom button pressed, starting scan"
         - if:
             condition:
-              m5stack_barcode.is_not_scanning:
+              m5stack_barcode.is_idle:
                 id: barcode_scanner
             then:
               - button.press: start_scan_button
@@ -201,37 +232,6 @@ switch:
     entity_category: "diagnostic"
     restore_mode: ALWAYS_OFF
     internal: true # Make this switch internal
-    on_turn_on:
-      then:
-        - logger.log: "Hardware trigger activated"
-        - script.execute: led_manual_scan_start
-        # Get the scan duration in milliseconds directly from the component
-        - m5stack_barcode.get_scan_duration_ms:
-            id: barcode_scanner
-            variable: "timeout_ms"
-        # If timeout is 0 (unlimited), use a long default
-        - if:
-            condition:
-              lambda: 'return id(timeout_ms) > 0;'
-            then:
-              - delay: !lambda 'return id(timeout_ms) * 0.001;' # Convert ms to seconds
-              - if:
-                  condition:
-                    switch.is_on: scanner_trigger_internal
-                  then:
-                    - logger.log: "Scan timeout reached"
-                    - script.execute: led_scan_timeout
-                    - switch.turn_off: scanner_trigger_internal
-            else:
-              # Default timeout of 60 seconds for unlimited
-              - delay: 60s
-              - if:
-                  condition:
-                    switch.is_on: scanner_trigger_internal
-                  then:
-                    - logger.log: "Safety timeout reached for unlimited scan"
-                    - script.execute: led_scan_timeout
-                    - switch.turn_off: scanner_trigger_internal
 
 text_sensor:
   - platform: template
@@ -255,7 +255,7 @@ button:
     on_press:
       - if:
           condition:
-            m5stack_barcode.is_not_scanning:
+            m5stack_barcode.is_idle:
               id: barcode_scanner
           then:
             - script.execute: led_manual_scan_start
@@ -279,11 +279,10 @@ button:
     on_press:
       - if:
           condition:
-            m5stack_barcode.is_not_scanning:
+            m5stack_barcode.is_idle:
               id: barcode_scanner
           then:
-            - script.execute: led_manual_scan_start
-            - switch.turn_on: scanner_trigger_internal
+            - script.execute: hardware_trigger_with_timeout
 
   # Config entities
   - platform: restart
@@ -310,26 +309,9 @@ select:
       - m5stack_barcode.set_mode:
           id: barcode_scanner
           operation_mode: !lambda "return x;"
-      - if:
-          condition:
-            or:
-              - binary_sensor.is_on: continuous_mode_active
-              - lambda: 'return x == "continuous" || x == "auto_sense";'
-          then:
-            # Handle the LED for continuous mode
-            - if:
-                condition:
-                  lambda: 'return x == "continuous" || x == "auto_sense";'
-                then:
-                  - script.execute: led_continuous_scan_active
-                  - binary_sensor.template.publish:
-                      id: continuous_mode_active
-                      state: true
-                else:
-                  - script.execute: led_off
-                  - binary_sensor.template.publish:
-                      id: continuous_mode_active
-                      state: false
+      - script.execute:
+          id: update_mode_led
+          mode: !lambda "return x;"
 
   - platform: template
     name: "Terminator"

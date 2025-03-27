@@ -222,11 +222,11 @@ template<typename... Ts> class IsManualScanningCondition : public Condition<Ts..
   BarcodeScanner *scanner_;
 };
 
-template<typename... Ts> class IsNotScanningCondition : public Condition<Ts...> {
+template<typename... Ts> class IsIdleCondition : public Condition<Ts...> {
  public:
-  explicit IsNotScanningCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
+  explicit IsIdleCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
 
-  bool check(Ts... x) override { return !this->scanner_->is_scanning(); }
+  bool check(Ts... x) override { return this->scanner_->get_scan_state() == ScanState::IDLE; }
 
  protected:
   BarcodeScanner *scanner_;

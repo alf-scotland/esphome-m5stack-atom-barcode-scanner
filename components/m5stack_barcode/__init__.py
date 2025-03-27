@@ -226,8 +226,8 @@ IsManualScanningCondition = m5stack_barcode_ns.class_(
     automation.Condition,
 )
 
-IsNotScanningCondition = m5stack_barcode_ns.class_(
-    "IsNotScanningCondition",
+IsIdleCondition = m5stack_barcode_ns.class_(
+    "IsIdleCondition",
     automation.Condition,
 )
 
@@ -787,17 +787,17 @@ async def barcode_is_manual_scanning_to_code(
 
 
 @automation.register_condition(
-    "m5stack_barcode.is_not_scanning",
-    IsNotScanningCondition,
+    "m5stack_barcode.is_idle",
+    IsIdleCondition,
     cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
 )
-async def barcode_is_not_scanning_to_code(
+async def barcode_is_idle_to_code(
     config: dict[str, Any],
     condition_id: str,
     template_arg: Any,
     args: Any,  # noqa: ARG001
-) -> IsNotScanningCondition:
-    """Register is not scanning condition."""
+) -> IsIdleCondition:
+    """Register is idle condition."""
     return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
 
 
