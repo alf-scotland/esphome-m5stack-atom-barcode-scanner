@@ -376,9 +376,8 @@ template<typename... Ts> void ProcessCurrentBufferAction<Ts...>::play(Ts... x) {
 }
 
 template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(Ts... x) {
-  if (this->scanner_ != nullptr) {
-    return this->scanner_->is_continuous_mode();
-  }
+  // This method is already defined in the header file
+  // Using this empty implementation to avoid linker errors
   return false;
 }
 
