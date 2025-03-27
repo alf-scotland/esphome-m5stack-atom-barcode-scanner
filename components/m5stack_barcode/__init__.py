@@ -33,6 +33,7 @@ CONF_BARCODE_ID = "barcode_id"
 CONF_VERSION_ID = "version_id"
 CONF_VERSION_SENSOR = "version_sensor"
 CONF_ON_BARCODE = "on_barcode"
+CONF_GLOBAL_MS_VAR = "global_ms_var"
 
 # Scanner operation settings
 CONF_OPERATION_MODE = "operation_mode"
@@ -642,6 +643,7 @@ async def barcode_set_decode_sound_mode_to_code(
             cv.Required(CONF_SCAN_DURATION): cv.templatable(
                 cv.enum(SCAN_DURATIONS, lower=True),
             ),
+            cv.Optional(CONF_GLOBAL_MS_VAR): cv.templatable(cv.string),
         },
     ),
 )
@@ -655,6 +657,15 @@ async def barcode_set_scan_duration_to_code(
     var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
     template_ = await cg.templatable(config[CONF_SCAN_DURATION], args, cg.std_string)
     cg.add(var.set_duration(template_))
+
+    if CONF_GLOBAL_MS_VAR in config:
+        template_ = await cg.templatable(
+            config[CONF_GLOBAL_MS_VAR],
+            args,
+            cg.std_string,
+        )
+        cg.add(var.set_global_ms_var(template_))
+
     return var
 
 
