@@ -89,8 +89,15 @@ output:
 script:
   - id: led_off
     then:
-      - light.turn_off:
-          id: atom_status_led
+      - if:
+          condition:
+            m5stack_barcode.is_continuous_mode:
+              id: barcode_scanner
+          then:
+            - script.execute: led_continuous_scan_active
+          else:
+            - light.turn_off:
+                id: atom_status_led
 
   - id: led_manual_scan_start
     then:
