@@ -27,7 +27,7 @@ esp32:
 
 # Enable logging
 logger:
-  level: INFO
+  level: DEBUG
 
 # Enable Home Assistant API
 api:
@@ -89,20 +89,15 @@ output:
 script:
   - id: led_off
     then:
-      - delay: 10ms
       - if:
           condition:
-            lambda: |-
-              return (id(barcode_scanner) != nullptr) && id(barcode_scanner).is_continuous_mode() && (id(atom_status_led) != nullptr);
+            m5stack_barcode.is_continuous_mode:
+              id: barcode_scanner
           then:
             - script.execute: led_continuous_scan_active
           else:
-            - if:
-                condition:
-                  lambda: 'return id(atom_status_led) != nullptr;'
-                then:
-                  - light.turn_off:
-                      id: atom_status_led
+            - light.turn_off:
+                id: atom_status_led
 
   - id: led_manual_scan_start
     then:
@@ -189,7 +184,7 @@ binary_sensor:
     pin:
       number: GPIO33
       mode: INPUT
-      #inverted: true  # DLED is inverted (active LOW)
+      inverted: true  # DLED is inverted (active LOW)
     name: "${friendly_name} Detection LED"
     id: scanner_dled_pin
     entity_category: "diagnostic"
@@ -250,7 +245,14 @@ text_sensor:
     icon: "mdi:barcode"
     on_value:
       then:
-        - script.execute: led_scan_success
+        - if:
+            condition:
+              not:
+                text_sensor.state:
+                  id: last_barcode
+                  state: ''
+            then:
+              - script.execute: led_scan_success
 
   - platform: template
     name: "Scanner Version"
