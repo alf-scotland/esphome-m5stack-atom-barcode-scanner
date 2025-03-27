@@ -10,7 +10,7 @@ namespace esphome {
 namespace m5stack_barcode {
 
 // Logging tag for this component
-static const char *const TAG_SCANNER = "m5stack_barcode";
+const char *const TAG_SCANNER = "m5stack_barcode";
 
 // Time constants (in milliseconds)
 static const uint32_t WAKEUP_DELAY_MS = 50;       // Delay between wake-up and command send
@@ -396,6 +396,12 @@ void BarcodeScanner::process_barcode_() {
     }
   }
 
+  // Update scan state in HOST mode only - continuous modes keep scanning
+  if (this->operation_mode_ == OperationMode::HOST) {
+    this->scanning_ = false;
+    this->set_scan_state(ScanState::IDLE);
+  }
+
   // Clear the buffer for the next barcode
   this->clear_buffer_();
 }
@@ -448,7 +454,7 @@ void BarcodeScanner::start_scan() {
     return;
   }
 
-  ESP_LOGD(TAG_SCANNER, "Starting scan");
+  ESP_LOGD(TAG_SCANNER, "Starting scan in HOST mode");
 
   // Create and queue the start command
   auto command = CommandFactory::create_start_command();
@@ -456,6 +462,7 @@ void BarcodeScanner::start_scan() {
 
   // Update state
   this->scanning_ = true;
+  this->set_scan_state(ScanState::MANUAL_SCANNING);
 
   // Set expected response type to BARCODE
   this->set_expected_response_(ResponseType::BARCODE);
@@ -472,7 +479,7 @@ void BarcodeScanner::stop_scan() {
     return;
   }
 
-  ESP_LOGD(TAG_SCANNER, "Stopping scan");
+  ESP_LOGD(TAG_SCANNER, "Stopping scan in HOST mode");
 
   // Create and queue the stop command
   auto command = CommandFactory::create_stop_command();
@@ -480,6 +487,7 @@ void BarcodeScanner::stop_scan() {
 
   // Update state
   this->scanning_ = false;
+  this->set_scan_state(ScanState::IDLE);
 }
 
 // Scanner Settings Methods
@@ -494,6 +502,16 @@ bool BarcodeScanner::set_operation_mode(OperationMode mode) {
   // Create and queue the mode command
   auto command = CommandFactory::create_mode_command(mode);
   this->queue_command(std::move(command));
+
+  // Update scan state based on new mode
+  if (mode == OperationMode::CONTINUOUS || mode == OperationMode::AUTO_SENSE) {
+    this->scanning_ = true;
+    this->set_scan_state(ScanState::CONTINUOUS_SCANNING);
+  } else if (this->scan_state_ == ScanState::CONTINUOUS_SCANNING) {
+    // If we're leaving continuous mode, reset the scan state
+    this->scanning_ = false;
+    this->set_scan_state(ScanState::IDLE);
+  }
 
   // Update internal state immediately
   this->operation_mode_ = mode;

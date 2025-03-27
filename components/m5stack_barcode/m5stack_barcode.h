@@ -14,6 +14,9 @@
 namespace esphome {
 namespace m5stack_barcode {
 
+// Logging tag for this component
+extern const char *const TAG_SCANNER;
+
 /**
  * @brief M5Stack Barcode Scanner component for ESPHome.
  *
@@ -231,6 +234,22 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_scanning(bool scanning) { this->scanning_ = scanning; }
 
   /**
+   * @brief Get the current scan state.
+   * @return ScanState Current scan state
+   */
+  ScanState get_scan_state() const { return this->scan_state_; }
+
+  /**
+   * @brief Set the scan state.
+   * @param state The new scan state
+   */
+  void set_scan_state(ScanState state) {
+    ESP_LOGD(TAG_SCANNER, "Setting scan state from %s to %s", scan_state_to_string(this->scan_state_),
+             scan_state_to_string(state));
+    this->scan_state_ = state;
+  }
+
+  /**
    * @brief Get the current operation mode.
    * @return OperationMode Current operation mode
    */
@@ -441,6 +460,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   std::vector<std::unique_ptr<CommandBase>> command_queue_;  ///< Queue of pending commands
 
   bool scanning_{false};                                ///< Current scanning state
+  ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
   bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
   uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
   CommandState command_state_{CommandState::IDLE};      ///< Current command processing state

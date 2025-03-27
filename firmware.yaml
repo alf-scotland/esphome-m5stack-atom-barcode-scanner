@@ -87,14 +87,23 @@ script:
       - light.turn_off:
           id: atom_status_led
 
-  - id: led_scan_start
+  - id: led_manual_scan_start
     then:
       - light.turn_on:
           id: atom_status_led
           brightness: 100%
           red: 0%
           green: 0%
-          blue: 100%
+          blue: 100%  # Blue for manual scanning
+
+  - id: led_continuous_scan_active
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 70%
+          red: 80%
+          green: 0%
+          blue: 80%  # Purple for continuous scanning
 
   - id: led_scan_success
     then:
@@ -114,11 +123,37 @@ script:
           id: atom_status_led
           brightness: 100%
           red: 100%
-          green: 100%
+          green: 50%
           blue: 0%
           flash_length: 500ms
       - delay: 500ms
       - script.execute: led_off
+
+  # Helper to get scan duration in milliseconds
+  - id: get_scan_timeout
+    parameters:
+      duration: string
+    then:
+      - lambda: |-
+          int timeout_ms = 3000; // Default 3 seconds
+          if (duration == "500ms") {
+            timeout_ms = 500;
+          } else if (duration == "1s") {
+            timeout_ms = 1000;
+          } else if (duration == "3s") {
+            timeout_ms = 3000;
+          } else if (duration == "5s") {
+            timeout_ms = 5000;
+          } else if (duration == "10s") {
+            timeout_ms = 10000;
+          } else if (duration == "15s") {
+            timeout_ms = 15000;
+          } else if (duration == "20s") {
+            timeout_ms = 20000;
+          } else if (duration == "unlimited") {
+            timeout_ms = 0;
+          }
+          return timeout_ms;
 
 binary_sensor:
   - platform: gpio
@@ -161,7 +196,13 @@ binary_sensor:
     on_press:
       then:
         - logger.log: "Atom button pressed, starting scan"
-        - button.press: start_scan_button
+        - if:
+            condition:
+              lambda: |-
+                auto scanner = static_cast<esphome::m5stack_barcode::BarcodeScanner*>(id(barcode_scanner));
+                return scanner->get_scan_state() != esphome::m5stack_barcode::ScanState::CONTINUOUS_SCANNING;
+            then:
+              - button.press: start_scan_button
 
 # Hardware trigger switch (internal)
 switch:
@@ -176,16 +217,53 @@ switch:
     on_turn_on:
       then:
         - logger.log: "Hardware trigger activated"
-        - script.execute: led_scan_start
-        # Set up timeout to turn off after 2.5 seconds
-        - delay: 2.5s
+        - script.execute: led_manual_scan_start
+        # Get the configured timeout value
+        - script.execute:
+            id: get_scan_timeout
+            duration: !lambda |-
+              // Get the current scan duration from the scanner
+              auto scanner = static_cast<esphome::m5stack_barcode::BarcodeScanner*>(id(barcode_scanner));
+              auto scan_duration = scanner->get_scan_duration();
+              std::string duration_str = "3s";
+
+              switch (scan_duration) {
+                case esphome::m5stack_barcode::ScanDuration::MS_500: duration_str = "500ms"; break;
+                case esphome::m5stack_barcode::ScanDuration::MS_1000: duration_str = "1s"; break;
+                case esphome::m5stack_barcode::ScanDuration::MS_3000: duration_str = "3s"; break;
+                case esphome::m5stack_barcode::ScanDuration::MS_5000: duration_str = "5s"; break;
+                case esphome::m5stack_barcode::ScanDuration::MS_10000: duration_str = "10s"; break;
+                case esphome::m5stack_barcode::ScanDuration::MS_15000: duration_str = "15s"; break;
+                case esphome::m5stack_barcode::ScanDuration::MS_20000: duration_str = "20s"; break;
+                case esphome::m5stack_barcode::ScanDuration::UNLIMITED: duration_str = "unlimited"; break;
+                default: duration_str = "3s"; break;
+              }
+
+              return duration_str;
+          timeout_ms: timeout_ms
+        # If timeout is 0 (unlimited), use a long default
         - if:
             condition:
-              switch.is_on: scanner_trigger_internal
+              lambda: 'return id(timeout_ms) > 0;'
             then:
-              - logger.log: "Scan timeout reached"
-              - script.execute: led_scan_timeout
-              - switch.turn_off: scanner_trigger_internal
+              - delay: !lambda 'return id(timeout_ms) * 0.001;' # Convert ms to seconds
+              - if:
+                  condition:
+                    switch.is_on: scanner_trigger_internal
+                  then:
+                    - logger.log: "Scan timeout reached"
+                    - script.execute: led_scan_timeout
+                    - switch.turn_off: scanner_trigger_internal
+            else:
+              # Default timeout of 60 seconds for unlimited
+              - delay: 60s
+              - if:
+                  condition:
+                    switch.is_on: scanner_trigger_internal
+                  then:
+                    - logger.log: "Safety timeout reached for unlimited scan"
+                    - script.execute: led_scan_timeout
+                    - switch.turn_off: scanner_trigger_internal
 
 text_sensor:
   - platform: template
@@ -207,9 +285,15 @@ button:
     id: start_scan_button
     icon: "mdi:play-circle-outline"
     on_press:
-      - script.execute: led_scan_start
-      - m5stack_barcode.start:
-          id: barcode_scanner
+      - if:
+          condition:
+            lambda: |-
+              auto scanner = static_cast<esphome::m5stack_barcode::BarcodeScanner*>(id(barcode_scanner));
+              return scanner->get_scan_state() != esphome::m5stack_barcode::ScanState::CONTINUOUS_SCANNING;
+          then:
+            - script.execute: led_manual_scan_start
+            - m5stack_barcode.start:
+                id: barcode_scanner
 
   - platform: template
     name: "Stop Scan"
@@ -226,8 +310,14 @@ button:
     icon: "mdi:barcode-scan"
     entity_category: "diagnostic"
     on_press:
-      - script.execute: led_scan_start
-      - switch.turn_on: scanner_trigger_internal
+      - if:
+          condition:
+            lambda: |-
+              auto scanner = static_cast<esphome::m5stack_barcode::BarcodeScanner*>(id(barcode_scanner));
+              return scanner->get_scan_state() != esphome::m5stack_barcode::ScanState::CONTINUOUS_SCANNING;
+          then:
+            - script.execute: led_manual_scan_start
+            - switch.turn_on: scanner_trigger_internal
 
   # Config entities
   - platform: restart
@@ -254,6 +344,15 @@ select:
       - m5stack_barcode.set_mode:
           id: barcode_scanner
           operation_mode: !lambda "return x;"
+      - lambda: |-
+          // Set LED based on operation mode
+          auto scanner = static_cast<esphome::m5stack_barcode::BarcodeScanner*>(id(barcode_scanner));
+          if (x == "continuous" || x == "auto_sense") {
+            id(led_continuous_scan_active).execute();
+          } else {
+            // Turn off LED for non-continuous modes
+            id(led_off).execute();
+          }
 
   - platform: template
     name: "Terminator"
