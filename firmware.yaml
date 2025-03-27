@@ -146,26 +146,6 @@ script:
       - delay: 500ms
       - script.execute: led_off
 
-# Add a timer component to handle dynamic timeouts
-interval:
-  - interval: 1s
-    then:
-      - if:
-          condition:
-            and:
-              - switch.is_on: scanner_trigger_internal
-              - lambda: 'return id(timeout_ms) > 0;'
-          then:
-            - lambda: |-
-                id(active_timeout_counter) += 1000;
-
-                if (id(active_timeout_counter) >= id(timeout_ms)) {
-                  ESP_LOGD("timeout", "Scan timeout reached after %d ms", id(active_timeout_counter));
-                  id(active_timeout_counter) = 0;
-                  id(scanner_trigger_internal).turn_off();
-                  id(led_scan_timeout).execute();
-                }
-
 # Script to handle hardware trigger with proper timeout behavior
   - id: hardware_trigger_with_timeout
     then:
@@ -195,6 +175,26 @@ interval:
             - script.execute: led_continuous_scan_active
           else:
             - script.execute: led_off
+
+# Add a timer component to handle dynamic timeouts
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            and:
+              - switch.is_on: scanner_trigger_internal
+              - lambda: 'return id(timeout_ms) > 0;'
+          then:
+            - lambda: |-
+                id(active_timeout_counter) += 1000;
+
+                if (id(active_timeout_counter) >= id(timeout_ms)) {
+                  ESP_LOGD("timeout", "Scan timeout reached after %d ms", id(active_timeout_counter));
+                  id(active_timeout_counter) = 0;
+                  id(scanner_trigger_internal).turn_off();
+                  id(led_scan_timeout).execute();
+                }
 
 binary_sensor:
   - platform: gpio
