@@ -141,73 +141,6 @@ script:
       - delay: 500ms
       - script.execute: led_off
 
-# Scripts for timeout handling
-  - id: timeout_1s
-    then:
-      - delay: 1s
-      - if:
-          condition:
-            switch.is_on: scanner_trigger_internal
-          then:
-            - logger.log: "Scan timeout reached (1s)"
-            - script.execute: led_scan_timeout
-            - switch.turn_off: scanner_trigger_internal
-
-  - id: timeout_3s
-    then:
-      - delay: 3s
-      - if:
-          condition:
-            switch.is_on: scanner_trigger_internal
-          then:
-            - logger.log: "Scan timeout reached (3s)"
-            - script.execute: led_scan_timeout
-            - switch.turn_off: scanner_trigger_internal
-
-  - id: timeout_5s
-    then:
-      - delay: 5s
-      - if:
-          condition:
-            switch.is_on: scanner_trigger_internal
-          then:
-            - logger.log: "Scan timeout reached (5s)"
-            - script.execute: led_scan_timeout
-            - switch.turn_off: scanner_trigger_internal
-
-  - id: timeout_10s
-    then:
-      - delay: 10s
-      - if:
-          condition:
-            switch.is_on: scanner_trigger_internal
-          then:
-            - logger.log: "Scan timeout reached (10s)"
-            - script.execute: led_scan_timeout
-            - switch.turn_off: scanner_trigger_internal
-
-  - id: timeout_15s
-    then:
-      - delay: 15s
-      - if:
-          condition:
-            switch.is_on: scanner_trigger_internal
-          then:
-            - logger.log: "Scan timeout reached (15s)"
-            - script.execute: led_scan_timeout
-            - switch.turn_off: scanner_trigger_internal
-
-  - id: timeout_20s
-    then:
-      - delay: 20s
-      - if:
-          condition:
-            switch.is_on: scanner_trigger_internal
-          then:
-            - logger.log: "Scan timeout reached (20s)"
-            - script.execute: led_scan_timeout
-            - switch.turn_off: scanner_trigger_internal
-
 # Script to handle hardware trigger with proper timeout behavior
   - id: hardware_trigger_with_timeout
     then:
@@ -224,37 +157,14 @@ script:
           condition:
             lambda: 'return id(timeout_ms) > 0;'
           then:
-            # Choose the right timeout script based on the timeout value
+            - delay: !lambda "return id(timeout_ms);"
             - if:
                 condition:
-                  lambda: 'return id(timeout_ms) <= 1000;'
+                  switch.is_on: scanner_trigger_internal
                 then:
-                  - script.execute: timeout_1s
-            - if:
-                condition:
-                  lambda: 'return id(timeout_ms) > 1000 && id(timeout_ms) <= 3000;'
-                then:
-                  - script.execute: timeout_3s
-            - if:
-                condition:
-                  lambda: 'return id(timeout_ms) > 3000 && id(timeout_ms) <= 5000;'
-                then:
-                  - script.execute: timeout_5s
-            - if:
-                condition:
-                  lambda: 'return id(timeout_ms) > 5000 && id(timeout_ms) <= 10000;'
-                then:
-                  - script.execute: timeout_10s
-            - if:
-                condition:
-                  lambda: 'return id(timeout_ms) > 10000 && id(timeout_ms) <= 15000;'
-                then:
-                  - script.execute: timeout_15s
-            - if:
-                condition:
-                  lambda: 'return id(timeout_ms) > 15000;'
-                then:
-                  - script.execute: timeout_20s
+                  - logger.log: "Scan timeout reached"
+                  - script.execute: led_scan_timeout
+                  - switch.turn_off: scanner_trigger_internal
 
 # Script to handle operation mode changes
   - id: update_mode_led
