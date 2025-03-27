@@ -807,6 +807,7 @@ async def barcode_is_not_scanning_to_code(
     cv.Schema(
         {
             cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.Optional("variable"): cv.templatable(cv.string),
         },
     ),
 )
@@ -814,7 +815,11 @@ async def barcode_get_scan_duration_ms_to_code(
     config: dict[str, Any],
     action_id: str,
     template_arg: Any,
-    args: Any,  # noqa: ARG001
+    args: Any,
 ) -> GetScanDurationMsAction:
     """Register get scan duration ms action."""
-    return cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
+    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
+    if "variable" in config:
+        template_ = await cg.templatable(config["variable"], args, cg.std_string)
+        cg.add(var.set_variable(template_))
+    return var

@@ -235,12 +235,18 @@ template<typename... Ts> class IsNotScanningCondition : public Condition<Ts...> 
 template<typename... Ts> class GetScanDurationMsAction : public Action<Ts...> {
  public:
   explicit GetScanDurationMsAction(BarcodeScanner *scanner) : scanner_(scanner) {}
+  TEMPLATABLE_VALUE(std::string, variable)
 
   void play(Ts... x) override {
     auto duration_ms = this->scanner_->get_scan_duration_ms();
-    // Return duration in milliseconds
-    x... = duration_ms;
+    // Log the duration
     ESP_LOGD("m5stack_barcode", "Scan duration: %u ms", duration_ms);
+
+    // Get the variable name if provided
+    std::string var = this->variable_.has_value() ? this->variable_.value(x...) : "scan_duration_ms";
+
+    // Set the global variable using lambda
+    esphome::id(var) = duration_ms;
   }
 
  protected:

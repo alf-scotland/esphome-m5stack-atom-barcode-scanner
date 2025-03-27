@@ -136,32 +136,6 @@ script:
       - delay: 500ms
       - script.execute: led_off
 
-  # Helper to get scan duration in milliseconds
-  - id: get_scan_timeout
-    parameters:
-      duration: string
-    then:
-      - lambda: |-
-          int timeout_ms = 3000; // Default 3 seconds
-          if (duration == "500ms") {
-            timeout_ms = 500;
-          } else if (duration == "1s") {
-            timeout_ms = 1000;
-          } else if (duration == "3s") {
-            timeout_ms = 3000;
-          } else if (duration == "5s") {
-            timeout_ms = 5000;
-          } else if (duration == "10s") {
-            timeout_ms = 10000;
-          } else if (duration == "15s") {
-            timeout_ms = 15000;
-          } else if (duration == "20s") {
-            timeout_ms = 20000;
-          } else if (duration == "unlimited") {
-            timeout_ms = 0;
-          }
-          return timeout_ms;
-
 binary_sensor:
   - platform: gpio
     pin:
@@ -231,12 +205,10 @@ switch:
       then:
         - logger.log: "Hardware trigger activated"
         - script.execute: led_manual_scan_start
-        - globals.set:
-            id: timeout_ms
-            value: !lambda |-
-              // Get the current scan duration from the scanner
-              auto scanner = static_cast<esphome::m5stack_barcode::BarcodeScanner*>(id(barcode_scanner));
-              return scanner->get_scan_duration_ms();
+        # Get the scan duration in milliseconds directly from the component
+        - m5stack_barcode.get_scan_duration_ms:
+            id: barcode_scanner
+            variable: "timeout_ms"
         # If timeout is 0 (unlimited), use a long default
         - if:
             condition:
