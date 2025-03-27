@@ -375,12 +375,6 @@ template<typename... Ts> void ProcessCurrentBufferAction<Ts...>::play(Ts... x) {
   }
 }
 
-template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(Ts... x) {
-  // This method is already defined in the header file
-  // Using this empty implementation to avoid linker errors
-  return false;
-}
-
 // Explicit template instantiations
 template class StartAction<>;
 template class StartAction<bool>;
