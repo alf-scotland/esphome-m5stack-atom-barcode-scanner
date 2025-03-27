@@ -62,11 +62,6 @@ globals:
     restore_value: no
     initial_value: '0'
 
-  - id: timeout_seconds
-    type: float
-    restore_value: no
-    initial_value: '3.0'
-
 # Status LED - Atom's built-in LED
 light:
   - platform: esp32_rmt_led_strip
@@ -151,15 +146,14 @@ script:
     then:
       - logger.log: "Hardware trigger activated"
       - script.execute: led_manual_scan_start
-      # Get the scan duration in milliseconds directly from the component
-      - m5stack_barcode.get_scan_duration_ms:
-          id: barcode_scanner
-          variable: "timeout_ms"
-      # Reset the timeout counter
+      # No need to explicitly get the scan duration - it's already updated in the global
+      # - m5stack_barcode.get_scan_duration_ms:
+      #     id: barcode_scanner
+      #     variable: "timeout_ms"
+      # Reset the timeout counter only
       - lambda: |-
           id(active_timeout_counter) = 0;
-          id(timeout_seconds) = id(timeout_ms) / 1000.0;
-          ESP_LOGD("timeout", "Using timeout: %.1f seconds", id(timeout_seconds));
+          ESP_LOGD("timeout", "Using timeout: %.1f seconds", id(timeout_ms) / 1000.0);
       # Turn on the hardware trigger
       - switch.turn_on: scanner_trigger_internal
 
@@ -485,6 +479,7 @@ select:
       - m5stack_barcode.set_scan_duration:
           id: barcode_scanner
           scan_duration: !lambda "return x;"
+          global_ms_var: "timeout_ms"
 
   - platform: template
     name: "Stable Induction Time"
