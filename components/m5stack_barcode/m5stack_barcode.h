@@ -84,7 +84,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @brief Get the setup priority for this component.
    * @return float Priority value (DATA)
    */
-  float get_setup_priority() const override { return setup_priority::DATA; }
+  float get_setup_priority() const override { return setup_priority::HARDWARE; }
 
   // Sensor Configuration
   /**
