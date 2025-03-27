@@ -57,11 +57,6 @@ globals:
     restore_value: no
     initial_value: '3000'
 
-  - id: active_timeout_counter
-    type: int
-    restore_value: no
-    initial_value: '0'
-
 # Status LED - Atom's built-in LED
 light:
   - platform: esp32_rmt_led_strip
@@ -146,16 +141,20 @@ script:
     then:
       - logger.log: "Hardware trigger activated"
       - script.execute: led_manual_scan_start
-      # No need to explicitly get the scan duration - it's already updated in the global
-      # - m5stack_barcode.get_scan_duration_ms:
-      #     id: barcode_scanner
-      #     variable: "timeout_ms"
-      # Reset the timeout counter only
-      - lambda: |-
-          id(active_timeout_counter) = 0;
-          ESP_LOGD("timeout", "Using timeout: %.1f seconds", id(timeout_ms) / 1000.0);
+      # Log the timeout we're going to use
+      - lambda: 'ESP_LOGD("timeout", "Using timeout: %.1f seconds", id(timeout_ms) / 1000.0);'
       # Turn on the hardware trigger
       - switch.turn_on: scanner_trigger_internal
+      # Add a delay using the timeout_ms global variable
+      - delay: !lambda 'return id(timeout_ms) / 1000.0;'
+      # After the delay, check if the switch is still on (was not turned off by a successful scan)
+      - if:
+          condition:
+            switch.is_on: scanner_trigger_internal
+          then:
+            - logger.log: "Scan timeout reached"
+            - switch.turn_off: scanner_trigger_internal
+            - script.execute: led_scan_timeout
 
 # Script to handle operation mode changes
   - id: update_mode_led
@@ -169,26 +168,6 @@ script:
             - script.execute: led_continuous_scan_active
           else:
             - script.execute: led_off
-
-# Add a timer component to handle dynamic timeouts
-interval:
-  - interval: 1s
-    then:
-      - if:
-          condition:
-            and:
-              - switch.is_on: scanner_trigger_internal
-              - lambda: 'return id(timeout_ms) > 0;'
-          then:
-            - lambda: |-
-                id(active_timeout_counter) += 1000;
-
-                if (id(active_timeout_counter) >= id(timeout_ms)) {
-                  ESP_LOGD("timeout", "Scan timeout reached after %d ms", id(active_timeout_counter));
-                  id(active_timeout_counter) = 0;
-                  id(scanner_trigger_internal).turn_off();
-                  id(led_scan_timeout).execute();
-                }
 
 binary_sensor:
   - platform: gpio
