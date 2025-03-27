@@ -122,6 +122,18 @@ script:
       - delay: 500ms
       - script.execute: led_off
 
+  - id: led_command_ack
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 70%
+          green: 70%
+          blue: 0%
+          flash_length: 200ms
+      - delay: 200ms
+      - script.execute: led_off
+
   - id: led_scan_timeout
     then:
       - light.turn_on:
@@ -165,6 +177,7 @@ binary_sensor:
     pin:
       number: GPIO33
       mode: INPUT
+      inverted: true  # DLED is inverted (active LOW)
     name: "${friendly_name} Detection LED"
     id: scanner_dled_pin
     entity_category: "diagnostic"
@@ -174,7 +187,7 @@ binary_sensor:
       - delayed_off: 10ms
     on_press:
       then:
-        - script.execute: led_scan_success
+        - script.execute: led_command_ack
         - if:
             condition:
               m5stack_barcode.is_continuous_mode:
@@ -223,6 +236,9 @@ text_sensor:
     name: "Last Barcode"
     id: last_barcode
     icon: "mdi:barcode"
+    on_value:
+      then:
+        - script.execute: led_scan_success
 
   - platform: template
     name: "Scanner Version"
