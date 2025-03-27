@@ -90,12 +90,7 @@ void BarcodeScanner::configure_defaults_() {
   auto same_code_interval_command = CommandFactory::create_same_code_interval_command(this->same_code_interval_);
   this->queue_command(std::move(same_code_interval_command));
 
-  // If a global variable named 'scanner_timeout_ms' exists, initialize it with the scan duration
-  if (id.has("scanner_timeout_ms")) {
-    uint32_t duration_ms = this->get_scan_duration_ms();
-    ESP_LOGD(TAG_SCANNER, "Initializing scanner_timeout_ms global with %u ms", duration_ms);
-    id("scanner_timeout_ms") = static_cast<int>(duration_ms);
-  }
+  // Initialization of global variables is handled by automated actions
 }
 
 void BarcodeScanner::loop() {
@@ -677,12 +672,7 @@ bool BarcodeScanner::set_scan_duration(ScanDuration duration) {
   // Update internal state immediately
   this->scan_duration_ = duration;
 
-  // Update global variable if it exists
-  if (id.has("scanner_timeout_ms")) {
-    uint32_t duration_ms = this->get_scan_duration_ms();
-    ESP_LOGD(TAG_SCANNER, "Updating scanner_timeout_ms global with %u ms", duration_ms);
-    id("scanner_timeout_ms") = static_cast<int>(duration_ms);
-  }
+  // Global variable updates are handled by automated actions
 
   return true;
 }
