@@ -228,36 +228,20 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   bool is_scanning() const { return this->scan_state_ != ScanState::IDLE; }
 
   /**
-   * @brief Set the scanning state.
-   * @param scanning True to indicate scanning is active
-   * @deprecated Use set_scan_state() instead
-   */
-  void set_scanning(bool scanning) {
-    if (scanning) {
-      if (this->scan_state_ == ScanState::IDLE) {
-        this->set_scan_state(ScanState::MANUAL_SCANNING);
-      }
-    } else {
-      if (this->scan_state_ != ScanState::IDLE) {
-        this->set_scan_state(ScanState::IDLE);
-      }
-    }
-  }
-
-  /**
-   * @brief Get the current scan state.
-   * @return ScanState Current scan state
+   * @brief Get the current scan state
+   * @return ScanState enum value
    */
   ScanState get_scan_state() const { return this->scan_state_; }
 
   /**
-   * @brief Set the scan state.
+   * @brief Set the scan state
    * @param state The new scan state
    */
   void set_scan_state(ScanState state) {
-    ESP_LOGD(TAG_SCANNER, "Setting scan state from %s to %s", scan_state_to_string(this->scan_state_),
-             scan_state_to_string(state));
-    this->scan_state_ = state;
+    if (this->scan_state_ != state) {
+      ESP_LOGD(TAG_SCANNER, "Scan state changed from %d to %d", (int) this->scan_state_, (int) state);
+      this->scan_state_ = state;
+    }
   }
 
   /**

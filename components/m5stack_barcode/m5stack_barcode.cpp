@@ -10,7 +10,7 @@ namespace esphome {
 namespace m5stack_barcode {
 
 // Logging tag for this component
-const char *const TAG_SCANNER = "m5stack_barcode";
+static const char *const TAG_SCANNER = "m5stack_barcode";
 
 // Time constants (in milliseconds)
 static const uint32_t WAKEUP_DELAY_MS = 50;       // Delay between wake-up and command send
@@ -174,8 +174,10 @@ void BarcodeScanner::loop() {
     if (should_process && !this->rx_buffer_.empty()) {
       this->process_barcode_();
 
-      // Reset scanning state after barcode is processed
-      this->set_scan_state(ScanState::IDLE);
+      // Reset scanning state after barcode is processed in HOST mode
+      if (this->operation_mode_ == OperationMode::HOST) {
+        this->set_scan_state(ScanState::IDLE);
+      }
 
       // Set expected response type to NONE
       this->expected_response_ = ResponseType::NONE;
@@ -394,11 +396,6 @@ void BarcodeScanner::process_barcode_() {
       this->text_sensor_->publish_state(barcode);
       ESP_LOGD(TAG_SCANNER, "Barcode received: %s", barcode.c_str());
     }
-  }
-
-  // Update scan state in HOST mode only - continuous modes keep scanning
-  if (this->operation_mode_ == OperationMode::HOST) {
-    this->set_scan_state(ScanState::IDLE);
   }
 
   // Clear the buffer for the next barcode
@@ -753,6 +750,11 @@ void BarcodeScanner::process_current_buffer() {
 
   // Then process the barcode using existing logic
   this->process_barcode_();
+
+  // In HOST mode, we should set the scanner back to IDLE state after processing
+  if (this->operation_mode_ == OperationMode::HOST && this->get_scan_state() != ScanState::IDLE) {
+    this->set_scan_state(ScanState::IDLE);
+  }
 }
 
 }  // namespace m5stack_barcode

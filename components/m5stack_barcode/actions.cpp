@@ -375,6 +375,44 @@ template<typename... Ts> void ProcessCurrentBufferAction<Ts...>::play(Ts... x) {
   }
 }
 
+template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(Ts... x) {
+  if (this->scanner_ != nullptr) {
+    return this->scanner_->is_continuous_mode();
+  }
+  return false;
+}
+
+template<typename... Ts> bool IsManualScanningCondition<Ts...>::check(Ts... x) {
+  if (this->scanner_ != nullptr) {
+    return this->scanner_->get_scan_state() == ScanState::MANUAL_SCANNING;
+  }
+  return false;
+}
+
+template<typename... Ts> bool IsIdleCondition<Ts...>::check(Ts... x) {
+  if (this->scanner_ != nullptr) {
+    return this->scanner_->get_scan_state() == ScanState::IDLE;
+  }
+  return false;
+}
+
+template<typename... Ts> void GetScanDurationMsAction<Ts...>::play(Ts... x) {
+  if (this->scanner_ == nullptr) {
+    ESP_LOGW(TAG_ACTION, "No scanner available");
+    return;
+  }
+
+  auto duration_ms = this->scanner_->get_scan_duration_ms();
+  // Log the duration
+  ESP_LOGD(TAG_ACTION, "Scan duration: %u ms", duration_ms);
+
+  // Get the variable name if provided
+  std::string var = this->variable_.has_value() ? this->variable_.value(x...) : "scan_duration_ms";
+
+  // Set the global variable using lambda
+  esphome::id(var) = duration_ms;
+}
+
 // Explicit template instantiations
 template class StartAction<>;
 template class StartAction<bool>;

@@ -202,21 +202,11 @@ template<typename... Ts> class ProcessCurrentBufferAction : public Action<Ts...>
   BarcodeScanner *scanner_;
 };
 
-template<typename... Ts> class IsContinuousModeCondition : public Condition<Ts...> {
- public:
-  explicit IsContinuousModeCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
-
-  bool check(Ts... x) override { return this->scanner_->is_continuous_mode(); }
-
- protected:
-  BarcodeScanner *scanner_;
-};
-
 template<typename... Ts> class IsManualScanningCondition : public Condition<Ts...> {
  public:
   explicit IsManualScanningCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
 
-  bool check(Ts... x) override { return this->scanner_->get_scan_state() == ScanState::MANUAL_SCANNING; }
+  bool check(Ts... x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -226,7 +216,17 @@ template<typename... Ts> class IsIdleCondition : public Condition<Ts...> {
  public:
   explicit IsIdleCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
 
-  bool check(Ts... x) override { return this->scanner_->get_scan_state() == ScanState::IDLE; }
+  bool check(Ts... x) override;
+
+ protected:
+  BarcodeScanner *scanner_;
+};
+
+template<typename... Ts> class IsContinuousModeCondition : public Condition<Ts...> {
+ public:
+  explicit IsContinuousModeCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
+
+  bool check(Ts... x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -237,17 +237,7 @@ template<typename... Ts> class GetScanDurationMsAction : public Action<Ts...> {
   explicit GetScanDurationMsAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, variable)
 
-  void play(Ts... x) override {
-    auto duration_ms = this->scanner_->get_scan_duration_ms();
-    // Log the duration
-    ESP_LOGD("m5stack_barcode", "Scan duration: %u ms", duration_ms);
-
-    // Get the variable name if provided
-    std::string var = this->variable_.has_value() ? this->variable_.value(x...) : "scan_duration_ms";
-
-    // Set the global variable using lambda
-    esphome::id(var) = duration_ms;
-  }
+  void play(Ts... x) override;
 
  protected:
   BarcodeScanner *scanner_;

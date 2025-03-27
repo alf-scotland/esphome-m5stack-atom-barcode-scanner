@@ -20,14 +20,14 @@ template<typename T, typename... Args> std::unique_ptr<T> make_unique(Args &&...
 std::unique_ptr<CommandBase> CommandFactory::create_start_command() {
   return make_unique<SimpleCommand>(
       Commands::START_SCAN, Commands::START_SCAN_SIZE, "Start scanning",
-      [](BarcodeScanner *scanner) { scanner->set_scanning(true); },
-      [](BarcodeScanner *scanner) { scanner->set_scanning(false); }, ResponseType::BARCODE);
+      [](BarcodeScanner *scanner) { scanner->set_scan_state(ScanState::MANUAL_SCANNING); },
+      [](BarcodeScanner *scanner) { scanner->set_scan_state(ScanState::IDLE); }, ResponseType::BARCODE);
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_stop_command() {
   return make_unique<SimpleCommand>(
       Commands::STOP_SCAN, Commands::STOP_SCAN_SIZE, "Stop scanning",
-      [](BarcodeScanner *scanner) { scanner->set_scanning(false); }, nullptr);
+      [](BarcodeScanner *scanner) { scanner->set_scan_state(ScanState::IDLE); }, nullptr);
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_version_command() {
