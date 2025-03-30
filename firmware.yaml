@@ -244,6 +244,7 @@ text_sensor:
     name: "Last Barcode"
     id: last_barcode
     icon: "mdi:barcode"
+    force_update: true
 
   - platform: template
     name: "Scanner Version"
