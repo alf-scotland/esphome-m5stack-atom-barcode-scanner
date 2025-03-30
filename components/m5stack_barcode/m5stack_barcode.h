@@ -14,6 +14,9 @@
 namespace esphome {
 namespace m5stack_barcode {
 
+// Forward declarations
+template<typename T> class StateCommand;
+
 // Logging tag for this component
 extern const char *const TAG_SCANNER;
 
@@ -84,7 +87,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @brief Get the setup priority for this component.
    * @return float Priority value (DATA)
    */
-  float get_setup_priority() const override { return setup_priority::HARDWARE; }
+  float get_setup_priority() const override { return setup_priority::DATA; }
 
   // Sensor Configuration
   /**
@@ -359,6 +362,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
  protected:
   friend class CommandBase;
   template<typename T> friend class Command;
+  template<typename T> friend class StateCommand;
   friend class SimpleCommand;
   template<typename... Ts> friend class IsContinuousModeCondition;
   template<typename... Ts> friend class ProcessCurrentBufferAction;
@@ -377,6 +381,21 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   template<typename... Ts> friend class SetStableInductionTimeAction;
   template<typename... Ts> friend class SetReadingIntervalAction;
   template<typename... Ts> friend class SetSameCodeIntervalAction;
+
+  // Protected state setter methods for use by commands
+  void set_terminator_state(Terminator term);
+  void set_light_mode_state(LightMode mode);
+  void set_locate_light_mode_state(LocateLightMode mode);
+  void set_sound_mode_state(SoundMode mode);
+  void set_buzzer_volume_state(BuzzerVolume volume);
+  void set_decoding_success_light_mode_state(DecodingSuccessLightMode mode);
+  void set_boot_sound_mode_state(BootSoundMode mode);
+  void set_decode_sound_mode_state(DecodeSoundMode mode);
+  void set_scan_duration_state(ScanDuration duration);
+  void set_stable_induction_time_state(StableInductionTime time);
+  void set_reading_interval_state(ReadingInterval interval);
+  void set_same_code_interval_state(SameCodeInterval interval);
+  void set_operation_mode_state(OperationMode mode);
 
   // Command Processing Methods
   /**
