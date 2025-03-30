@@ -219,33 +219,26 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @brief Check if the scanner is in continuous mode.
    * @return bool True if in continuous mode or auto sense mode
    */
-  bool is_continuous_mode() const {
-    return this->operation_mode_ == OperationMode::CONTINUOUS || this->operation_mode_ == OperationMode::AUTO_SENSE;
-  }
+  bool is_continuous_mode() const;
 
   // State Accessors
   /**
    * @brief Check if the scanner is currently scanning.
    * @return bool True if scanning is active
    */
-  bool is_scanning() const { return this->scan_state_ != ScanState::IDLE; }
+  bool is_scanning() const;
 
   /**
    * @brief Get the current scan state
    * @return ScanState enum value
    */
-  ScanState get_scan_state() const { return this->scan_state_; }
+  ScanState get_scan_state() const;
 
   /**
    * @brief Set the scan state
    * @param state The new scan state
    */
-  void set_scan_state(ScanState state) {
-    if (this->scan_state_ != state) {
-      ESP_LOGD(TAG_SCANNER, "Scan state changed from %d to %d", (int) this->scan_state_, (int) state);
-      this->scan_state_ = state;
-    }
-  }
+  void set_scan_state(ScanState state);
 
   /**
    * @brief Get the current operation mode.
@@ -330,34 +323,13 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @param duration The scan duration enum to convert
    * @return uint32_t Duration in milliseconds (0 for unlimited)
    */
-  uint32_t scan_duration_to_ms(ScanDuration duration) const {
-    switch (duration) {
-      case ScanDuration::MS_500:
-        return 500;
-      case ScanDuration::MS_1000:
-        return 1000;
-      case ScanDuration::MS_3000:
-        return 3000;
-      case ScanDuration::MS_5000:
-        return 5000;
-      case ScanDuration::MS_10000:
-        return 10000;
-      case ScanDuration::MS_15000:
-        return 15000;
-      case ScanDuration::MS_20000:
-        return 20000;
-      case ScanDuration::UNLIMITED:
-        return 0;
-      default:
-        return 3000;  // Default to 3 seconds
-    }
-  }
+  uint32_t scan_duration_to_ms(ScanDuration duration) const;
 
   /**
    * @brief Get the current scan duration in milliseconds
    * @return uint32_t Current scan duration in milliseconds (0 for unlimited)
    */
-  uint32_t get_scan_duration_ms() const { return scan_duration_to_ms(this->scan_duration_); }
+  uint32_t get_scan_duration_ms() const;
 
  protected:
   friend class CommandBase;

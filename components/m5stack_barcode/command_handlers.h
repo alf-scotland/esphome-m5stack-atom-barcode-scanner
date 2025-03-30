@@ -118,8 +118,6 @@ class CommandFactory {
   static std::unique_ptr<CommandBase> create_locate_light_command(LocateLightMode mode);
   static std::unique_ptr<CommandBase> create_sound_command(SoundMode mode);
   static std::unique_ptr<CommandBase> create_volume_command(BuzzerVolume volume);
-
-  // New setting commands
   static std::unique_ptr<CommandBase> create_decoding_success_light_command(DecodingSuccessLightMode mode);
   static std::unique_ptr<CommandBase> create_boot_sound_command(BootSoundMode mode);
   static std::unique_ptr<CommandBase> create_decode_sound_command(DecodeSoundMode mode);
