@@ -14,6 +14,12 @@
 namespace esphome {
 namespace m5stack_barcode {
 
+// Forward declarations
+template<typename T> class StateCommand;
+
+// Logging tag for this component
+extern const char *const TAG_SCANNER;
+
 /**
  * @brief M5Stack Barcode Scanner component for ESPHome.
  *
@@ -213,22 +219,26 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @brief Check if the scanner is in continuous mode.
    * @return bool True if in continuous mode or auto sense mode
    */
-  bool is_continuous_mode() const {
-    return this->operation_mode_ == OperationMode::CONTINUOUS || this->operation_mode_ == OperationMode::AUTO_SENSE;
-  }
+  bool is_continuous_mode() const;
 
   // State Accessors
   /**
    * @brief Check if the scanner is currently scanning.
    * @return bool True if scanning is active
    */
-  bool is_scanning() const { return this->scanning_; }
+  bool is_scanning() const;
 
   /**
-   * @brief Set the scanning state.
-   * @param scanning True to indicate scanning is active
+   * @brief Get the current scan state
+   * @return ScanState enum value
    */
-  void set_scanning(bool scanning) { this->scanning_ = scanning; }
+  ScanState get_scan_state() const;
+
+  /**
+   * @brief Set the scan state
+   * @param state The new scan state
+   */
+  void set_scan_state(ScanState state);
 
   /**
    * @brief Get the current operation mode.
@@ -308,9 +318,23 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    */
   SameCodeInterval get_same_code_interval() const { return this->same_code_interval_; }
 
+  /**
+   * @brief Convert scan duration enum to milliseconds
+   * @param duration The scan duration enum to convert
+   * @return uint32_t Duration in milliseconds (0 for unlimited)
+   */
+  uint32_t scan_duration_to_ms(ScanDuration duration) const;
+
+  /**
+   * @brief Get the current scan duration in milliseconds
+   * @return uint32_t Current scan duration in milliseconds (0 for unlimited)
+   */
+  uint32_t get_scan_duration_ms() const;
+
  protected:
   friend class CommandBase;
   template<typename T> friend class Command;
+  template<typename T> friend class StateCommand;
   friend class SimpleCommand;
   template<typename... Ts> friend class IsContinuousModeCondition;
   template<typename... Ts> friend class ProcessCurrentBufferAction;
@@ -329,6 +353,21 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   template<typename... Ts> friend class SetStableInductionTimeAction;
   template<typename... Ts> friend class SetReadingIntervalAction;
   template<typename... Ts> friend class SetSameCodeIntervalAction;
+
+  // Protected state setter methods for use by commands
+  void set_terminator_state(Terminator term);
+  void set_light_mode_state(LightMode mode);
+  void set_locate_light_mode_state(LocateLightMode mode);
+  void set_sound_mode_state(SoundMode mode);
+  void set_buzzer_volume_state(BuzzerVolume volume);
+  void set_decoding_success_light_mode_state(DecodingSuccessLightMode mode);
+  void set_boot_sound_mode_state(BootSoundMode mode);
+  void set_decode_sound_mode_state(DecodeSoundMode mode);
+  void set_scan_duration_state(ScanDuration duration);
+  void set_stable_induction_time_state(StableInductionTime time);
+  void set_reading_interval_state(ReadingInterval interval);
+  void set_same_code_interval_state(SameCodeInterval interval);
+  void set_operation_mode_state(OperationMode mode);
 
   // Command Processing Methods
   /**
@@ -440,7 +479,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   std::vector<uint8_t> rx_buffer_;                           ///< Buffer for received data
   std::vector<std::unique_ptr<CommandBase>> command_queue_;  ///< Queue of pending commands
 
-  bool scanning_{false};                                ///< Current scanning state
+  ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
   bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
   uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
   CommandState command_state_{CommandState::IDLE};      ///< Current command processing state

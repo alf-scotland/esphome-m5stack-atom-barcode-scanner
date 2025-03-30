@@ -121,6 +121,13 @@ enum class SameCodeInterval {
   MS_2000   // 2s
 };
 
+// Scanning state to track different states of the scanner
+enum class ScanState {
+  IDLE,                // Not scanning
+  MANUAL_SCANNING,     // Manual scanning (host mode or hardware trigger)
+  CONTINUOUS_SCANNING  // Continuous scanning (continuous or auto-sense mode)
+};
+
 // String conversion helpers for logging
 auto operation_mode_to_string(OperationMode mode) -> const char *;
 auto terminator_to_string(Terminator term) -> const char *;
@@ -135,5 +142,6 @@ auto scan_duration_to_string(ScanDuration duration) -> const char *;
 auto stable_induction_time_to_string(StableInductionTime time) -> const char *;
 auto reading_interval_to_string(ReadingInterval interval) -> const char *;
 auto same_code_interval_to_string(SameCodeInterval interval) -> const char *;
+auto scan_state_to_string(ScanState state) -> const char *;
 
 }  // namespace esphome::m5stack_barcode

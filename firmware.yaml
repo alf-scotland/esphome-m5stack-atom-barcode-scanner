@@ -27,7 +27,7 @@ esp32:
 
 # Enable logging
 logger:
-  level: INFO
+  level: DEBUG
 
 # Enable Home Assistant API
 api:
@@ -50,6 +50,13 @@ wifi:
 # Enable captive portal for easy WiFi setup
 captive_portal:
 
+# Global variables for timeout handling
+globals:
+  - id: timeout_ms
+    type: int
+    restore_value: no
+    initial_value: '3000'
+
 # Status LED - Atom's built-in LED
 light:
   - platform: esp32_rmt_led_strip
@@ -61,6 +68,7 @@ light:
     num_leds: 1
     rgb_order: grb
     rmt_channel: 0
+    disabled_by_default: true
     effects:
       - pulse:
       - flicker:
@@ -72,29 +80,43 @@ uart:
   rx_pin: 22
 
 # Define GPIO pins for hardware control
-# TRIG pin - LOW to activate scanner, HIGH to deactivate
-# DLED pin - HIGH when QR code is detected
 output:
   - platform: gpio
     pin: GPIO23
     id: scanner_trig_pin
-    inverted: true  # Inverted because LOW activates the scanner
+    inverted: true  # LOW activates scanner
 
 # Scripts for LED status indications
 script:
   - id: led_off
     then:
-      - light.turn_off:
-          id: atom_status_led
+      - if:
+          condition:
+            m5stack_barcode.is_continuous_mode:
+              id: barcode_scanner
+          then:
+            - script.execute: led_continuous_scan_active
+          else:
+            - light.turn_off:
+                id: atom_status_led
 
-  - id: led_scan_start
+  - id: led_manual_scan_start
     then:
       - light.turn_on:
           id: atom_status_led
           brightness: 100%
           red: 0%
           green: 0%
-          blue: 100%
+          blue: 100%  # Blue for manual scanning
+
+  - id: led_continuous_scan_active
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 70%
+          red: 80%
+          green: 0%
+          blue: 80%  # Purple for continuous scanning
 
   - id: led_scan_success
     then:
@@ -108,23 +130,62 @@ script:
       - delay: 500ms
       - script.execute: led_off
 
+  - id: led_command_ack
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 70%
+          green: 70%
+          blue: 0%
+          flash_length: 200ms
+      - delay: 200ms
+      - script.execute: led_off
+
   - id: led_scan_timeout
     then:
       - light.turn_on:
           id: atom_status_led
           brightness: 100%
           red: 100%
-          green: 100%
+          green: 50%
           blue: 0%
           flash_length: 500ms
       - delay: 500ms
       - script.execute: led_off
+
+# Script to handle hardware trigger with proper timeout behavior
+  - id: hardware_trigger_with_timeout
+    then:
+      - script.execute: led_manual_scan_start
+      - switch.turn_on: scanner_trigger_internal
+      - delay: !lambda 'return id(timeout_ms);'
+      - if:
+          condition:
+            switch.is_on: scanner_trigger_internal
+          then:
+            - switch.turn_off: scanner_trigger_internal
+            - script.execute: led_scan_timeout
+
+# Script to handle operation mode changes
+  - id: update_mode_led
+    parameters:
+      mode: string
+    then:
+      - if:
+          condition:
+            lambda: 'return mode == "continuous" || mode == "auto_sense";'
+          then:
+            - script.execute: led_continuous_scan_active
+          else:
+            - script.execute: led_off
 
 binary_sensor:
   - platform: gpio
     pin:
       number: GPIO33
       mode: INPUT
+      inverted: true  # DLED is inverted (active LOW)
     name: "${friendly_name} Detection LED"
     id: scanner_dled_pin
     entity_category: "diagnostic"
@@ -134,8 +195,7 @@ binary_sensor:
       - delayed_off: 10ms
     on_press:
       then:
-        - logger.log: "QR code detected via DLED pin"
-        - script.execute: led_scan_success
+        - script.execute: led_command_ack
         - if:
             condition:
               m5stack_barcode.is_continuous_mode:
@@ -143,7 +203,8 @@ binary_sensor:
             then:
               - m5stack_barcode.process_current_buffer:
                   id: barcode_scanner
-        - switch.turn_off: scanner_trigger_internal
+            else:
+              - switch.turn_off: scanner_trigger_internal
 
   # Atom Lite built-in button on GPIO39
   - platform: gpio
@@ -160,8 +221,12 @@ binary_sensor:
       - delayed_off: 20ms
     on_press:
       then:
-        - logger.log: "Atom button pressed, starting scan"
-        - button.press: start_scan_button
+        - if:
+            condition:
+              m5stack_barcode.is_idle:
+                id: barcode_scanner
+            then:
+              - button.press: start_scan_button
 
 # Hardware trigger switch (internal)
 switch:
@@ -172,20 +237,7 @@ switch:
     icon: "mdi:barcode-scan"
     entity_category: "diagnostic"
     restore_mode: ALWAYS_OFF
-    internal: true # Make this switch internal
-    on_turn_on:
-      then:
-        - logger.log: "Hardware trigger activated"
-        - script.execute: led_scan_start
-        # Set up timeout to turn off after 2.5 seconds
-        - delay: 2.5s
-        - if:
-            condition:
-              switch.is_on: scanner_trigger_internal
-            then:
-              - logger.log: "Scan timeout reached"
-              - script.execute: led_scan_timeout
-              - switch.turn_off: scanner_trigger_internal
+    internal: true
 
 text_sensor:
   - platform: template
@@ -193,7 +245,6 @@ text_sensor:
     id: last_barcode
     icon: "mdi:barcode"
 
-  # Diagnostic entities
   - platform: template
     name: "Scanner Version"
     id: scanner_version
@@ -201,15 +252,19 @@ text_sensor:
     icon: "mdi:information-outline"
 
 button:
-  # Main scanning buttons using software-based scanning
   - platform: template
     name: "Start Scan"
     id: start_scan_button
     icon: "mdi:play-circle-outline"
     on_press:
-      - script.execute: led_scan_start
-      - m5stack_barcode.start:
-          id: barcode_scanner
+      - if:
+          condition:
+            m5stack_barcode.is_idle:
+              id: barcode_scanner
+          then:
+            - script.execute: led_manual_scan_start
+            - m5stack_barcode.start:
+                id: barcode_scanner
 
   - platform: template
     name: "Stop Scan"
@@ -219,29 +274,31 @@ button:
           id: barcode_scanner
       - script.execute: led_off
 
-  # Diagnostic buttons for hardware-based scanning
   - platform: template
     name: "Hardware Trigger"
     id: hardware_trigger_button
     icon: "mdi:barcode-scan"
     entity_category: "diagnostic"
     on_press:
-      - script.execute: led_scan_start
-      - switch.turn_on: scanner_trigger_internal
+      - if:
+          condition:
+            m5stack_barcode.is_idle:
+              id: barcode_scanner
+          then:
+            - script.execute: hardware_trigger_with_timeout
 
-  # Config entities
   - platform: restart
     name: "${friendly_name} Restart"
     entity_category: "config"
     icon: "mdi:restart"
 
 select:
-  # Config entities
   - platform: template
     name: "Operation Mode"
     id: operation_mode
     entity_category: "config"
     icon: "mdi:tune"
+    setup_priority: 100
     options:
       - "host"
       - "level"
@@ -254,12 +311,16 @@ select:
       - m5stack_barcode.set_mode:
           id: barcode_scanner
           operation_mode: !lambda "return x;"
+      - script.execute:
+          id: update_mode_led
+          mode: !lambda "return x;"
 
   - platform: template
     name: "Terminator"
     id: terminator
     entity_category: "config"
     icon: "mdi:keyboard-return"
+    setup_priority: 100
     options:
       - "none"
       - "crlf"
@@ -279,6 +340,7 @@ select:
     id: light_mode
     entity_category: "config"
     icon: "mdi:lightbulb"
+    setup_priority: 100
     options:
       - "on_when_reading"
       - "always_on"
@@ -295,6 +357,7 @@ select:
     id: locate_light_mode
     entity_category: "config"
     icon: "mdi:crosshairs"
+    setup_priority: 100
     options:
       - "on_when_reading"
       - "always_on"
@@ -311,6 +374,7 @@ select:
     id: decoding_success_light
     entity_category: "config"
     icon: "mdi:led-on"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -326,6 +390,7 @@ select:
     id: sound_mode
     entity_category: "config"
     icon: "mdi:volume-high"
+    setup_priority: 100
     options:
       - "disabled"
       - "enabled"
@@ -341,6 +406,7 @@ select:
     id: boot_sound
     entity_category: "config"
     icon: "mdi:power"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -356,6 +422,7 @@ select:
     id: decode_sound
     entity_category: "config"
     icon: "mdi:volume-source"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -371,6 +438,7 @@ select:
     id: volume
     entity_category: "config"
     icon: "mdi:volume-medium"
+    setup_priority: 100
     options:
       - "high"
       - "medium"
@@ -387,6 +455,7 @@ select:
     id: scan_duration
     entity_category: "config"
     icon: "mdi:timer"
+    setup_priority: 100
     options:
       - "500ms"
       - "1s"
@@ -402,12 +471,14 @@ select:
       - m5stack_barcode.set_scan_duration:
           id: barcode_scanner
           scan_duration: !lambda "return x;"
+          global_ms_var: timeout_ms
 
   - platform: template
     name: "Stable Induction Time"
     id: stable_induction_time
     entity_category: "config"
     icon: "mdi:timer-sand"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"
@@ -426,6 +497,7 @@ select:
     id: reading_interval
     entity_category: "config"
     icon: "mdi:timer-outline"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"
@@ -446,6 +518,7 @@ select:
     id: same_code_interval
     entity_category: "config"
     icon: "mdi:timer-refresh"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"

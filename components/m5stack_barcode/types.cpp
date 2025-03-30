@@ -203,4 +203,17 @@ auto same_code_interval_to_string(SameCodeInterval interval) -> const char * {
   }
 }
 
+auto scan_state_to_string(ScanState state) -> const char * {
+  switch (state) {
+    case ScanState::IDLE:
+      return "Idle";
+    case ScanState::MANUAL_SCANNING:
+      return "Manual Scanning";
+    case ScanState::CONTINUOUS_SCANNING:
+      return "Continuous Scanning";
+    default:
+      return "Unknown Scan State";
+  }
+}
+
 }  // namespace esphome::m5stack_barcode

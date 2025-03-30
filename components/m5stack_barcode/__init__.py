@@ -33,6 +33,7 @@ CONF_BARCODE_ID = "barcode_id"
 CONF_VERSION_ID = "version_id"
 CONF_VERSION_SENSOR = "version_sensor"
 CONF_ON_BARCODE = "on_barcode"
+CONF_GLOBAL_MS_VAR = "global_ms_var"
 
 # Scanner operation settings
 CONF_OPERATION_MODE = "operation_mode"
@@ -219,6 +220,21 @@ ProcessCurrentBufferAction = m5stack_barcode_ns.class_(
 IsContinuousModeCondition = m5stack_barcode_ns.class_(
     "IsContinuousModeCondition",
     automation.Condition,
+)
+
+IsManualScanningCondition = m5stack_barcode_ns.class_(
+    "IsManualScanningCondition",
+    automation.Condition,
+)
+
+IsIdleCondition = m5stack_barcode_ns.class_(
+    "IsIdleCondition",
+    automation.Condition,
+)
+
+GetScanDurationMsAction = m5stack_barcode_ns.class_(
+    "GetScanDurationMsAction",
+    automation.Action,
 )
 
 # Configuration schema
@@ -627,6 +643,7 @@ async def barcode_set_decode_sound_mode_to_code(
             cv.Required(CONF_SCAN_DURATION): cv.templatable(
                 cv.enum(SCAN_DURATIONS, lower=True),
             ),
+            cv.Optional(CONF_GLOBAL_MS_VAR): cv.templatable(cv.string),
         },
     ),
 )
@@ -640,6 +657,15 @@ async def barcode_set_scan_duration_to_code(
     var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
     template_ = await cg.templatable(config[CONF_SCAN_DURATION], args, cg.std_string)
     cg.add(var.set_duration(template_))
+
+    if CONF_GLOBAL_MS_VAR in config:
+        template_ = await cg.templatable(
+            config[CONF_GLOBAL_MS_VAR],
+            args,
+            cg.std_string,
+        )
+        cg.add(var.set_global_ms_var(template_))
+
     return var
 
 
@@ -754,3 +780,57 @@ async def barcode_is_continuous_mode_to_code(
 ) -> IsContinuousModeCondition:
     """Register is continuous mode condition."""
     return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
+
+
+@automation.register_condition(
+    "m5stack_barcode.is_manual_scanning",
+    IsManualScanningCondition,
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+)
+async def barcode_is_manual_scanning_to_code(
+    config: dict[str, Any],
+    condition_id: str,
+    template_arg: Any,
+    args: Any,  # noqa: ARG001
+) -> IsManualScanningCondition:
+    """Register is manual scanning condition."""
+    return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
+
+
+@automation.register_condition(
+    "m5stack_barcode.is_idle",
+    IsIdleCondition,
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+)
+async def barcode_is_idle_to_code(
+    config: dict[str, Any],
+    condition_id: str,
+    template_arg: Any,
+    args: Any,  # noqa: ARG001
+) -> IsIdleCondition:
+    """Register is idle condition."""
+    return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
+
+
+@automation.register_action(
+    "m5stack_barcode.get_scan_duration_ms",
+    GetScanDurationMsAction,
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.Optional("variable"): cv.templatable(cv.string),
+        },
+    ),
+)
+async def barcode_get_scan_duration_ms_to_code(
+    config: dict[str, Any],
+    action_id: str,
+    template_arg: Any,
+    args: Any,
+) -> GetScanDurationMsAction:
+    """Register get scan duration ms action."""
+    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
+    if "variable" in config:
+        template_ = await cg.templatable(config["variable"], args, cg.std_string)
+        cg.add(var.set_variable(template_))
+    return var
