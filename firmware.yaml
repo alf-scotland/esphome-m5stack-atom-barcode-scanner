@@ -68,6 +68,7 @@ light:
     num_leds: 1
     rgb_order: grb
     rmt_channel: 0
+    disabled_by_default: true
     effects:
       - pulse:
       - flicker:
