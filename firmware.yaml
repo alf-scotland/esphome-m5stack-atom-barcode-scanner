@@ -298,6 +298,7 @@ select:
     id: operation_mode
     entity_category: "config"
     icon: "mdi:tune"
+    setup_priority: 100
     options:
       - "host"
       - "level"
@@ -319,6 +320,7 @@ select:
     id: terminator
     entity_category: "config"
     icon: "mdi:keyboard-return"
+    setup_priority: 100
     options:
       - "none"
       - "crlf"
@@ -338,6 +340,7 @@ select:
     id: light_mode
     entity_category: "config"
     icon: "mdi:lightbulb"
+    setup_priority: 100
     options:
       - "on_when_reading"
       - "always_on"
@@ -354,6 +357,7 @@ select:
     id: locate_light_mode
     entity_category: "config"
     icon: "mdi:crosshairs"
+    setup_priority: 100
     options:
       - "on_when_reading"
       - "always_on"
@@ -370,6 +374,7 @@ select:
     id: decoding_success_light
     entity_category: "config"
     icon: "mdi:led-on"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -385,6 +390,7 @@ select:
     id: sound_mode
     entity_category: "config"
     icon: "mdi:volume-high"
+    setup_priority: 100
     options:
       - "disabled"
       - "enabled"
@@ -400,6 +406,7 @@ select:
     id: boot_sound
     entity_category: "config"
     icon: "mdi:power"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -415,6 +422,7 @@ select:
     id: decode_sound
     entity_category: "config"
     icon: "mdi:volume-source"
+    setup_priority: 100
     options:
       - "enabled"
       - "disabled"
@@ -430,6 +438,7 @@ select:
     id: volume
     entity_category: "config"
     icon: "mdi:volume-medium"
+    setup_priority: 100
     options:
       - "high"
       - "medium"
@@ -446,6 +455,7 @@ select:
     id: scan_duration
     entity_category: "config"
     icon: "mdi:timer"
+    setup_priority: 100
     options:
       - "500ms"
       - "1s"
@@ -468,6 +478,7 @@ select:
     id: stable_induction_time
     entity_category: "config"
     icon: "mdi:timer-sand"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"
@@ -486,6 +497,7 @@ select:
     id: reading_interval
     entity_category: "config"
     icon: "mdi:timer-outline"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"
@@ -506,6 +518,7 @@ select:
     id: same_code_interval
     entity_category: "config"
     icon: "mdi:timer-refresh"
+    setup_priority: 100
     options:
       - "0ms"
       - "100ms"
