@@ -536,15 +536,17 @@ select:
 
 event:
   - platform: template
-    name: "Barcode Scanned"
-    id: barcode_scanned_event
+    name: "Scanner Events"
+    id: scanner_events
     icon: "mdi:barcode-scan"
     device_class: "button"
     event_types:
-      - "barcode_scanned"
+      - "scan_started"
+      - "scan_successful"
+      - "command_acknowledged"
     on_event:
       then:
-        - logger.log: "Barcode scanned event triggered"
+        - logger.log: "Scanner event triggered: {{ trigger.event_type }}"
 
 m5stack_barcode:
   id: barcode_scanner
@@ -553,4 +555,4 @@ m5stack_barcode:
   operation_mode: host
   terminator: crlf
   uart_id: uart_bus
-  barcode_event: barcode_scanned_event
+  barcode_event: scanner_events

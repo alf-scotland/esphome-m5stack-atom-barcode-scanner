@@ -440,8 +440,8 @@ void BarcodeScanner::process_barcode_() {
 
     // Trigger the barcode scanned event
     if (this->barcode_event_ != nullptr) {
-      this->barcode_event_->trigger("barcode_scanned");
-      ESP_LOGD(TAG_SCANNER, "Barcode scanned event triggered");
+      this->barcode_event_->trigger("scan_successful");
+      ESP_LOGD(TAG_SCANNER, "Scanner event triggered: scan_successful");
     }
   }
 

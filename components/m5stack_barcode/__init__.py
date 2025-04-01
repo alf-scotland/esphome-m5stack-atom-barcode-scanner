@@ -37,7 +37,11 @@ CONF_GLOBAL_MS_VAR = "global_ms_var"
 CONF_BARCODE_EVENT = "barcode_event"
 
 # Event types
-EVENT_TYPES = ["barcode_scanned"]
+EVENT_TYPES = [
+    "scan_started",
+    "scan_successful",
+    "command_acknowledged",
+]
 
 # Scanner operation settings
 CONF_OPERATION_MODE = "operation_mode"
