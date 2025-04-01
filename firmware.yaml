@@ -289,14 +289,13 @@ button:
 
   - platform: restart
     name: "${friendly_name} Restart"
-    entity_category: "config"
+    entity_category: "diagnostic"
     icon: "mdi:restart"
 
 select:
   - platform: template
     name: "Operation Mode"
     id: operation_mode
-    entity_category: "config"
     icon: "mdi:tune"
     setup_priority: 100
     options:
@@ -534,6 +533,18 @@ select:
           id: barcode_scanner
           same_code_interval: !lambda "return x;"
 
+event:
+  - platform: template
+    name: "Scanner Events"
+    id: scanner_events
+    icon: "mdi:barcode-scan"
+    device_class: "button"
+    event_types:
+      - "scan_successful"
+    on_event:
+      then:
+        - logger.log: "Scanner event triggered: {{ trigger.event_type }}"
+
 m5stack_barcode:
   id: barcode_scanner
   barcode_id: last_barcode
@@ -541,3 +552,4 @@ m5stack_barcode:
   operation_mode: host
   terminator: crlf
   uart_id: uart_bus
+  barcode_event: scanner_events

@@ -8,6 +8,7 @@
 #include "commands.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/components/event/event.h"
 #include "esphome/core/component.h"
 #include "types.h"
 
@@ -35,11 +36,13 @@ extern const char *const TAG_SCANNER;
  * - Firmware version reporting
  * - Automatic wake-up handling
  * - Command acknowledgment verification
+ * - Barcode scan events
  *
  * Requirements:
  * - UART communication configured in YAML
  * - Optional text sensor for barcode output
  * - Optional text sensor for firmware version
+ * - Optional event component for barcode scan events
  *
  * Usage:
  * ```yaml
@@ -101,6 +104,12 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @param version_sensor Pointer to the text sensor component
    */
   void set_version_sensor(text_sensor::TextSensor *version_sensor) { this->version_sensor_ = version_sensor; }
+
+  /**
+   * @brief Set the event component for barcode scan events.
+   * @param event Pointer to the event component
+   */
+  void set_barcode_event(event::Event *event) { this->barcode_event_ = event; }
 
   // Scanner Control Methods
   /**
@@ -475,6 +484,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   // Component State
   text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
   text_sensor::TextSensor *version_sensor_{nullptr};  ///< Sensor for firmware version
+  event::Event *barcode_event_{nullptr};              ///< Event for barcode scans
 
   std::vector<uint8_t> rx_buffer_;                           ///< Buffer for received data
   std::vector<std::unique_ptr<CommandBase>> command_queue_;  ///< Queue of pending commands
