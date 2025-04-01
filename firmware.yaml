@@ -289,14 +289,13 @@ button:
 
   - platform: restart
     name: "${friendly_name} Restart"
-    entity_category: "config"
+    entity_category: "diagnostic"
     icon: "mdi:restart"
 
 select:
   - platform: template
     name: "Operation Mode"
     id: operation_mode
-    entity_category: "config"
     icon: "mdi:tune"
     setup_priority: 100
     options:
