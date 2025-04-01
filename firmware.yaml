@@ -534,6 +534,18 @@ select:
           id: barcode_scanner
           same_code_interval: !lambda "return x;"
 
+event:
+  - platform: template
+    name: "Barcode Scanned"
+    id: barcode_scanned_event
+    icon: "mdi:barcode-scan"
+    device_class: "button"
+    event_types:
+      - "barcode_scanned"
+    on_event:
+      then:
+        - logger.log: "Barcode scanned event triggered"
+
 m5stack_barcode:
   id: barcode_scanner
   barcode_id: last_barcode
@@ -541,3 +553,4 @@ m5stack_barcode:
   operation_mode: host
   terminator: crlf
   uart_id: uart_bus
+  barcode_event: barcode_scanned_event

@@ -5,12 +5,12 @@ from typing import Any
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
-from esphome.components import text_sensor, uart
+from esphome.components import event, text_sensor, uart
 from esphome.const import CONF_ID
 
 # Dependencies
 DEPENDENCIES = ["uart"]
-AUTO_LOAD = ["text_sensor"]
+AUTO_LOAD = ["text_sensor", "event"]
 
 
 # Helper function to get the scanner from config
@@ -34,6 +34,10 @@ CONF_VERSION_ID = "version_id"
 CONF_VERSION_SENSOR = "version_sensor"
 CONF_ON_BARCODE = "on_barcode"
 CONF_GLOBAL_MS_VAR = "global_ms_var"
+CONF_BARCODE_EVENT = "barcode_event"
+
+# Event types
+EVENT_TYPES = ["barcode_scanned"]
 
 # Scanner operation settings
 CONF_OPERATION_MODE = "operation_mode"
@@ -243,6 +247,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(BarcodeScanner),
         cv.Optional(CONF_BARCODE_ID): cv.use_id(text_sensor.TextSensor),
         cv.Optional(CONF_VERSION_ID): cv.use_id(text_sensor.TextSensor),
+        cv.Required(CONF_BARCODE_EVENT): cv.use_id(event.Event),
         cv.Optional(CONF_OPERATION_MODE, default="host"): cv.enum(
             OPERATION_MODES,
             lower=True,
@@ -273,12 +278,12 @@ CONFIG_SCHEMA = cv.Schema(
 async def handle_sensor_config(var: Any, config: dict[str, Any]) -> None:
     """Handle sensor configuration."""
     if CONF_BARCODE_ID in config:
-        sens = await cg.get_variable(config[CONF_BARCODE_ID])
-        cg.add(var.set_text_sensor(sens))
+        barcode_var = await cg.get_variable(config[CONF_BARCODE_ID])
+        cg.add(var.set_text_sensor(barcode_var))
 
     if CONF_VERSION_ID in config:
-        vers = await cg.get_variable(config[CONF_VERSION_ID])
-        cg.add(var.set_version_sensor(vers))
+        version_var = await cg.get_variable(config[CONF_VERSION_ID])
+        cg.add(var.set_version_sensor(version_var))
 
 
 async def handle_operation_config(var: Any, config: dict[str, Any]) -> None:
@@ -364,6 +369,11 @@ async def to_code(config: dict[str, Any]) -> None:
     await handle_light_config(var, config)
     await handle_sound_config(var, config)
     await handle_timing_config(var, config)
+
+    # Handle barcode event configuration
+    if CONF_BARCODE_EVENT in config:
+        event_var = await cg.get_variable(config[CONF_BARCODE_EVENT])
+        cg.add(var.set_barcode_event(event_var))
 
 
 # Action registrations

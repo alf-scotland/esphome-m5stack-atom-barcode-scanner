@@ -437,6 +437,12 @@ void BarcodeScanner::process_barcode_() {
       this->text_sensor_->publish_state(barcode);
       ESP_LOGD(TAG_SCANNER, "Barcode received: %s", barcode.c_str());
     }
+
+    // Trigger the barcode scanned event
+    if (this->barcode_event_ != nullptr) {
+      this->barcode_event_->trigger("barcode_scanned");
+      ESP_LOGD(TAG_SCANNER, "Barcode scanned event triggered");
+    }
   }
 
   // Clear the buffer for the next barcode
