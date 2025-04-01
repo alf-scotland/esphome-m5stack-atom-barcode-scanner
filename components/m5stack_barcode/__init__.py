@@ -38,9 +38,7 @@ CONF_BARCODE_EVENT = "barcode_event"
 
 # Event types
 EVENT_TYPES = [
-    "scan_started",
     "scan_successful",
-    "command_acknowledged",
 ]
 
 # Scanner operation settings
