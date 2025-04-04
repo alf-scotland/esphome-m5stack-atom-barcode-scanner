@@ -52,14 +52,19 @@ jobs:
         run: |
           mkdir -p release-files
           uv run esphome compile firmware.yaml
-          cp -v .esphome/build/*/*/*.bin release-files/ || echo "No firmware files found"
+          # Copy both the OTA and factory firmware files
+          cp -v .esphome/build/atom-barcode/.pioenvs/atom-barcode/firmware.bin release-files/atom-barcode.bin || echo "No OTA firmware found"
+          cp -v .esphome/build/atom-barcode/.pioenvs/atom-barcode/firmware.factory.bin release-files/atom-barcode.factory.bin || echo "No factory firmware found"
           ls -la release-files/
 
       - name: Generate manifest file
         run: |
-          # Get the firmware file name
-          FIRMWARE_FILE=$(find release-files -name "*.bin" -type f | head -n1)
-          if [ -z "$FIRMWARE_FILE" ]; then
+          # Get the firmware file name - prefer OTA firmware
+          FIRMWARE_FILE="release-files/atom-barcode.bin"
+          if [ ! -f "$FIRMWARE_FILE" ]; then
+            FIRMWARE_FILE="release-files/atom-barcode.factory.bin"
+          fi
+          if [ ! -f "$FIRMWARE_FILE" ]; then
             echo "No firmware file found!"
             exit 1
           fi
