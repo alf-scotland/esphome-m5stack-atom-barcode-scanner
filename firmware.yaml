@@ -3,6 +3,7 @@ substitutions:
   friendly_name: Atom Barcode Scanner
   project_name: esphome-m5stack-atom-barcode-scanner
   project_version: "2025.3.0-beta.1"
+  firmware_base_url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner/releases/latest/download
 
 dashboard_import:
   package_import_url: github://scotland/esphome-m5stack-atom-barcode-scanner/firmware.yaml@main
@@ -39,6 +40,14 @@ ota:
 
 http_request:
   verify_ssl: false
+
+# Add managed updates configuration
+update:
+  - platform: http_request
+    name: Firmware Update
+    source: ${firmware_base_url}/manifest.json
+    update_interval: 6h
+    id: http_firmware_update
 
 safe_mode:
   disabled: true

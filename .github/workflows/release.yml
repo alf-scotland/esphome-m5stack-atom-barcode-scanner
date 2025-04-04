@@ -67,6 +67,34 @@ jobs:
           cp -v .esphome/build/*/*/*.bin release-files/ || echo "No firmware files found"
           ls -la release-files/
 
+      - name: Generate manifest file
+        run: |
+          # Get the firmware file name
+          FIRMWARE_FILE=$(ls release-files/*.bin | head -n1)
+          FIRMWARE_NAME=$(basename $FIRMWARE_FILE)
+
+          # Calculate MD5 hash
+          MD5_HASH=$(md5sum $FIRMWARE_FILE | cut -d ' ' -f1)
+
+          # Create manifest file
+          cat > release-files/manifest.json << EOF
+          {
+            "name": "ESPHome M5Stack Atom Barcode Scanner",
+            "version": "${{ steps.extract_version.outputs.version }}",
+            "builds": [
+              {
+                "chipFamily": "ESP32",
+                "ota": {
+                  "md5": "$MD5_HASH",
+                  "path": "$FIRMWARE_NAME",
+                  "release_url": "https://github.com/scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v${{ steps.extract_version.outputs.version }}",
+                  "summary": "Release v${{ steps.extract_version.outputs.version }}"
+                }
+              }
+            ]
+          }
+          EOF
+
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -77,4 +105,6 @@ jobs:
           draft: false
           prerelease: ${{ steps.extract_version.outputs.is_prerelease }}
           generate_release_notes: true
-          files: release-files/*.bin
+          files: |
+            release-files/*.bin
+            release-files/manifest.json
