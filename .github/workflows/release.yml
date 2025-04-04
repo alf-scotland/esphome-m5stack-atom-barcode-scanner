@@ -32,10 +32,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Create secrets.yaml for CI
-        run: |
-          cp secrets.yaml.example secrets.yaml
-
       - name: Extract version from tag
         id: extract_version
         run: |
@@ -54,27 +50,23 @@ jobs:
 
       - name: Build firmware
         run: |
-          uv run esphome compile firmware.yaml
-
-      - name: Find binary files
-        run: |
-          echo "Listing build directory structure:"
-          find .esphome -name "*.bin" -type f | sort
-
-      - name: Copy artifacts to release directory
-        run: |
           mkdir -p release-files
+          esphome compile firmware.yaml
           cp -v .esphome/build/*/*/*.bin release-files/ || echo "No firmware files found"
           ls -la release-files/
 
       - name: Generate manifest file
         run: |
           # Get the firmware file name
-          FIRMWARE_FILE=$(ls release-files/*.bin | head -n1)
-          FIRMWARE_NAME=$(basename $FIRMWARE_FILE)
+          FIRMWARE_FILE=$(find release-files -name "*.bin" -type f | head -n1)
+          if [ -z "$FIRMWARE_FILE" ]; then
+            echo "No firmware file found!"
+            exit 1
+          fi
+          FIRMWARE_NAME=$(basename "$FIRMWARE_FILE")
 
           # Calculate MD5 hash
-          MD5_HASH=$(md5sum $FIRMWARE_FILE | cut -d ' ' -f1)
+          MD5_HASH=$(md5sum "$FIRMWARE_FILE" | cut -d ' ' -f1)
 
           # Create manifest file
           cat > release-files/manifest.json << EOF
