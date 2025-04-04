@@ -51,7 +51,7 @@ jobs:
       - name: Build firmware
         run: |
           mkdir -p release-files
-          esphome compile firmware.yaml
+          uv run esphome compile firmware.yaml
           cp -v .esphome/build/*/*/*.bin release-files/ || echo "No firmware files found"
           ls -la release-files/
 
