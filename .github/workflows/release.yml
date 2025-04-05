@@ -47,6 +47,7 @@ jobs:
 
           # Update version in firmware.yaml
           sed -i "s/project_version: \".*\"/project_version: \"$TAG\"/" firmware.yaml
+          sed -i "s|firmware_base_url: .*|firmware_base_url: https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v$TAG|" firmware.yaml
 
       - name: Build firmware
         run: |
@@ -84,7 +85,7 @@ jobs:
                 "ota": {
                   "md5": "$MD5_HASH",
                   "path": "$FIRMWARE_NAME",
-                  "release_url": "https://github.com/scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v${{ steps.extract_version.outputs.version }}",
+                  "release_url": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v${{ steps.extract_version.outputs.version }}",
                   "summary": "Release v${{ steps.extract_version.outputs.version }}"
                 }
               }

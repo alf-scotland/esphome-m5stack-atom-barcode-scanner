@@ -2,8 +2,8 @@ substitutions:
   name: atom-barcode
   friendly_name: Atom Barcode Scanner
   project_name: esphome-m5stack-atom-barcode-scanner
-  project_version: "2025.3.0-beta.1"
-  firmware_base_url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner/releases/latest/download
+  project_version: "2025.3.0-beta.5"
+  firmware_base_url: https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v${project_version}
 
 dashboard_import:
   package_import_url: github://scotland/esphome-m5stack-atom-barcode-scanner/firmware.yaml@main
