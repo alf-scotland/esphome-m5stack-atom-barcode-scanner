@@ -19,7 +19,6 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
           python-version-file: 'pyproject.toml'
 
       - name: Install uv
@@ -31,10 +30,6 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --all-extras
-
-      - name: Create secrets.yaml for CI
-        run: |
-          cp secrets.yaml.example secrets.yaml
 
       - name: Extract version from tag
         id: extract_version
