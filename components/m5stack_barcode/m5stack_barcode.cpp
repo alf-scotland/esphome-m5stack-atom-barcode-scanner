@@ -145,7 +145,7 @@ void BarcodeScanner::loop() {
   this->read_buffer_();
 
   // Handle command acknowledgments
-  if (this->waiting_for_ack_) {
+  if (this->command_state_ == CommandState::COMMAND_SENT) {
     // Check if we've received an acknowledgment
     if (!this->rx_buffer_.empty() && this->is_ack_sequence_(this->rx_buffer_.data(), this->rx_buffer_.size())) {
       ESP_LOGD(TAG_SCANNER, "Command acknowledged");
@@ -160,7 +160,6 @@ void BarcodeScanner::loop() {
       this->command_queue_.erase(this->command_queue_.begin());
 
       // Reset state
-      this->waiting_for_ack_ = false;
       this->command_state_ = CommandState::IDLE;
 
       // Clear the buffer except for version responses
@@ -179,7 +178,6 @@ void BarcodeScanner::loop() {
       this->command_queue_.erase(this->command_queue_.begin());
 
       // Reset state
-      this->waiting_for_ack_ = false;
       this->command_state_ = CommandState::IDLE;
       this->expected_response_ = ResponseType::NONE;
 
@@ -268,7 +266,7 @@ void BarcodeScanner::set_expected_response_(ResponseType type) { this->expected_
 // Command Processing Methods
 void BarcodeScanner::process_command_queue_() {
   // Only process commands if we're not waiting for an acknowledgment
-  if (this->waiting_for_ack_ || this->command_queue_.empty()) {
+  if (this->command_state_ == CommandState::COMMAND_SENT || this->command_queue_.empty()) {
     return;
   }
 
@@ -309,7 +307,6 @@ void BarcodeScanner::write_command_(const std::unique_ptr<CommandBase> &command)
   this->write_array(command->get_data(), command->get_length());
 
   // Update state tracking
-  this->waiting_for_ack_ = true;
   this->last_command_time_ = millis();
   this->command_state_ = CommandState::COMMAND_SENT;
 }
