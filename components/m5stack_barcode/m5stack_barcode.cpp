@@ -721,21 +721,6 @@ bool BarcodeScanner::set_same_code_interval(SameCodeInterval interval) {
 }
 
 // Command Factory Methods
-std::unique_ptr<CommandBase> BarcodeScanner::create_mode_command(OperationMode mode) {
-  return CommandFactory::create_mode_command(mode);
-}
-
-std::unique_ptr<CommandBase> BarcodeScanner::create_terminator_command(Terminator term) {
-  return CommandFactory::create_terminator_command(term);
-}
-
-std::unique_ptr<CommandBase> BarcodeScanner::create_start_command() { return CommandFactory::create_start_command(); }
-
-std::unique_ptr<CommandBase> BarcodeScanner::create_stop_command() { return CommandFactory::create_stop_command(); }
-
-std::unique_ptr<CommandBase> BarcodeScanner::create_version_command() {
-  return CommandFactory::create_version_command();
-}
 
 void BarcodeScanner::process_current_buffer() {
   // First ensure we have the latest data

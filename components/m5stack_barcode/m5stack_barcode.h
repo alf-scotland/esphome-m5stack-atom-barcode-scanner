@@ -448,39 +448,6 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    */
   void write_command_(const std::unique_ptr<CommandBase> &command);
 
-  // Command Factories
-  /**
-   * @brief Create a mode command.
-   * @param mode The operation mode to set
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_mode_command(OperationMode mode);
-
-  /**
-   * @brief Create a terminator command.
-   * @param term The terminator to set
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_terminator_command(Terminator term);
-
-  /**
-   * @brief Create a start scanning command.
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_start_command();
-
-  /**
-   * @brief Create a stop scanning command.
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_stop_command();
-
-  /**
-   * @brief Create a version request command.
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_version_command();
-
   // Component State
   text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
   text_sensor::TextSensor *version_sensor_{nullptr};  ///< Sensor for firmware version
