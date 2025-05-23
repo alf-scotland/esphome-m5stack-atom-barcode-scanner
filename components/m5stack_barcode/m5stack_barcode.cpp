@@ -138,6 +138,17 @@ void BarcodeScanner::configure_defaults_() {
 }
 
 void BarcodeScanner::loop() {
+  // Handle manual scan timeout in HOST mode
+  if (this->operation_mode_ == OperationMode::HOST && this->scan_state_ == ScanState::MANUAL_SCANNING) {
+    uint32_t timeout_ms = this->get_scan_duration_ms();
+    if (timeout_ms > 0 && (millis() - this->manual_scan_start_time_ >= timeout_ms)) {
+      ESP_LOGD(TAG_SCANNER, "Manual scan timed out after %u ms. Resetting scan state.", timeout_ms);
+      this->set_scan_state(ScanState::IDLE);
+      this->manual_scan_start_time_ = 0; // Reset timer
+      // Do not send a stop command to the hardware, just reset software state.
+    }
+  }
+
   // Process any pending commands first
   this->process_command_queue_();
 
@@ -221,6 +232,7 @@ void BarcodeScanner::loop() {
       // Reset scanning state after barcode is processed in HOST mode
       if (this->operation_mode_ == OperationMode::HOST) {
         this->set_scan_state(ScanState::IDLE);
+        this->manual_scan_start_time_ = 0; // Reset timer
       }
 
       // Set expected response type to NONE
@@ -503,6 +515,7 @@ void BarcodeScanner::start_scan() {
 
   // Update state
   this->set_scan_state(ScanState::MANUAL_SCANNING);
+  this->manual_scan_start_time_ = millis();
 
   // Set expected response type to BARCODE
   this->set_expected_response_(ResponseType::BARCODE);
@@ -526,6 +539,7 @@ void BarcodeScanner::stop_scan() {
   this->queue_command(std::move(command));
 
   // Update state
+  this->manual_scan_start_time_ = 0;
   this->set_scan_state(ScanState::IDLE);
 }
 

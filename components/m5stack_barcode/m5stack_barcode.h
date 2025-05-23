@@ -492,6 +492,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
   bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
   uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
+  uint32_t manual_scan_start_time_{0};                  ///< Timestamp of manual scan start
   CommandState command_state_{CommandState::IDLE};      ///< Current command processing state
   ResponseType expected_response_{ResponseType::NONE};  ///< Expected response type
 
