@@ -541,6 +541,7 @@ event:
     device_class: "button"
     event_types:
       - "scan_successful"
+      - "scan_timed_out" # <-- New event type added here
     on_event:
       then:
         - logger.log: "Scanner event triggered: {{ trigger.event_type }}"

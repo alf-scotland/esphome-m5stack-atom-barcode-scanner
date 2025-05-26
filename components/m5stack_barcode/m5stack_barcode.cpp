@@ -45,6 +45,24 @@ void BarcodeScanner::set_scan_state(ScanState state) {
   }
 }
 
+void BarcodeScanner::check_host_mode_scan_timeout_() {
+  uint32_t configured_timeout_ms = this->get_scan_duration_ms();
+
+  // Only proceed if a timeout is configured (not 0, which means unlimited)
+  if (configured_timeout_ms != 0) {
+    if ((millis() - this->last_command_time_) > configured_timeout_ms) {
+      ESP_LOGD(TAG_SCANNER, "Host mode scan timed out.");
+      this->scan_state_ = ScanState::IDLE;
+      this->expected_response_ = ResponseType::NONE;
+
+      if (this->barcode_event_ != nullptr) {
+        this->barcode_event_->trigger("scan_timed_out");
+        ESP_LOGD(TAG_SCANNER, "Event triggered: scan_timed_out");
+      }
+    }
+  }
+}
+
 uint32_t BarcodeScanner::get_scan_duration_ms() const {
   return esphome::m5stack_barcode::scan_duration_to_ms(this->scan_duration_);
 }
@@ -117,6 +135,11 @@ void BarcodeScanner::configure_defaults_() {
 }
 
 void BarcodeScanner::loop() {
+  // Check for host mode scan timeout
+  if (this->operation_mode_ == OperationMode::HOST && this->scan_state_ == ScanState::MANUAL_SCANNING) {
+    this->check_host_mode_scan_timeout_();
+  }
+
   // Process any pending commands first
   this->process_command_queue_();
 

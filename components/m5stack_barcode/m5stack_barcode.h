@@ -441,6 +441,12 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    */
   void write_command_(const std::unique_ptr<CommandBase> &command);
 
+  /**
+   * @brief Checks if the host mode scan has timed out and updates state accordingly.
+   * Only relevant when operation_mode_ is HOST and scan_state_ is MANUAL_SCANNING.
+   */
+  void check_host_mode_scan_timeout_();
+
   // Component State
   text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
   text_sensor::TextSensor *version_sensor_{nullptr};  ///< Sensor for firmware version
