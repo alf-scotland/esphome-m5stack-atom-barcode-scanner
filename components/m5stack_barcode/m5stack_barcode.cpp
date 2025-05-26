@@ -530,10 +530,10 @@ void BarcodeScanner::stop_scan() {
 }
 
 // Scanner Settings Methods
-bool BarcodeScanner::set_operation_mode(OperationMode mode) {
+void BarcodeScanner::set_operation_mode(OperationMode mode) {
   if (mode == this->operation_mode_) {
     ESP_LOGD(TAG_SCANNER, "Operation mode already set to %s", operation_mode_to_string(mode));
-    return true;
+    return;
   }
 
   // Create and queue the mode command
@@ -547,177 +547,138 @@ bool BarcodeScanner::set_operation_mode(OperationMode mode) {
     // If we're leaving continuous mode, reset the scan state
     this->set_scan_state(ScanState::IDLE);
   }
-
-  // The operation mode state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_terminator(Terminator term) {
+void BarcodeScanner::set_terminator(Terminator term) {
   if (term == this->terminator_) {
     ESP_LOGD(TAG_SCANNER, "Terminator already set to %s", terminator_to_string(term));
-    return true;
+    return;
   }
 
   // Create and queue the terminator command
   auto command = CommandFactory::create_terminator_command(term);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_light_mode(LightMode mode) {
+void BarcodeScanner::set_light_mode(LightMode mode) {
   if (mode == this->light_mode_) {
     ESP_LOGD(TAG_SCANNER, "Light mode already set to %s", light_mode_to_string(mode));
-    return true;
+    return;
   }
 
   // Create and queue the light mode command
   auto command = CommandFactory::create_light_command(mode);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_locate_light_mode(LocateLightMode mode) {
+void BarcodeScanner::set_locate_light_mode(LocateLightMode mode) {
   if (mode == this->locate_light_mode_) {
     ESP_LOGD(TAG_SCANNER, "Locate light mode already set to %s", locate_light_mode_to_string(mode));
-    return true;
+    return;
   }
 
   // Create and queue the locate light mode command
   auto command = CommandFactory::create_locate_light_command(mode);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_sound_mode(SoundMode mode) {
+void BarcodeScanner::set_sound_mode(SoundMode mode) {
   if (mode == this->sound_mode_) {
     ESP_LOGD(TAG_SCANNER, "Sound mode already set to %s", sound_mode_to_string(mode));
-    return true;
+    return;
   }
 
   // Create and queue the sound mode command
   auto command = CommandFactory::create_sound_command(mode);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_buzzer_volume(BuzzerVolume volume) {
+void BarcodeScanner::set_buzzer_volume(BuzzerVolume volume) {
   if (volume == this->buzzer_volume_) {
     ESP_LOGD(TAG_SCANNER, "Buzzer volume already set to %s", buzzer_volume_to_string(volume));
-    return true;
+    return;
   }
 
   // Create and queue the volume command
   auto command = CommandFactory::create_volume_command(volume);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_decoding_success_light_mode(DecodingSuccessLightMode mode) {
+void BarcodeScanner::set_decoding_success_light_mode(DecodingSuccessLightMode mode) {
   if (mode == this->decoding_success_light_mode_) {
     ESP_LOGD(TAG_SCANNER, "Decoding success light mode already set to %s", decoding_success_light_mode_to_string(mode));
-    return true;
+    return;
   }
 
   // Create and queue the command
   auto command = CommandFactory::create_decoding_success_light_command(mode);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_boot_sound_mode(BootSoundMode mode) {
+void BarcodeScanner::set_boot_sound_mode(BootSoundMode mode) {
   if (mode == this->boot_sound_mode_) {
     ESP_LOGD(TAG_SCANNER, "Boot sound mode already set to %s", boot_sound_mode_to_string(mode));
-    return true;
+    return;
   }
 
   // Create and queue the command
   auto command = CommandFactory::create_boot_sound_command(mode);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_decode_sound_mode(DecodeSoundMode mode) {
+void BarcodeScanner::set_decode_sound_mode(DecodeSoundMode mode) {
   if (mode == this->decode_sound_mode_) {
     ESP_LOGD(TAG_SCANNER, "Decode sound mode already set to %s", decode_sound_mode_to_string(mode));
-    return true;
+    return;
   }
 
   // Create and queue the command
   auto command = CommandFactory::create_decode_sound_command(mode);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_scan_duration(ScanDuration duration) {
+void BarcodeScanner::set_scan_duration(ScanDuration duration) {
   if (duration == this->scan_duration_) {
     ESP_LOGD(TAG_SCANNER, "Scan duration already set to %s", scan_duration_to_string(duration));
-    return true;
+    return;
   }
 
   // Create and queue the command
   auto command = CommandFactory::create_scan_duration_command(duration);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_stable_induction_time(StableInductionTime time) {
+void BarcodeScanner::set_stable_induction_time(StableInductionTime time) {
   if (time == this->stable_induction_time_) {
     ESP_LOGD(TAG_SCANNER, "Stable induction time already set to %s", stable_induction_time_to_string(time));
-    return true;
+    return;
   }
 
   // Create and queue the command
   auto command = CommandFactory::create_stable_induction_time_command(time);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_reading_interval(ReadingInterval interval) {
+void BarcodeScanner::set_reading_interval(ReadingInterval interval) {
   if (interval == this->reading_interval_) {
     ESP_LOGD(TAG_SCANNER, "Reading interval already set to %s", reading_interval_to_string(interval));
-    return true;
+    return;
   }
 
   // Create and queue the command
   auto command = CommandFactory::create_reading_interval_command(interval);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
-bool BarcodeScanner::set_same_code_interval(SameCodeInterval interval) {
+void BarcodeScanner::set_same_code_interval(SameCodeInterval interval) {
   if (interval == this->same_code_interval_) {
     ESP_LOGD(TAG_SCANNER, "Same code interval already set to %s", same_code_interval_to_string(interval));
-    return true;
+    return;
   }
 
   // Create and queue the command
   auto command = CommandFactory::create_same_code_interval_command(interval);
   this->queue_command(std::move(command));
-
-  // The state will be updated in the command's success callback
-  return true;
 }
 
 void BarcodeScanner::process_current_buffer() {
