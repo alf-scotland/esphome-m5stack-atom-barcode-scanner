@@ -216,4 +216,27 @@ auto scan_state_to_string(ScanState state) -> const char * {
   }
 }
 
+auto scan_duration_to_ms(ScanDuration duration) -> uint32_t {
+  switch (duration) {
+    case ScanDuration::MS_500:
+      return 500;
+    case ScanDuration::MS_1000:
+      return 1000;
+    case ScanDuration::MS_3000:
+      return 3000;
+    case ScanDuration::MS_5000:
+      return 5000;
+    case ScanDuration::MS_10000:
+      return 10000;
+    case ScanDuration::MS_15000:
+      return 15000;
+    case ScanDuration::MS_20000:
+      return 20000;
+    case ScanDuration::UNLIMITED:
+      return 0;
+    default:
+      return 3000;  // Default to 3 seconds
+  }
+}
+
 }  // namespace esphome::m5stack_barcode

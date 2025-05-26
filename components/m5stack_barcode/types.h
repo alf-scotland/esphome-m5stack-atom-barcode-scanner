@@ -144,4 +144,7 @@ auto reading_interval_to_string(ReadingInterval interval) -> const char *;
 auto same_code_interval_to_string(SameCodeInterval interval) -> const char *;
 auto scan_state_to_string(ScanState state) -> const char *;
 
+// Duration conversion helper
+auto scan_duration_to_ms(ScanDuration duration) -> uint32_t;
+
 }  // namespace esphome::m5stack_barcode

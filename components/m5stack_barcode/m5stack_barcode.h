@@ -132,91 +132,91 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @param mode The desired operation mode
    * @return bool True if command was queued successfully
    */
-  bool set_operation_mode(OperationMode mode);
+  void set_operation_mode(OperationMode mode);
 
   /**
    * @brief Set the terminator sequence for barcode output.
    * @param term The desired terminator type
    * @return bool True if command was queued successfully
    */
-  bool set_terminator(Terminator term);
+  void set_terminator(Terminator term);
 
   /**
    * @brief Set the main light mode of the scanner.
    * @param mode The desired light mode
    * @return bool True if command was queued successfully
    */
-  bool set_light_mode(LightMode mode);
+  void set_light_mode(LightMode mode);
 
   /**
    * @brief Set the locate light mode of the scanner.
    * @param mode The desired locate light mode
    * @return bool True if command was queued successfully
    */
-  bool set_locate_light_mode(LocateLightMode mode);
+  void set_locate_light_mode(LocateLightMode mode);
 
   /**
    * @brief Set the sound mode of the scanner.
    * @param mode The desired sound mode
    * @return bool True if command was queued successfully
    */
-  bool set_sound_mode(SoundMode mode);
+  void set_sound_mode(SoundMode mode);
 
   /**
    * @brief Set the buzzer volume level.
    * @param volume The desired volume level
    * @return bool True if command was queued successfully
    */
-  bool set_buzzer_volume(BuzzerVolume volume);
+  void set_buzzer_volume(BuzzerVolume volume);
 
   /**
    * @brief Set the decoding success light mode of the scanner.
    * @param mode The desired decoding success light mode
    * @return bool True if command was queued successfully
    */
-  bool set_decoding_success_light_mode(DecodingSuccessLightMode mode);
+  void set_decoding_success_light_mode(DecodingSuccessLightMode mode);
 
   /**
    * @brief Set the boot sound mode of the scanner.
    * @param mode The desired boot sound mode
    * @return bool True if command was queued successfully
    */
-  bool set_boot_sound_mode(BootSoundMode mode);
+  void set_boot_sound_mode(BootSoundMode mode);
 
   /**
    * @brief Set the decode sound mode of the scanner.
    * @param mode The desired decode sound mode
    * @return bool True if command was queued successfully
    */
-  bool set_decode_sound_mode(DecodeSoundMode mode);
+  void set_decode_sound_mode(DecodeSoundMode mode);
 
   /**
    * @brief Set the scan duration of the scanner.
    * @param duration The desired scan duration
    * @return bool True if command was queued successfully
    */
-  bool set_scan_duration(ScanDuration duration);
+  void set_scan_duration(ScanDuration duration);
 
   /**
    * @brief Set the stable induction time of the scanner.
    * @param time The desired stable induction time
    * @return bool True if command was queued successfully
    */
-  bool set_stable_induction_time(StableInductionTime time);
+  void set_stable_induction_time(StableInductionTime time);
 
   /**
    * @brief Set the reading interval of the scanner.
    * @param interval The desired reading interval
    * @return bool True if command was queued successfully
    */
-  bool set_reading_interval(ReadingInterval interval);
+  void set_reading_interval(ReadingInterval interval);
 
   /**
    * @brief Set the same code interval of the scanner.
    * @param interval The desired same code interval
    * @return bool True if command was queued successfully
    */
-  bool set_same_code_interval(SameCodeInterval interval);
+  void set_same_code_interval(SameCodeInterval interval);
 
   /**
    * @brief Process the current buffer as a barcode.
@@ -328,15 +328,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   SameCodeInterval get_same_code_interval() const { return this->same_code_interval_; }
 
   /**
-   * @brief Convert scan duration enum to milliseconds
-   * @param duration The scan duration enum to convert
-   * @return uint32_t Duration in milliseconds (0 for unlimited)
-   */
-  uint32_t scan_duration_to_ms(ScanDuration duration) const;
-
-  /**
    * @brief Get the current scan duration in milliseconds
-   * @return uint32_t Current scan duration in milliseconds (0 for unlimited)
+   * @return uint32_t Duration in milliseconds (0 for unlimited)
    */
   uint32_t get_scan_duration_ms() const;
 
@@ -447,39 +440,6 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @param command Reference to the command to write
    */
   void write_command_(const std::unique_ptr<CommandBase> &command);
-
-  // Command Factories
-  /**
-   * @brief Create a mode command.
-   * @param mode The operation mode to set
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_mode_command(OperationMode mode);
-
-  /**
-   * @brief Create a terminator command.
-   * @param term The terminator to set
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_terminator_command(Terminator term);
-
-  /**
-   * @brief Create a start scanning command.
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_start_command();
-
-  /**
-   * @brief Create a stop scanning command.
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_stop_command();
-
-  /**
-   * @brief Create a version request command.
-   * @return std::unique_ptr<CommandBase> The created command
-   */
-  std::unique_ptr<CommandBase> create_version_command();
 
   // Component State
   text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
