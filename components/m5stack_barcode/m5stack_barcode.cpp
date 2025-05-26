@@ -45,30 +45,9 @@ void BarcodeScanner::set_scan_state(ScanState state) {
   }
 }
 
-uint32_t BarcodeScanner::scan_duration_to_ms(ScanDuration duration) const {
-  switch (duration) {
-    case ScanDuration::MS_500:
-      return 500;
-    case ScanDuration::MS_1000:
-      return 1000;
-    case ScanDuration::MS_3000:
-      return 3000;
-    case ScanDuration::MS_5000:
-      return 5000;
-    case ScanDuration::MS_10000:
-      return 10000;
-    case ScanDuration::MS_15000:
-      return 15000;
-    case ScanDuration::MS_20000:
-      return 20000;
-    case ScanDuration::UNLIMITED:
-      return 0;
-    default:
-      return 3000;  // Default to 3 seconds
-  }
+uint32_t BarcodeScanner::get_scan_duration_ms() const {
+  return esphome::m5stack_barcode::scan_duration_to_ms(this->scan_duration_);
 }
-
-uint32_t BarcodeScanner::get_scan_duration_ms() const { return scan_duration_to_ms(this->scan_duration_); }
 
 // Component Lifecycle Methods
 void BarcodeScanner::setup() {

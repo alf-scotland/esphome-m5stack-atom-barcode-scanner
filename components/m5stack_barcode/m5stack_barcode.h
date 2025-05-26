@@ -328,15 +328,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   SameCodeInterval get_same_code_interval() const { return this->same_code_interval_; }
 
   /**
-   * @brief Convert scan duration enum to milliseconds
-   * @param duration The scan duration enum to convert
-   * @return uint32_t Duration in milliseconds (0 for unlimited)
-   */
-  uint32_t scan_duration_to_ms(ScanDuration duration) const;
-
-  /**
    * @brief Get the current scan duration in milliseconds
-   * @return uint32_t Current scan duration in milliseconds (0 for unlimited)
+   * @return uint32_t Duration in milliseconds (0 for unlimited)
    */
   uint32_t get_scan_duration_ms() const;
 
