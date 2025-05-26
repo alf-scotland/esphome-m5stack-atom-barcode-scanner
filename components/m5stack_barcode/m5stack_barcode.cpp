@@ -720,8 +720,6 @@ bool BarcodeScanner::set_same_code_interval(SameCodeInterval interval) {
   return true;
 }
 
-// Command Factory Methods
-
 void BarcodeScanner::process_current_buffer() {
   // First ensure we have the latest data
   this->read_buffer_();
