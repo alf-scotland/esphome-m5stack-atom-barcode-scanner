@@ -97,9 +97,9 @@ void BarcodeScanner::configure_defaults_() {
 
 // Helper macro: queue a command only when the stored value differs from the
 // desired value (or when there are no valid stored preferences at all).
-#define QUEUE_IF_CHANGED(field, create_fn, value)                                \
-  if (!has_valid_prefs || stored.field != static_cast<uint8_t>(value)) {         \
-    this->queue_command(create_fn(value));                                        \
+#define QUEUE_IF_CHANGED(field, create_fn, value) \
+  if (!has_valid_prefs || stored.field != static_cast<uint8_t>(value)) { \
+    this->queue_command(create_fn(value)); \
   }
 
   QUEUE_IF_CHANGED(operation_mode, CommandFactory::create_mode_command, this->operation_mode_)
@@ -915,7 +915,8 @@ void DecodeSoundSwitch::write_state(bool state) {
     ESP_LOGW(TAG_SCANNER, "DecodeSoundSwitch: no scanner attached");
     return;
   }
-  scanner_->set_decode_sound_mode(state ? DecodeSoundMode::DECODE_SOUND_ENABLED : DecodeSoundMode::DECODE_SOUND_DISABLED);
+  scanner_->set_decode_sound_mode(state ? DecodeSoundMode::DECODE_SOUND_ENABLED
+                                        : DecodeSoundMode::DECODE_SOUND_DISABLED);
 }
 
 void DecodingSuccessLightSwitch::write_state(bool state) {
@@ -924,7 +925,7 @@ void DecodingSuccessLightSwitch::write_state(bool state) {
     return;
   }
   scanner_->set_decoding_success_light_mode(state ? DecodingSuccessLightMode::DECODING_LIGHT_ENABLED
-                                                   : DecodingSuccessLightMode::DECODING_LIGHT_DISABLED);
+                                                  : DecodingSuccessLightMode::DECODING_LIGHT_DISABLED);
 }
 
 void StartButton::press_action() {

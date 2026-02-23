@@ -112,8 +112,8 @@ std::unique_ptr<CommandBase> CommandFactory::create_stop_command() {
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_version_command() {
-  return std::make_unique<SimpleCommand>(Commands::GET_VERSION, Commands::GET_VERSION_SIZE, "Get Version", nullptr, nullptr,
-                                    ResponseType::VERSION);
+  return std::make_unique<SimpleCommand>(Commands::GET_VERSION, Commands::GET_VERSION_SIZE, "Get Version", nullptr,
+                                         nullptr, ResponseType::VERSION);
 }
 
 // Setting commands
@@ -141,7 +141,8 @@ std::unique_ptr<CommandBase> CommandFactory::create_mode_command(OperationMode m
       return nullptr;
   }
 
-  return std::make_unique<StateCommand<OperationMode>>(cmd_data, Commands::Mode::SIZE, mode, operation_mode_to_string(mode));
+  return std::make_unique<StateCommand<OperationMode>>(cmd_data, Commands::Mode::SIZE, mode,
+                                                       operation_mode_to_string(mode));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_terminator_command(Terminator term) {
@@ -171,7 +172,8 @@ std::unique_ptr<CommandBase> CommandFactory::create_terminator_command(Terminato
       return nullptr;
   }
 
-  return std::make_unique<StateCommand<Terminator>>(cmd_data, Commands::Terminator::SIZE, term, terminator_to_string(term));
+  return std::make_unique<StateCommand<Terminator>>(cmd_data, Commands::Terminator::SIZE, term,
+                                                    terminator_to_string(term));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_light_command(LightMode mode) {
@@ -214,7 +216,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_locate_light_command(LocateL
   }
 
   return std::make_unique<StateCommand<LocateLightMode>>(cmd_data, Commands::LocateLight::SIZE, mode,
-                                                    locate_light_mode_to_string(mode));
+                                                         locate_light_mode_to_string(mode));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_sound_command(SoundMode mode) {
@@ -254,7 +256,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_volume_command(BuzzerVolume 
   }
 
   return std::make_unique<StateCommand<BuzzerVolume>>(cmd_data, Commands::Volume::SIZE, volume,
-                                                 buzzer_volume_to_string(volume));
+                                                      buzzer_volume_to_string(volume));
 }
 
 // New command factory methods for additional settings
@@ -275,7 +277,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_decoding_success_light_comma
   }
 
   return std::make_unique<StateCommand<DecodingSuccessLightMode>>(cmd_data, Commands::DecodingSuccessLight::SIZE, mode,
-                                                             decoding_success_light_mode_to_string(mode));
+                                                                  decoding_success_light_mode_to_string(mode));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_boot_sound_command(BootSoundMode mode) {
@@ -294,7 +296,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_boot_sound_command(BootSound
   }
 
   return std::make_unique<StateCommand<BootSoundMode>>(cmd_data, Commands::BootSound::SIZE, mode,
-                                                  boot_sound_mode_to_string(mode));
+                                                       boot_sound_mode_to_string(mode));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_decode_sound_command(DecodeSoundMode mode) {
@@ -313,7 +315,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_decode_sound_command(DecodeS
   }
 
   return std::make_unique<StateCommand<DecodeSoundMode>>(cmd_data, Commands::DecodeSound::SIZE, mode,
-                                                    decode_sound_mode_to_string(mode));
+                                                         decode_sound_mode_to_string(mode));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_scan_duration_command(ScanDuration duration) {
@@ -350,7 +352,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_scan_duration_command(ScanDu
   }
 
   return std::make_unique<StateCommand<ScanDuration>>(cmd_data, Commands::ScanDuration::SIZE, duration,
-                                                 scan_duration_to_string(duration));
+                                                      scan_duration_to_string(duration));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_stable_induction_time_command(StableInductionTime time) {
@@ -378,7 +380,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_stable_induction_time_comman
   }
 
   return std::make_unique<StateCommand<StableInductionTime>>(cmd_data, Commands::StableInductionTime::SIZE, time,
-                                                        stable_induction_time_to_string(time));
+                                                             stable_induction_time_to_string(time));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_reading_interval_command(ReadingInterval interval) {
@@ -412,7 +414,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_reading_interval_command(Rea
   }
 
   return std::make_unique<StateCommand<ReadingInterval>>(cmd_data, Commands::ReadingInterval::SIZE, interval,
-                                                    reading_interval_to_string(interval));
+                                                         reading_interval_to_string(interval));
 }
 
 std::unique_ptr<CommandBase> CommandFactory::create_same_code_interval_command(SameCodeInterval interval) {
@@ -446,7 +448,7 @@ std::unique_ptr<CommandBase> CommandFactory::create_same_code_interval_command(S
   }
 
   return std::make_unique<StateCommand<SameCodeInterval>>(cmd_data, Commands::SameCodeInterval::SIZE, interval,
-                                                     same_code_interval_to_string(interval));
+                                                          same_code_interval_to_string(interval));
 }
 
 }  // namespace m5stack_barcode

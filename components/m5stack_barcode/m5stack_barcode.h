@@ -195,9 +195,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_sound_switch(SoundSwitch *sw) { this->sound_switch_ = sw; }
   void set_boot_sound_switch(BootSoundSwitch *sw) { this->boot_sound_switch_ = sw; }
   void set_decode_sound_switch(DecodeSoundSwitch *sw) { this->decode_sound_switch_ = sw; }
-  void set_decoding_success_light_switch(DecodingSuccessLightSwitch *sw) {
-    this->decoding_success_light_switch_ = sw;
-  }
+  void set_decoding_success_light_switch(DecodingSuccessLightSwitch *sw) { this->decoding_success_light_switch_ = sw; }
   void set_buzzer_volume_select(BuzzerVolumeSelect *sel) { this->buzzer_volume_select_ = sel; }
   void set_light_mode_select(LightModeSelect *sel) { this->light_mode_select_ = sel; }
   void set_locate_light_mode_select(LocateLightModeSelect *sel) { this->locate_light_mode_select_ = sel; }
@@ -553,17 +551,17 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   CallbackManager<void()> scan_timeout_callback_;        ///< on_scan_timeout automation triggers
 
   // Component State
-  text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
-  text_sensor::TextSensor *version_sensor_{nullptr};  ///< Sensor for firmware version
-  event::Event *barcode_event_{nullptr};              ///< Event for barcode scans
-  OperationModeSelect *operation_mode_select_{nullptr};        ///< Optional HA select for operation mode
-  BuzzerVolumeSelect *buzzer_volume_select_{nullptr};          ///< Optional HA select for buzzer volume
-  LightModeSelect *light_mode_select_{nullptr};                ///< Optional HA select for light mode
-  LocateLightModeSelect *locate_light_mode_select_{nullptr};   ///< Optional HA select for locate light mode
-  ScanDurationSelect *scan_duration_select_{nullptr};          ///< Optional HA select for scan duration
-  SoundSwitch *sound_switch_{nullptr};                         ///< Optional HA switch for sound mode
-  BootSoundSwitch *boot_sound_switch_{nullptr};                ///< Optional HA switch for boot sound mode
-  DecodeSoundSwitch *decode_sound_switch_{nullptr};            ///< Optional HA switch for decode sound mode
+  text_sensor::TextSensor *text_sensor_{nullptr};                       ///< Sensor for barcode output
+  text_sensor::TextSensor *version_sensor_{nullptr};                    ///< Sensor for firmware version
+  event::Event *barcode_event_{nullptr};                                ///< Event for barcode scans
+  OperationModeSelect *operation_mode_select_{nullptr};                 ///< Optional HA select for operation mode
+  BuzzerVolumeSelect *buzzer_volume_select_{nullptr};                   ///< Optional HA select for buzzer volume
+  LightModeSelect *light_mode_select_{nullptr};                         ///< Optional HA select for light mode
+  LocateLightModeSelect *locate_light_mode_select_{nullptr};            ///< Optional HA select for locate light mode
+  ScanDurationSelect *scan_duration_select_{nullptr};                   ///< Optional HA select for scan duration
+  SoundSwitch *sound_switch_{nullptr};                                  ///< Optional HA switch for sound mode
+  BootSoundSwitch *boot_sound_switch_{nullptr};                         ///< Optional HA switch for boot sound mode
+  DecodeSoundSwitch *decode_sound_switch_{nullptr};                     ///< Optional HA switch for decode sound mode
   DecodingSuccessLightSwitch *decoding_success_light_switch_{nullptr};  ///< Optional HA switch for success light
   binary_sensor::BinarySensor *scanning_binary_sensor_{nullptr};        ///< Optional HA binary sensor for scan state
 
@@ -622,11 +620,16 @@ class OperationModeSelect : public select::Select {
   /// Returns the YAML key string for an OperationMode enum value (used when publishing state).
   static const char *mode_to_key(OperationMode mode) {
     switch (mode) {
-      case OperationMode::LEVEL: return "level";
-      case OperationMode::PULSE: return "pulse";
-      case OperationMode::CONTINUOUS: return "continuous";
-      case OperationMode::AUTO_SENSE: return "auto_sense";
-      default: return "host";
+      case OperationMode::LEVEL:
+        return "level";
+      case OperationMode::PULSE:
+        return "pulse";
+      case OperationMode::CONTINUOUS:
+        return "continuous";
+      case OperationMode::AUTO_SENSE:
+        return "auto_sense";
+      default:
+        return "host";
     }
   }
 
@@ -644,9 +647,12 @@ class BuzzerVolumeSelect : public select::Select {
 
   static const char *volume_to_key(BuzzerVolume volume) {
     switch (volume) {
-      case BuzzerVolume::BUZZER_VOLUME_HIGH: return "high";
-      case BuzzerVolume::BUZZER_VOLUME_MEDIUM: return "medium";
-      default: return "low";
+      case BuzzerVolume::BUZZER_VOLUME_HIGH:
+        return "high";
+      case BuzzerVolume::BUZZER_VOLUME_MEDIUM:
+        return "medium";
+      default:
+        return "low";
     }
   }
 
@@ -664,9 +670,12 @@ class LightModeSelect : public select::Select {
 
   static const char *mode_to_key(LightMode mode) {
     switch (mode) {
-      case LightMode::LIGHT_ALWAYS_ON: return "always_on";
-      case LightMode::LIGHT_ALWAYS_OFF: return "always_off";
-      default: return "on_when_reading";
+      case LightMode::LIGHT_ALWAYS_ON:
+        return "always_on";
+      case LightMode::LIGHT_ALWAYS_OFF:
+        return "always_off";
+      default:
+        return "on_when_reading";
     }
   }
 
@@ -684,9 +693,12 @@ class LocateLightModeSelect : public select::Select {
 
   static const char *mode_to_key(LocateLightMode mode) {
     switch (mode) {
-      case LocateLightMode::LOCATE_LIGHT_ALWAYS_ON: return "always_on";
-      case LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF: return "always_off";
-      default: return "on_when_reading";
+      case LocateLightMode::LOCATE_LIGHT_ALWAYS_ON:
+        return "always_on";
+      case LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF:
+        return "always_off";
+      default:
+        return "on_when_reading";
     }
   }
 
@@ -704,15 +716,24 @@ class ScanDurationSelect : public select::Select {
 
   static const char *duration_to_key(ScanDuration duration) {
     switch (duration) {
-      case ScanDuration::MS_500: return "500ms";
-      case ScanDuration::MS_1000: return "1s";
-      case ScanDuration::MS_3000: return "3s";
-      case ScanDuration::MS_5000: return "5s";
-      case ScanDuration::MS_10000: return "10s";
-      case ScanDuration::MS_15000: return "15s";
-      case ScanDuration::MS_20000: return "20s";
-      case ScanDuration::UNLIMITED: return "unlimited";
+      case ScanDuration::MS_500:
+        return "500ms";
+      case ScanDuration::MS_1000:
+        return "1s";
+      case ScanDuration::MS_3000:
+        return "3s";
+      case ScanDuration::MS_5000:
+        return "5s";
+      case ScanDuration::MS_10000:
+        return "10s";
+      case ScanDuration::MS_15000:
+        return "15s";
+      case ScanDuration::MS_20000:
+        return "20s";
+      case ScanDuration::UNLIMITED:
+        return "unlimited";
     }
+    return nullptr;  // Unreachable: all enum values handled above
   }
 
  protected:
