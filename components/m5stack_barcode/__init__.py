@@ -5,12 +5,12 @@ from typing import Any
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
-from esphome.components import event, text_sensor, uart
+from esphome.components import event, select, text_sensor, uart
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 
 # Dependencies
 DEPENDENCIES = ["uart"]
-AUTO_LOAD = ["text_sensor", "event"]
+AUTO_LOAD = ["event", "select", "text_sensor"]
 
 
 # Helper function to get the scanner from config
@@ -31,7 +31,9 @@ BarcodeScanner = m5stack_barcode_ns.class_(
 CONF_BARCODE_ID = "barcode_id"
 CONF_VERSION_ID = "version_id"
 CONF_ON_BARCODE = "on_barcode"
+CONF_ON_SCAN_TIMEOUT = "on_scan_timeout"
 CONF_BARCODE_EVENT = "barcode_event"
+CONF_OPERATION_MODE_SELECT = "operation_mode_select"
 
 # Event types
 EVENT_TYPES = [
@@ -224,6 +226,16 @@ BarcodeTrigger = m5stack_barcode_ns.class_(
     "BarcodeTrigger",
     automation.Trigger.template(cg.std_string),
 )
+ScanTimeoutTrigger = m5stack_barcode_ns.class_(
+    "ScanTimeoutTrigger",
+    automation.Trigger.template(),
+)
+
+# Sub-components
+OperationModeSelect = m5stack_barcode_ns.class_(
+    "OperationModeSelect",
+    select.Select,
+)
 
 # Conditions
 IsContinuousModeCondition = m5stack_barcode_ns.class_(
@@ -253,6 +265,14 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger),
             }
         ),
+        cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation(
+            {
+                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ScanTimeoutTrigger),
+            }
+        ),
+        cv.Optional(CONF_OPERATION_MODE_SELECT): select.SELECT_SCHEMA.extend(
+            {cv.GenerateID(): cv.declare_id(OperationModeSelect)}
+        ).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_OPERATION_MODE, default="host"): cv.enum(
             OPERATION_MODES,
             lower=True,
@@ -294,51 +314,51 @@ async def handle_sensor_config(var: Any, config: dict[str, Any]) -> None:
 async def handle_operation_config(var: Any, config: dict[str, Any]) -> None:
     """Handle operation mode and terminator configuration."""
     if CONF_OPERATION_MODE in config:
-        cg.add(var.set_operation_mode(config[CONF_OPERATION_MODE]))
+        cg.add(var.set_operation_mode_initial(config[CONF_OPERATION_MODE]))
     if CONF_TERMINATOR in config:
-        cg.add(var.set_terminator(config[CONF_TERMINATOR]))
+        cg.add(var.set_terminator_initial(config[CONF_TERMINATOR]))
 
 
 async def handle_light_config(var: Any, config: dict[str, Any]) -> None:
     """Handle light-related configuration."""
     if CONF_LIGHT_MODE in config:
-        cg.add(var.set_light_mode(config[CONF_LIGHT_MODE]))
+        cg.add(var.set_light_mode_initial(config[CONF_LIGHT_MODE]))
 
     if CONF_LOCATE_LIGHT_MODE in config:
-        cg.add(var.set_locate_light_mode(config[CONF_LOCATE_LIGHT_MODE]))
+        cg.add(var.set_locate_light_mode_initial(config[CONF_LOCATE_LIGHT_MODE]))
 
     if CONF_DECODING_SUCCESS_LIGHT_MODE in config:
-        cg.add(var.set_decoding_success_light_mode(config[CONF_DECODING_SUCCESS_LIGHT_MODE]))
+        cg.add(var.set_decoding_success_light_mode_initial(config[CONF_DECODING_SUCCESS_LIGHT_MODE]))
 
 
 async def handle_sound_config(var: Any, config: dict[str, Any]) -> None:
     """Handle sound-related configuration."""
     if CONF_SOUND_MODE in config:
-        cg.add(var.set_sound_mode(config[CONF_SOUND_MODE]))
+        cg.add(var.set_sound_mode_initial(config[CONF_SOUND_MODE]))
 
     if CONF_BUZZER_VOLUME in config:
-        cg.add(var.set_buzzer_volume(config[CONF_BUZZER_VOLUME]))
+        cg.add(var.set_buzzer_volume_initial(config[CONF_BUZZER_VOLUME]))
 
     if CONF_BOOT_SOUND_MODE in config:
-        cg.add(var.set_boot_sound_mode(config[CONF_BOOT_SOUND_MODE]))
+        cg.add(var.set_boot_sound_mode_initial(config[CONF_BOOT_SOUND_MODE]))
 
     if CONF_DECODE_SOUND_MODE in config:
-        cg.add(var.set_decode_sound_mode(config[CONF_DECODE_SOUND_MODE]))
+        cg.add(var.set_decode_sound_mode_initial(config[CONF_DECODE_SOUND_MODE]))
 
 
 async def handle_timing_config(var: Any, config: dict[str, Any]) -> None:
     """Handle timing-related configuration."""
     if CONF_SCAN_DURATION in config:
-        cg.add(var.set_scan_duration(config[CONF_SCAN_DURATION]))
+        cg.add(var.set_scan_duration_initial(config[CONF_SCAN_DURATION]))
 
     if CONF_STABLE_INDUCTION_TIME in config:
-        cg.add(var.set_stable_induction_time(config[CONF_STABLE_INDUCTION_TIME]))
+        cg.add(var.set_stable_induction_time_initial(config[CONF_STABLE_INDUCTION_TIME]))
 
     if CONF_READING_INTERVAL in config:
-        cg.add(var.set_reading_interval(config[CONF_READING_INTERVAL]))
+        cg.add(var.set_reading_interval_initial(config[CONF_READING_INTERVAL]))
 
     if CONF_SAME_CODE_INTERVAL in config:
-        cg.add(var.set_same_code_interval(config[CONF_SAME_CODE_INTERVAL]))
+        cg.add(var.set_same_code_interval_initial(config[CONF_SAME_CODE_INTERVAL]))
 
 
 async def to_code(config: dict[str, Any]) -> None:
@@ -362,6 +382,24 @@ async def to_code(config: dict[str, Any]) -> None:
     for conf in config.get(CONF_ON_BARCODE, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
         await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
+
+    # Register on_scan_timeout automation triggers
+    for conf in config.get(CONF_ON_SCAN_TIMEOUT, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
+        await automation.build_automation(trigger, [], conf)
+
+    # Wire up the optional operation-mode select sub-component
+    if CONF_OPERATION_MODE_SELECT in config:
+        sel_conf = config[CONF_OPERATION_MODE_SELECT]
+        sel_var = cg.new_Pvariable(sel_conf[CONF_ID])
+        await cg.register_component(sel_var, sel_conf)
+        await select.register_select(
+            sel_var,
+            sel_conf,
+            options=list(OPERATION_MODES.keys()),
+        )
+        cg.add(sel_var.set_scanner(var))
+        cg.add(var.set_operation_mode_select(sel_var))
 
 
 # Action registrations

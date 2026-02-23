@@ -47,6 +47,8 @@ Component Options
 - **version_id** (*Optional*, :ref:`config-id`): The ID of a template text sensor that will display the scanner firmware version.
 - **id** (*Optional*, :ref:`config-id`): Manually specify the ID for this component.
 - **on_barcode** (*Optional*, :ref:`Automation <automation>`): Automation to run whenever a barcode is successfully decoded. The scanned string is available as the variable ``x``.
+- **on_scan_timeout** (*Optional*, :ref:`Automation <automation>`): Automation to run when a HOST-mode scan times out without producing a result (after ``scan_duration`` has elapsed). Use this to give user feedback or retry logic. Not triggered when ``scan_duration`` is set to ``unlimited``.
+- **operation_mode_select** (*Optional*): Expose the scanner's operation mode as a Home Assistant ``select`` entity for runtime switching. Accepts standard entity options (``name``, ``icon``, etc.).
 
 - **operation_mode** (*Optional*): Set the scanner operation mode.
 
@@ -409,6 +411,55 @@ string is available as ``x`` inside the automation block.
         - text_sensor.template.publish:
             id: last_barcode
             state: !lambda "return x;"
+
+.. _m5stack_barcode-on_scan_timeout_trigger:
+
+``on_scan_timeout``
+*******************
+
+Automation triggered when a HOST-mode scan times out — i.e. ``scan_duration`` elapses
+after ``m5stack_barcode.start`` without a barcode being decoded. Not triggered when
+``scan_duration: unlimited``.
+
+Use this for user feedback (flash an LED, sound a buzzer, update a sensor) or to
+implement retry logic in Home Assistant automations.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      operation_mode: host
+      scan_duration: 5s
+      on_scan_timeout:
+        - logger.log: "No barcode found within 5s"
+        - light.turn_on:
+            id: status_led
+            effect: "Fast Blink"
+
+Sub-components
+--------------
+
+.. _m5stack_barcode-operation_mode_select:
+
+``operation_mode_select``
+*************************
+
+Exposes the scanner's operation mode as a Home Assistant ``select`` entity so users can
+switch between modes at runtime without modifying YAML. The select stays in sync with
+the scanner state: changing the mode via an action or at startup automatically updates
+the entity in Home Assistant.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      operation_mode: host
+      operation_mode_select:
+        name: "Scanner Mode"
+        icon: "mdi:tune"
+
+The available options match the ``operation_mode`` keys:
+``host``, ``level``, ``pulse``, ``continuous``, ``auto_sense``.
 
 Conditions
 ----------

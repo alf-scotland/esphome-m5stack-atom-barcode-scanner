@@ -7,6 +7,7 @@
 #include "actions.h"
 #include "command_handlers.h"
 #include "commands.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/event/event.h"
@@ -45,6 +46,7 @@ struct ScannerPreferences {
 
 // Forward declarations
 template<typename T> class StateCommand;
+class OperationModeSelect;
 
 // Logging tag for this component
 extern const char *const TAG_SCANNER;
@@ -146,6 +148,36 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void add_on_barcode_callback(std::function<void(std::string)> &&callback) {
     this->barcode_callback_.add(std::move(callback));
   }
+
+  /**
+   * @brief Register a callback invoked when a HOST-mode scan times out without a result.
+   * @param callback Function called on scan timeout
+   */
+  void add_on_scan_timeout_callback(std::function<void()> &&callback) {
+    this->scan_timeout_callback_.add(std::move(callback));
+  }
+
+  // Initial-value setters — called by ESPHome code generation to set desired values
+  // before setup() runs. They update the in-memory state so configure_defaults_() sends
+  // only the settings that differ from NVS, without double-queuing.
+  void set_operation_mode_initial(OperationMode mode) { this->operation_mode_ = mode; }
+  void set_terminator_initial(Terminator term) { this->terminator_ = term; }
+  void set_light_mode_initial(LightMode mode) { this->light_mode_ = mode; }
+  void set_locate_light_mode_initial(LocateLightMode mode) { this->locate_light_mode_ = mode; }
+  void set_sound_mode_initial(SoundMode mode) { this->sound_mode_ = mode; }
+  void set_buzzer_volume_initial(BuzzerVolume volume) { this->buzzer_volume_ = volume; }
+  void set_decoding_success_light_mode_initial(DecodingSuccessLightMode mode) {
+    this->decoding_success_light_mode_ = mode;
+  }
+  void set_boot_sound_mode_initial(BootSoundMode mode) { this->boot_sound_mode_ = mode; }
+  void set_decode_sound_mode_initial(DecodeSoundMode mode) { this->decode_sound_mode_ = mode; }
+  void set_scan_duration_initial(ScanDuration duration) { this->scan_duration_ = duration; }
+  void set_stable_induction_time_initial(StableInductionTime time) { this->stable_induction_time_ = time; }
+  void set_reading_interval_initial(ReadingInterval interval) { this->reading_interval_ = interval; }
+  void set_same_code_interval_initial(SameCodeInterval interval) { this->same_code_interval_ = interval; }
+
+  /// Attach the optional operation-mode select sub-component.
+  void set_operation_mode_select(OperationModeSelect *select) { this->operation_mode_select_ = select; }
 
   // Scanner Control Methods
   /**
@@ -494,11 +526,13 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
 
   // Callbacks
   CallbackManager<void(std::string)> barcode_callback_;  ///< on_barcode automation triggers
+  CallbackManager<void()> scan_timeout_callback_;        ///< on_scan_timeout automation triggers
 
   // Component State
   text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
   text_sensor::TextSensor *version_sensor_{nullptr};  ///< Sensor for firmware version
   event::Event *barcode_event_{nullptr};              ///< Event for barcode scans
+  OperationModeSelect *operation_mode_select_{nullptr};  ///< Optional HA select for operation mode
 
   std::vector<uint8_t> rx_buffer_;                           ///< Buffer for received data
   std::vector<std::unique_ptr<CommandBase>> command_queue_;  ///< Queue of pending commands
@@ -506,6 +540,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
   bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
   uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
+  uint32_t scan_started_at_{0};                         ///< millis() when start_scan() was called; 0 = idle
   CommandState command_state_{CommandState::IDLE};      ///< Current command processing state
   ResponseType expected_response_{ResponseType::NONE};  ///< Expected response type
 
@@ -533,6 +568,40 @@ class BarcodeTrigger : public Trigger<std::string> {
   explicit BarcodeTrigger(BarcodeScanner *parent) {
     parent->add_on_barcode_callback([this](std::string barcode) { this->trigger(std::move(barcode)); });
   }
+};
+
+/// Trigger fired when a HOST-mode scan times out (scan_duration elapsed without a result).
+/// Use via `on_scan_timeout:` in YAML for error handling and user feedback automations.
+class ScanTimeoutTrigger : public Trigger<> {
+ public:
+  explicit ScanTimeoutTrigger(BarcodeScanner *parent) {
+    parent->add_on_scan_timeout_callback([this]() { this->trigger(); });
+  }
+};
+
+/// Select sub-component that exposes the scanner's operation mode as a Home Assistant
+/// select entity. Changing the select in HA sends the appropriate UART command and waits
+/// for the scanner ACK before publishing the new confirmed state.
+class OperationModeSelect : public select::Select {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  /// Returns the YAML key string for an OperationMode enum value (used when publishing state).
+  static const char *mode_to_key(OperationMode mode) {
+    switch (mode) {
+      case OperationMode::LEVEL: return "level";
+      case OperationMode::PULSE: return "pulse";
+      case OperationMode::CONTINUOUS: return "continuous";
+      case OperationMode::AUTO_SENSE: return "auto_sense";
+      default: return "host";
+    }
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
 };
 
 }  // namespace m5stack_barcode

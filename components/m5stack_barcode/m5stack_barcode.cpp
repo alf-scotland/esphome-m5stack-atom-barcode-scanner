@@ -54,6 +54,11 @@ void BarcodeScanner::setup() {
   // Configure settings, skipping any that the scanner already has from a previous boot
   this->configure_defaults_();
 
+  // Publish initial operation-mode state to the HA select entity (if wired)
+  if (this->operation_mode_select_ != nullptr) {
+    this->operation_mode_select_->publish_state(OperationModeSelect::mode_to_key(this->operation_mode_));
+  }
+
   // Then request version information (optional)
   if (this->version_sensor_ != nullptr) {
     this->request_version_();
@@ -202,6 +207,19 @@ void BarcodeScanner::loop() {
 
       // Set expected response type to NONE
       this->expected_response_ = ResponseType::NONE;
+    }
+  }
+
+  // HOST-mode scan timeout: fire on_scan_timeout if scan_duration has elapsed without a result.
+  // scan_duration_to_ms() returns 0 for UNLIMITED, in which case we never time out.
+  if (this->scan_state_ == ScanState::MANUAL_SCANNING && this->scan_started_at_ != 0) {
+    const uint32_t duration_ms = this->get_scan_duration_ms();
+    if (duration_ms > 0 && (millis() - this->scan_started_at_) > duration_ms) {
+      ESP_LOGD(TAG_SCANNER, "Scan timed out after %u ms", duration_ms);
+      this->scan_started_at_ = 0;
+      this->set_scan_state(ScanState::IDLE);
+      this->expected_response_ = ResponseType::NONE;
+      this->scan_timeout_callback_();
     }
   }
 }
@@ -409,6 +427,9 @@ void BarcodeScanner::process_barcode_() {
   if (data_length > 0) {
     barcode.assign(reinterpret_cast<char *>(this->rx_buffer_.data()), data_length);
 
+    // Barcode received — cancel any pending scan timeout
+    this->scan_started_at_ = 0;
+
     ESP_LOGD(TAG_SCANNER, "Barcode received: %s", barcode.c_str());
 
     // Publish the barcode to optional text sensor
@@ -482,6 +503,9 @@ void BarcodeScanner::start_scan() {
   auto command = CommandFactory::create_start_command();
   this->queue_command(std::move(command));
 
+  // Record when scanning started so we can fire on_scan_timeout after scan_duration elapses
+  this->scan_started_at_ = millis();
+
   // Update state
   this->set_scan_state(ScanState::MANUAL_SCANNING);
 
@@ -505,6 +529,9 @@ void BarcodeScanner::stop_scan() {
   // Create and queue the stop command
   auto command = CommandFactory::create_stop_command();
   this->queue_command(std::move(command));
+
+  // Cancel any pending scan timeout
+  this->scan_started_at_ = 0;
 
   // Update state
   this->set_scan_state(ScanState::IDLE);
@@ -756,6 +783,25 @@ void BarcodeScanner::set_operation_mode_state(OperationMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting operation mode to %s", operation_mode_to_string(mode));
   this->operation_mode_ = mode;
   this->save_settings_();
+  // Keep the HA select entity in sync after the scanner ACKs the command
+  if (this->operation_mode_select_ != nullptr) {
+    this->operation_mode_select_->publish_state(OperationModeSelect::mode_to_key(mode));
+  }
+}
+
+// OperationModeSelect — routes HA select changes to the scanner command queue
+void OperationModeSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "OperationModeSelect: no scanner attached");
+    return;
+  }
+  OperationMode mode;
+  if (!parse_operation_mode(value, mode)) {
+    ESP_LOGW(TAG_SCANNER, "OperationModeSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_operation_mode(mode);
+  // publish_state is deferred until set_operation_mode_state() fires after the scanner ACKs
 }
 
 }  // namespace m5stack_barcode
