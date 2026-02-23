@@ -48,7 +48,10 @@ uint32_t BarcodeScanner::get_scan_duration_ms() const {
 void BarcodeScanner::setup() {
   ESP_LOGCONFIG(TAG_SCANNER, "Setting up M5Stack Barcode Scanner");
 
-  // Configure default settings first
+  // Initialise preference storage keyed to this component instance
+  this->pref_ = global_preferences->make_preference<ScannerPreferences>(this->get_object_id_hash());
+
+  // Configure settings, skipping any that the scanner already has from a previous boot
   this->configure_defaults_();
 
   // Then request version information (optional)
@@ -58,57 +61,57 @@ void BarcodeScanner::setup() {
 }
 
 void BarcodeScanner::configure_defaults_() {
-  // Set operation mode
-  auto mode_command = CommandFactory::create_mode_command(this->operation_mode_);
-  this->queue_command(std::move(mode_command));
+  // Load previously-saved settings from NVS flash.  A valid entry means the
+  // scanner was already programmed with those values and does not need them
+  // resent unless they have changed in the YAML configuration.
+  ScannerPreferences stored{};
+  const bool has_valid_prefs = this->pref_.load(&stored) && stored.version == SETTINGS_VERSION;
 
-  // Set terminator
-  auto term_command = CommandFactory::create_terminator_command(this->terminator_);
-  this->queue_command(std::move(term_command));
+  ESP_LOGD(TAG_SCANNER, "Configuring scanner defaults (cached prefs valid=%s)", has_valid_prefs ? "yes" : "no");
 
-  // Set light mode
-  auto light_command = CommandFactory::create_light_command(this->light_mode_);
-  this->queue_command(std::move(light_command));
+// Helper macro: queue a command only when the stored value differs from the
+// desired value (or when there are no valid stored preferences at all).
+#define QUEUE_IF_CHANGED(field, create_fn, value)                                \
+  if (!has_valid_prefs || stored.field != static_cast<uint8_t>(value)) {         \
+    this->queue_command(create_fn(value));                                        \
+  }
 
-  // Set locate light mode
-  auto locate_light_command = CommandFactory::create_locate_light_command(this->locate_light_mode_);
-  this->queue_command(std::move(locate_light_command));
+  QUEUE_IF_CHANGED(operation_mode, CommandFactory::create_mode_command, this->operation_mode_)
+  QUEUE_IF_CHANGED(terminator, CommandFactory::create_terminator_command, this->terminator_)
+  QUEUE_IF_CHANGED(light_mode, CommandFactory::create_light_command, this->light_mode_)
+  QUEUE_IF_CHANGED(locate_light_mode, CommandFactory::create_locate_light_command, this->locate_light_mode_)
+  QUEUE_IF_CHANGED(sound_mode, CommandFactory::create_sound_command, this->sound_mode_)
+  QUEUE_IF_CHANGED(buzzer_volume, CommandFactory::create_volume_command, this->buzzer_volume_)
+  QUEUE_IF_CHANGED(decoding_success_light_mode, CommandFactory::create_decoding_success_light_command,
+                   this->decoding_success_light_mode_)
+  QUEUE_IF_CHANGED(boot_sound_mode, CommandFactory::create_boot_sound_command, this->boot_sound_mode_)
+  QUEUE_IF_CHANGED(decode_sound_mode, CommandFactory::create_decode_sound_command, this->decode_sound_mode_)
+  QUEUE_IF_CHANGED(scan_duration, CommandFactory::create_scan_duration_command, this->scan_duration_)
+  QUEUE_IF_CHANGED(stable_induction_time, CommandFactory::create_stable_induction_time_command,
+                   this->stable_induction_time_)
+  QUEUE_IF_CHANGED(reading_interval, CommandFactory::create_reading_interval_command, this->reading_interval_)
+  QUEUE_IF_CHANGED(same_code_interval, CommandFactory::create_same_code_interval_command, this->same_code_interval_)
 
-  // Set sound mode
-  auto sound_command = CommandFactory::create_sound_command(this->sound_mode_);
-  this->queue_command(std::move(sound_command));
+#undef QUEUE_IF_CHANGED
+}
 
-  // Set buzzer volume
-  auto volume_command = CommandFactory::create_volume_command(this->buzzer_volume_);
-  this->queue_command(std::move(volume_command));
-
-  // Set decoding success light mode
-  auto decode_light_command = CommandFactory::create_decoding_success_light_command(this->decoding_success_light_mode_);
-  this->queue_command(std::move(decode_light_command));
-
-  // Set boot sound mode
-  auto boot_sound_command = CommandFactory::create_boot_sound_command(this->boot_sound_mode_);
-  this->queue_command(std::move(boot_sound_command));
-
-  // Set decode sound mode
-  auto decode_sound_command = CommandFactory::create_decode_sound_command(this->decode_sound_mode_);
-  this->queue_command(std::move(decode_sound_command));
-
-  // Set scan duration
-  auto scan_duration_command = CommandFactory::create_scan_duration_command(this->scan_duration_);
-  this->queue_command(std::move(scan_duration_command));
-
-  // Set stable induction time
-  auto induction_time_command = CommandFactory::create_stable_induction_time_command(this->stable_induction_time_);
-  this->queue_command(std::move(induction_time_command));
-
-  // Set reading interval
-  auto reading_interval_command = CommandFactory::create_reading_interval_command(this->reading_interval_);
-  this->queue_command(std::move(reading_interval_command));
-
-  // Set same code interval
-  auto same_code_interval_command = CommandFactory::create_same_code_interval_command(this->same_code_interval_);
-  this->queue_command(std::move(same_code_interval_command));
+void BarcodeScanner::save_settings_() {
+  ScannerPreferences prefs{};
+  prefs.version = SETTINGS_VERSION;
+  prefs.operation_mode = static_cast<uint8_t>(this->operation_mode_);
+  prefs.terminator = static_cast<uint8_t>(this->terminator_);
+  prefs.light_mode = static_cast<uint8_t>(this->light_mode_);
+  prefs.locate_light_mode = static_cast<uint8_t>(this->locate_light_mode_);
+  prefs.sound_mode = static_cast<uint8_t>(this->sound_mode_);
+  prefs.buzzer_volume = static_cast<uint8_t>(this->buzzer_volume_);
+  prefs.decoding_success_light_mode = static_cast<uint8_t>(this->decoding_success_light_mode_);
+  prefs.boot_sound_mode = static_cast<uint8_t>(this->boot_sound_mode_);
+  prefs.decode_sound_mode = static_cast<uint8_t>(this->decode_sound_mode_);
+  prefs.scan_duration = static_cast<uint8_t>(this->scan_duration_);
+  prefs.stable_induction_time = static_cast<uint8_t>(this->stable_induction_time_);
+  prefs.reading_interval = static_cast<uint8_t>(this->reading_interval_);
+  prefs.same_code_interval = static_cast<uint8_t>(this->same_code_interval_);
+  this->pref_.save(&prefs);
 }
 
 void BarcodeScanner::loop() {
@@ -668,70 +671,87 @@ void BarcodeScanner::process_current_buffer() {
   }
 }
 
-// Protected state setter implementations
+// Protected state setter implementations.
+// Each setter is called from StateCommand::on_success() after the scanner ACKs the command.
+// After updating the in-memory state, save_settings_() persists all settings to NVS so that
+// the next boot can skip re-sending settings that are already applied.
+
 void BarcodeScanner::set_terminator_state(Terminator term) {
   ESP_LOGD(TAG_SCANNER, "Setting terminator to %s", terminator_to_string(term));
   this->terminator_ = term;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_light_mode_state(LightMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting light mode to %s", light_mode_to_string(mode));
   this->light_mode_ = mode;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_locate_light_mode_state(LocateLightMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting locate light mode to %s", locate_light_mode_to_string(mode));
   this->locate_light_mode_ = mode;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_sound_mode_state(SoundMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting sound mode to %s", sound_mode_to_string(mode));
   this->sound_mode_ = mode;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_buzzer_volume_state(BuzzerVolume volume) {
   ESP_LOGD(TAG_SCANNER, "Setting buzzer volume to %s", buzzer_volume_to_string(volume));
   this->buzzer_volume_ = volume;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_decoding_success_light_mode_state(DecodingSuccessLightMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting decoding success light mode to %s", decoding_success_light_mode_to_string(mode));
   this->decoding_success_light_mode_ = mode;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_boot_sound_mode_state(BootSoundMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting boot sound mode to %s", boot_sound_mode_to_string(mode));
   this->boot_sound_mode_ = mode;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_decode_sound_mode_state(DecodeSoundMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting decode sound mode to %s", decode_sound_mode_to_string(mode));
   this->decode_sound_mode_ = mode;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_scan_duration_state(ScanDuration duration) {
   ESP_LOGD(TAG_SCANNER, "Setting scan duration to %s", scan_duration_to_string(duration));
   this->scan_duration_ = duration;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_stable_induction_time_state(StableInductionTime time) {
   ESP_LOGD(TAG_SCANNER, "Setting stable induction time to %s", stable_induction_time_to_string(time));
   this->stable_induction_time_ = time;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_reading_interval_state(ReadingInterval interval) {
   ESP_LOGD(TAG_SCANNER, "Setting reading interval to %s", reading_interval_to_string(interval));
   this->reading_interval_ = interval;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_same_code_interval_state(SameCodeInterval interval) {
   ESP_LOGD(TAG_SCANNER, "Setting same code interval to %s", same_code_interval_to_string(interval));
   this->same_code_interval_ = interval;
+  this->save_settings_();
 }
 
 void BarcodeScanner::set_operation_mode_state(OperationMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting operation mode to %s", operation_mode_to_string(mode));
   this->operation_mode_ = mode;
+  this->save_settings_();
 }
 
 }  // namespace m5stack_barcode

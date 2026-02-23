@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>  // For uint8_t
+#include <string>   // For std::string (used by parse helpers)
 
 namespace esphome {
 namespace m5stack_barcode {
@@ -147,6 +148,22 @@ auto scan_state_to_string(ScanState state) -> const char *;
 
 // Duration conversion helper
 auto scan_duration_to_ms(ScanDuration duration) -> uint32_t;
+
+// String-to-enum parse helpers (used by actions for runtime string values from selects).
+// Returns true on success, false if the string is not a valid enum value.
+auto parse_operation_mode(const std::string &str, OperationMode &out) -> bool;
+auto parse_terminator(const std::string &str, Terminator &out) -> bool;
+auto parse_light_mode(const std::string &str, LightMode &out) -> bool;
+auto parse_locate_light_mode(const std::string &str, LocateLightMode &out) -> bool;
+auto parse_sound_mode(const std::string &str, SoundMode &out) -> bool;
+auto parse_buzzer_volume(const std::string &str, BuzzerVolume &out) -> bool;
+auto parse_decoding_success_light_mode(const std::string &str, DecodingSuccessLightMode &out) -> bool;
+auto parse_boot_sound_mode(const std::string &str, BootSoundMode &out) -> bool;
+auto parse_decode_sound_mode(const std::string &str, DecodeSoundMode &out) -> bool;
+auto parse_scan_duration(const std::string &str, ScanDuration &out) -> bool;
+auto parse_stable_induction_time(const std::string &str, StableInductionTime &out) -> bool;
+auto parse_reading_interval(const std::string &str, ReadingInterval &out) -> bool;
+auto parse_same_code_interval(const std::string &str, SameCodeInterval &out) -> bool;
 
 }  // namespace m5stack_barcode
 }  // namespace esphome

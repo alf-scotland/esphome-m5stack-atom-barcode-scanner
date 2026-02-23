@@ -1,5 +1,7 @@
 #include "types.h"
-namespace esphome::m5stack_barcode {
+
+namespace esphome {
+namespace m5stack_barcode {
 
 // String conversion helpers for logging
 auto operation_mode_to_string(OperationMode mode) -> const char * {
@@ -239,4 +241,207 @@ auto scan_duration_to_ms(ScanDuration duration) -> uint32_t {
   }
 }
 
-}  // namespace esphome::m5stack_barcode
+// String-to-enum parse helpers (used by actions for runtime string values from selects)
+auto parse_operation_mode(const std::string &str, OperationMode &out) -> bool {
+  if (str == "host") {
+    out = OperationMode::HOST;
+  } else if (str == "level") {
+    out = OperationMode::LEVEL;
+  } else if (str == "pulse") {
+    out = OperationMode::PULSE;
+  } else if (str == "continuous") {
+    out = OperationMode::CONTINUOUS;
+  } else if (str == "auto_sense") {
+    out = OperationMode::AUTO_SENSE;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_terminator(const std::string &str, Terminator &out) -> bool {
+  if (str == "none") {
+    out = Terminator::NONE;
+  } else if (str == "crlf") {
+    out = Terminator::CRLF;
+  } else if (str == "cr") {
+    out = Terminator::CR;
+  } else if (str == "tab") {
+    out = Terminator::TAB;
+  } else if (str == "crcr") {
+    out = Terminator::CRCR;
+  } else if (str == "crlfcrlf") {
+    out = Terminator::CRLFCRLF;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_light_mode(const std::string &str, LightMode &out) -> bool {
+  if (str == "on_when_reading") {
+    out = LightMode::LIGHT_ON_WHEN_READING;
+  } else if (str == "always_on") {
+    out = LightMode::LIGHT_ALWAYS_ON;
+  } else if (str == "always_off") {
+    out = LightMode::LIGHT_ALWAYS_OFF;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_locate_light_mode(const std::string &str, LocateLightMode &out) -> bool {
+  if (str == "on_when_reading") {
+    out = LocateLightMode::LOCATE_LIGHT_ON_WHEN_READING;
+  } else if (str == "always_on") {
+    out = LocateLightMode::LOCATE_LIGHT_ALWAYS_ON;
+  } else if (str == "always_off") {
+    out = LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_sound_mode(const std::string &str, SoundMode &out) -> bool {
+  if (str == "enabled") {
+    out = SoundMode::SOUND_ENABLED;
+  } else if (str == "disabled") {
+    out = SoundMode::SOUND_DISABLED;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_buzzer_volume(const std::string &str, BuzzerVolume &out) -> bool {
+  if (str == "high") {
+    out = BuzzerVolume::BUZZER_VOLUME_HIGH;
+  } else if (str == "medium") {
+    out = BuzzerVolume::BUZZER_VOLUME_MEDIUM;
+  } else if (str == "low") {
+    out = BuzzerVolume::BUZZER_VOLUME_LOW;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_decoding_success_light_mode(const std::string &str, DecodingSuccessLightMode &out) -> bool {
+  if (str == "enabled") {
+    out = DecodingSuccessLightMode::DECODING_LIGHT_ENABLED;
+  } else if (str == "disabled") {
+    out = DecodingSuccessLightMode::DECODING_LIGHT_DISABLED;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_boot_sound_mode(const std::string &str, BootSoundMode &out) -> bool {
+  if (str == "enabled") {
+    out = BootSoundMode::BOOT_SOUND_ENABLED;
+  } else if (str == "disabled") {
+    out = BootSoundMode::BOOT_SOUND_DISABLED;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_decode_sound_mode(const std::string &str, DecodeSoundMode &out) -> bool {
+  if (str == "enabled") {
+    out = DecodeSoundMode::DECODE_SOUND_ENABLED;
+  } else if (str == "disabled") {
+    out = DecodeSoundMode::DECODE_SOUND_DISABLED;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_scan_duration(const std::string &str, ScanDuration &out) -> bool {
+  if (str == "500ms") {
+    out = ScanDuration::MS_500;
+  } else if (str == "1s") {
+    out = ScanDuration::MS_1000;
+  } else if (str == "3s") {
+    out = ScanDuration::MS_3000;
+  } else if (str == "5s") {
+    out = ScanDuration::MS_5000;
+  } else if (str == "10s") {
+    out = ScanDuration::MS_10000;
+  } else if (str == "15s") {
+    out = ScanDuration::MS_15000;
+  } else if (str == "20s") {
+    out = ScanDuration::MS_20000;
+  } else if (str == "unlimited") {
+    out = ScanDuration::UNLIMITED;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_stable_induction_time(const std::string &str, StableInductionTime &out) -> bool {
+  if (str == "0ms") {
+    out = StableInductionTime::MS_0;
+  } else if (str == "100ms") {
+    out = StableInductionTime::MS_100;
+  } else if (str == "300ms") {
+    out = StableInductionTime::MS_300;
+  } else if (str == "500ms") {
+    out = StableInductionTime::MS_500;
+  } else if (str == "1s") {
+    out = StableInductionTime::MS_1000;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_reading_interval(const std::string &str, ReadingInterval &out) -> bool {
+  if (str == "0ms") {
+    out = ReadingInterval::MS_0;
+  } else if (str == "100ms") {
+    out = ReadingInterval::MS_100;
+  } else if (str == "300ms") {
+    out = ReadingInterval::MS_300;
+  } else if (str == "500ms") {
+    out = ReadingInterval::MS_500;
+  } else if (str == "1s") {
+    out = ReadingInterval::MS_1000;
+  } else if (str == "1.5s") {
+    out = ReadingInterval::MS_1500;
+  } else if (str == "2s") {
+    out = ReadingInterval::MS_2000;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+auto parse_same_code_interval(const std::string &str, SameCodeInterval &out) -> bool {
+  if (str == "0ms") {
+    out = SameCodeInterval::MS_0;
+  } else if (str == "100ms") {
+    out = SameCodeInterval::MS_100;
+  } else if (str == "300ms") {
+    out = SameCodeInterval::MS_300;
+  } else if (str == "500ms") {
+    out = SameCodeInterval::MS_500;
+  } else if (str == "1s") {
+    out = SameCodeInterval::MS_1000;
+  } else if (str == "1.5s") {
+    out = SameCodeInterval::MS_1500;
+  } else if (str == "2s") {
+    out = SameCodeInterval::MS_2000;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+}  // namespace m5stack_barcode
+}  // namespace esphome

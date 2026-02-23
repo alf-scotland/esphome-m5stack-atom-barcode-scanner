@@ -10,10 +10,35 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/event/event.h"
 #include "esphome/core/component.h"
+#include "esphome/core/preferences.h"
 #include "types.h"
 
 namespace esphome {
 namespace m5stack_barcode {
+
+/// Version tag for the stored preference struct. Increment when the struct layout changes
+/// to automatically invalidate stale preferences and force a full re-sync.
+static const uint8_t SETTINGS_VERSION = 1;
+
+/// Packed representation of all scanner settings stored in ESPHome preferences (NVS flash).
+/// On first boot (or after a factory reset / version bump) all fields are sent to the scanner.
+/// On subsequent boots only settings that differ from what was last ACK'd are re-sent.
+struct ScannerPreferences {
+  uint8_t version;
+  uint8_t operation_mode;
+  uint8_t terminator;
+  uint8_t light_mode;
+  uint8_t locate_light_mode;
+  uint8_t sound_mode;
+  uint8_t buzzer_volume;
+  uint8_t decoding_success_light_mode;
+  uint8_t boot_sound_mode;
+  uint8_t decode_sound_mode;
+  uint8_t scan_duration;
+  uint8_t stable_induction_time;
+  uint8_t reading_interval;
+  uint8_t same_code_interval;
+} __attribute__((packed));
 
 // Forward declarations
 template<typename T> class StateCommand;
@@ -416,8 +441,20 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
 
   /**
    * @brief Configure default scanner settings.
+   *
+   * Compares each setting against the last-saved preferences and only queues
+   * commands for values that have changed. On first boot (or after a version
+   * bump) all settings are sent so the scanner state is fully initialised.
    */
   void configure_defaults_();
+
+  /**
+   * @brief Persist all current scanner settings to ESPHome preferences (NVS flash).
+   *
+   * Called after each successful command ACK so that subsequent boots can skip
+   * re-sending settings that are already applied.
+   */
+  void save_settings_();
 
   // Buffer Management
   /**
@@ -441,6 +478,9 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @param command Reference to the command to write
    */
   void write_command_(const std::unique_ptr<CommandBase> &command);
+
+  // Preferences
+  ESPPreferenceObject pref_;  ///< NVS storage for persisting scanner settings across reboots
 
   // Component State
   text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
