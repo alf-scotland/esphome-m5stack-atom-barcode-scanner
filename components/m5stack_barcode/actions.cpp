@@ -1,6 +1,7 @@
 #include "actions.h"
 
 #include "esphome/core/component.h"
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 #include "m5stack_barcode.h"
 
@@ -12,21 +13,21 @@ const char *const TAG_ACTION = "m5stack_barcode.action";
 
 // Implement the action classes
 
-template<typename... Ts> void StartAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void StartAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ != nullptr) {
     ESP_LOGD(TAG_ACTION, "Executing start scan action");
     this->scanner_->start_scan();
   }
 }
 
-template<typename... Ts> void StopAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void StopAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ != nullptr) {
     ESP_LOGD(TAG_ACTION, "Executing stop scan action");
     this->scanner_->stop_scan();
   }
 }
 
-template<typename... Ts> void SetModeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetModeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -41,7 +42,7 @@ template<typename... Ts> void SetModeAction<Ts...>::play(Ts... x) {
   this->scanner_->set_operation_mode(mode);
 }
 
-template<typename... Ts> void SetTerminatorAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetTerminatorAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -56,7 +57,7 @@ template<typename... Ts> void SetTerminatorAction<Ts...>::play(Ts... x) {
   this->scanner_->set_terminator(term);
 }
 
-template<typename... Ts> void SetLightModeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetLightModeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -74,7 +75,7 @@ template<typename... Ts> void SetLightModeAction<Ts...>::play(Ts... x) {
   this->scanner_->set_light_mode(mode);
 }
 
-template<typename... Ts> void SetLocateLightModeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetLocateLightModeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -92,7 +93,7 @@ template<typename... Ts> void SetLocateLightModeAction<Ts...>::play(Ts... x) {
   this->scanner_->set_locate_light_mode(mode);
 }
 
-template<typename... Ts> void SetSoundModeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetSoundModeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -107,7 +108,7 @@ template<typename... Ts> void SetSoundModeAction<Ts...>::play(Ts... x) {
   this->scanner_->set_sound_mode(mode);
 }
 
-template<typename... Ts> void SetBuzzerVolumeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetBuzzerVolumeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -125,7 +126,7 @@ template<typename... Ts> void SetBuzzerVolumeAction<Ts...>::play(Ts... x) {
   this->scanner_->set_buzzer_volume(volume);
 }
 
-template<typename... Ts> void SetDecodingSuccessLightModeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetDecodingSuccessLightModeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -143,7 +144,7 @@ template<typename... Ts> void SetDecodingSuccessLightModeAction<Ts...>::play(Ts.
   this->scanner_->set_decoding_success_light_mode(mode);
 }
 
-template<typename... Ts> void SetBootSoundModeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetBootSoundModeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -158,7 +159,7 @@ template<typename... Ts> void SetBootSoundModeAction<Ts...>::play(Ts... x) {
   this->scanner_->set_boot_sound_mode(mode);
 }
 
-template<typename... Ts> void SetDecodeSoundModeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetDecodeSoundModeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -173,7 +174,7 @@ template<typename... Ts> void SetDecodeSoundModeAction<Ts...>::play(Ts... x) {
   this->scanner_->set_decode_sound_mode(mode);
 }
 
-template<typename... Ts> void SetScanDurationAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetScanDurationAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -188,7 +189,7 @@ template<typename... Ts> void SetScanDurationAction<Ts...>::play(Ts... x) {
   this->scanner_->set_scan_duration(duration);
 }
 
-template<typename... Ts> void SetStableInductionTimeAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetStableInductionTimeAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -203,7 +204,7 @@ template<typename... Ts> void SetStableInductionTimeAction<Ts...>::play(Ts... x)
   this->scanner_->set_stable_induction_time(time);
 }
 
-template<typename... Ts> void SetReadingIntervalAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetReadingIntervalAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -218,7 +219,7 @@ template<typename... Ts> void SetReadingIntervalAction<Ts...>::play(Ts... x) {
   this->scanner_->set_reading_interval(interval);
 }
 
-template<typename... Ts> void SetSameCodeIntervalAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void SetSameCodeIntervalAction<Ts...>::play(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
@@ -233,28 +234,28 @@ template<typename... Ts> void SetSameCodeIntervalAction<Ts...>::play(Ts... x) {
   this->scanner_->set_same_code_interval(interval);
 }
 
-template<typename... Ts> void ProcessCurrentBufferAction<Ts...>::play(Ts... x) {
+template<typename... Ts> void ProcessCurrentBufferAction<Ts...>::play(const Ts &...x) {
   ESP_LOGD(TAG_ACTION, "Processing current buffer");
   if (this->scanner_ != nullptr) {
     this->scanner_->process_current_buffer();
   }
 }
 
-template<typename... Ts> bool IsManualScanningCondition<Ts...>::check(Ts... x) {
+template<typename... Ts> bool IsManualScanningCondition<Ts...>::check(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     return false;
   }
   return this->scanner_->get_scan_state() == ScanState::MANUAL_SCANNING;
 }
 
-template<typename... Ts> bool IsIdleCondition<Ts...>::check(Ts... x) {
+template<typename... Ts> bool IsIdleCondition<Ts...>::check(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     return false;
   }
   return this->scanner_->get_scan_state() == ScanState::IDLE;
 }
 
-template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(Ts... x) {
+template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(const Ts &...x) {
   if (this->scanner_ == nullptr) {
     return false;
   }
@@ -291,23 +292,23 @@ template class IsIdleCondition<>;
 template class IsContinuousModeCondition<>;
 
 // Explicit template instantiations for the types used in YAML
-template class StartAction<std::string, unsigned int>;
-template class StopAction<std::string, unsigned int>;
-template class SetModeAction<std::string, unsigned int>;
-template class SetTerminatorAction<std::string, unsigned int>;
-template class SetLightModeAction<std::string, unsigned int>;
-template class SetLocateLightModeAction<std::string, unsigned int>;
-template class SetSoundModeAction<std::string, unsigned int>;
-template class SetBuzzerVolumeAction<std::string, unsigned int>;
-template class SetDecodingSuccessLightModeAction<std::string, unsigned int>;
-template class SetBootSoundModeAction<std::string, unsigned int>;
-template class SetDecodeSoundModeAction<std::string, unsigned int>;
-template class SetScanDurationAction<std::string, unsigned int>;
-template class SetStableInductionTimeAction<std::string, unsigned int>;
-template class SetReadingIntervalAction<std::string, unsigned int>;
-template class SetSameCodeIntervalAction<std::string, unsigned int>;
-template class ProcessCurrentBufferAction<std::string, unsigned int>;
-template class IsContinuousModeCondition<std::string, unsigned int>;
+template class StartAction<StringRef, size_t>;
+template class StopAction<StringRef, size_t>;
+template class SetModeAction<StringRef, size_t>;
+template class SetTerminatorAction<StringRef, size_t>;
+template class SetLightModeAction<StringRef, size_t>;
+template class SetLocateLightModeAction<StringRef, size_t>;
+template class SetSoundModeAction<StringRef, size_t>;
+template class SetBuzzerVolumeAction<StringRef, size_t>;
+template class SetDecodingSuccessLightModeAction<StringRef, size_t>;
+template class SetBootSoundModeAction<StringRef, size_t>;
+template class SetDecodeSoundModeAction<StringRef, size_t>;
+template class SetScanDurationAction<StringRef, size_t>;
+template class SetStableInductionTimeAction<StringRef, size_t>;
+template class SetReadingIntervalAction<StringRef, size_t>;
+template class SetSameCodeIntervalAction<StringRef, size_t>;
+template class ProcessCurrentBufferAction<StringRef, size_t>;
+template class IsContinuousModeCondition<StringRef, size_t>;
 
 }  // namespace m5stack_barcode
 }  // namespace esphome

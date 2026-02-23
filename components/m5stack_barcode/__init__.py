@@ -335,43 +335,43 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ScanTimeoutTrigger),
             },
         ),
-        cv.Optional(CONF_OPERATION_MODE_SELECT): select.SELECT_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(OperationModeSelect)},
+        cv.Optional(CONF_OPERATION_MODE_SELECT): select.select_schema(
+            OperationModeSelect,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_BUZZER_VOLUME_SELECT): select.SELECT_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(BuzzerVolumeSelect)},
+        cv.Optional(CONF_BUZZER_VOLUME_SELECT): select.select_schema(
+            BuzzerVolumeSelect,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_LIGHT_MODE_SELECT): select.SELECT_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(LightModeSelect)},
+        cv.Optional(CONF_LIGHT_MODE_SELECT): select.select_schema(
+            LightModeSelect,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_LOCATE_LIGHT_MODE_SELECT): select.SELECT_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(LocateLightModeSelect)},
+        cv.Optional(CONF_LOCATE_LIGHT_MODE_SELECT): select.select_schema(
+            LocateLightModeSelect,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SCAN_DURATION_SELECT): select.SELECT_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(ScanDurationSelect)},
+        cv.Optional(CONF_SCAN_DURATION_SELECT): select.select_schema(
+            ScanDurationSelect,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SOUND_SWITCH): switch.SWITCH_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(SoundSwitch)},
+        cv.Optional(CONF_SOUND_SWITCH): switch.switch_schema(
+            SoundSwitch,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_BOOT_SOUND_SWITCH): switch.SWITCH_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(BootSoundSwitch)},
+        cv.Optional(CONF_BOOT_SOUND_SWITCH): switch.switch_schema(
+            BootSoundSwitch,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_DECODE_SOUND_SWITCH): switch.SWITCH_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(DecodeSoundSwitch)},
+        cv.Optional(CONF_DECODE_SOUND_SWITCH): switch.switch_schema(
+            DecodeSoundSwitch,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_DECODING_SUCCESS_LIGHT_SWITCH): switch.SWITCH_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(DecodingSuccessLightSwitch)},
+        cv.Optional(CONF_DECODING_SUCCESS_LIGHT_SWITCH): switch.switch_schema(
+            DecodingSuccessLightSwitch,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_START_BUTTON): button.BUTTON_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(StartButton)},
+        cv.Optional(CONF_START_BUTTON): button.button_schema(
+            StartButton,
         ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_STOP_BUTTON): button.BUTTON_SCHEMA.extend(
-            {cv.GenerateID(): cv.declare_id(StopButton)},
+        cv.Optional(CONF_STOP_BUTTON): button.button_schema(
+            StopButton,
         ).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_SCANNING_BINARY_SENSOR): (
-            binary_sensor.BINARY_SENSOR_SCHEMA.extend(
-                {cv.GenerateID(): cv.declare_id(binary_sensor.BinarySensor)},
-            ).extend(cv.COMPONENT_SCHEMA)
+            binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor).extend(
+                cv.COMPONENT_SCHEMA,
+            )
         ),
         cv.Optional(CONF_OPERATION_MODE, default="host"): cv.enum(
             OPERATION_MODES,

@@ -4,6 +4,7 @@
 #include "commands.h"
 #include "esphome/core/application.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 #include "types.h"
 
@@ -51,7 +52,7 @@ void BarcodeScanner::setup() {
   ESP_LOGCONFIG(TAG_SCANNER, "Setting up M5Stack Barcode Scanner");
 
   // Initialise preference storage keyed to this component instance
-  this->pref_ = global_preferences->make_preference<ScannerPreferences>(this->get_object_id_hash());
+  this->pref_ = global_preferences->make_preference<ScannerPreferences>(fnv1_hash("m5stack_barcode"));
 
   // Configure settings, skipping any that the scanner already has from a previous boot
   this->configure_defaults_();

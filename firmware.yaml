@@ -63,7 +63,6 @@ light:
     name: "${friendly_name} Status LED"
     id: atom_status_led
     pin: GPIO27
-    rmt_channel: 0
     default_transition_length: 0s
     chipset: SK6812
     num_leds: 1
