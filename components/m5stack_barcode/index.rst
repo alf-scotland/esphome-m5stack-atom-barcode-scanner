@@ -23,27 +23,30 @@ The ``m5stack_barcode`` component provides an interface to the M5Stack 2D/QR Bar
       rx_pin: GPIO22
       baud_rate: 9600
 
-    # Text sensor for barcode output
+    m5stack_barcode:
+      id: barcode_scanner
+      uart_id: uart_bus
+      operation_mode: host
+      on_barcode:
+        - logger.log:
+            format: "Scanned: %s"
+            args: [ 'x.c_str()' ]
+
+    # Optional: expose barcode state as a text sensor in Home Assistant
     text_sensor:
       - platform: template
         name: "Last Barcode"
-        id: barcode_sensor
+        id: last_barcode
         icon: "mdi:barcode"
-
-    # Configure the barcode scanner
-    m5stack_barcode:
-      id: barcode_scanner
-      barcode_id: barcode_sensor
-      operation_mode: host
-      uart_id: uart_bus
 
 Component Options
 ----------------
 
-- **barcode_id** (**Required**, :ref:`config-id`): The ID of a template text sensor that will show the scanned barcode data.
+- **barcode_id** (*Optional*, :ref:`config-id`): The ID of a template text sensor that will show the scanned barcode data. Use ``on_barcode`` instead when you only need automation triggers.
 - **uart_id** (*Optional*, :ref:`config-id`): The ID of the UART bus if you need to specify a particular UART bus.
 - **version_id** (*Optional*, :ref:`config-id`): The ID of a template text sensor that will display the scanner firmware version.
 - **id** (*Optional*, :ref:`config-id`): Manually specify the ID for this component.
+- **on_barcode** (*Optional*, :ref:`Automation <automation>`): Automation to run whenever a barcode is successfully decoded. The scanned string is available as the variable ``x``.
 
 - **operation_mode** (*Optional*): Set the scanner operation mode.
 
@@ -96,9 +99,9 @@ Component Options
 
 - **buzzer_volume** (*Optional*): Buzzer volume level.
 
-  - ``medium`` (Default): Medium volume
+  - ``low`` (Default): Low volume
+  - ``medium``: Medium volume
   - ``high``: High volume
-  - ``low``: Low volume
 
 - **scan_duration** (*Optional*): How long scanner attempts to read a barcode.
 
@@ -384,6 +387,29 @@ Set delay before reading the same code again.
             id: barcode_scanner
             same_code_interval: 500ms
 
+Triggers
+--------
+
+.. _m5stack_barcode-on_barcode_trigger:
+
+``on_barcode``
+**************
+
+Automation triggered whenever the scanner successfully decodes a barcode. The decoded
+string is available as ``x`` inside the automation block.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      on_barcode:
+        - logger.log:
+            format: "Scanned: %s"
+            args: [ 'x.c_str()' ]
+        - text_sensor.template.publish:
+            id: last_barcode
+            state: !lambda "return x;"
+
 Conditions
 ----------
 
@@ -408,6 +434,44 @@ Check if the scanner is in continuous mode. Useful for conditional logic.
                     id: barcode_scanner
                 then:
                   - m5stack_barcode.process_current_buffer: barcode_scanner
+
+.. _m5stack_barcode-is_manual_scanning_condition:
+
+``m5stack_barcode.is_manual_scanning``
+*************************************
+
+Check if the scanner is actively scanning in HOST (manual) mode. Returns ``true``
+between a ``m5stack_barcode.start`` and the completion or timeout of a scan.
+
+.. code-block:: yaml
+
+    on_...:
+      then:
+        - if:
+            condition:
+              m5stack_barcode.is_manual_scanning:
+                id: barcode_scanner
+            then:
+              - logger.log: "Scan in progress"
+
+.. _m5stack_barcode-is_idle_condition:
+
+``m5stack_barcode.is_idle``
+***************************
+
+Check if the scanner is idle (not scanning). Returns ``true`` when no scan is
+in progress in HOST mode and the scanner is not in a continuous scanning mode.
+
+.. code-block:: yaml
+
+    on_...:
+      then:
+        - if:
+            condition:
+              m5stack_barcode.is_idle:
+                id: barcode_scanner
+            then:
+              - m5stack_barcode.start: barcode_scanner
 
 Hardware Connection
 ------------------

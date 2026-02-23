@@ -409,11 +409,15 @@ void BarcodeScanner::process_barcode_() {
   if (data_length > 0) {
     barcode.assign(reinterpret_cast<char *>(this->rx_buffer_.data()), data_length);
 
-    // Publish the barcode
+    ESP_LOGD(TAG_SCANNER, "Barcode received: %s", barcode.c_str());
+
+    // Publish the barcode to optional text sensor
     if (this->text_sensor_ != nullptr) {
       this->text_sensor_->publish_state(barcode);
-      ESP_LOGD(TAG_SCANNER, "Barcode received: %s", barcode.c_str());
     }
+
+    // Fire on_barcode automation trigger
+    this->barcode_callback_(barcode);
 
     // Trigger the barcode scanned event
     if (this->barcode_event_ != nullptr) {

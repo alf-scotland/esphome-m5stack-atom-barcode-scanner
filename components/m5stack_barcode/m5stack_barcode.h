@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -9,7 +10,9 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/event/event.h"
+#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
+#include "esphome/core/helpers.h"
 #include "esphome/core/preferences.h"
 #include "types.h"
 
@@ -135,6 +138,14 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @param event Pointer to the event component
    */
   void set_barcode_event(event::Event *event) { this->barcode_event_ = event; }
+
+  /**
+   * @brief Register a callback invoked whenever a barcode is successfully decoded.
+   * @param callback Function receiving the decoded barcode string
+   */
+  void add_on_barcode_callback(std::function<void(std::string)> &&callback) {
+    this->barcode_callback_.add(std::move(callback));
+  }
 
   // Scanner Control Methods
   /**
@@ -381,7 +392,6 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   template<typename... Ts> friend class SetReadingIntervalAction;
   template<typename... Ts> friend class SetSameCodeIntervalAction;
 
-
   // Protected state setter methods for use by commands
   void set_terminator_state(Terminator term);
   void set_light_mode_state(LightMode mode);
@@ -482,6 +492,9 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   // Preferences
   ESPPreferenceObject pref_;  ///< NVS storage for persisting scanner settings across reboots
 
+  // Callbacks
+  CallbackManager<void(std::string)> barcode_callback_;  ///< on_barcode automation triggers
+
   // Component State
   text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
   text_sensor::TextSensor *version_sensor_{nullptr};  ///< Sensor for firmware version
@@ -511,6 +524,15 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   StableInductionTime stable_induction_time_{StableInductionTime::MS_500};    ///< Current stable induction time
   ReadingInterval reading_interval_{ReadingInterval::MS_500};                 ///< Current reading interval
   SameCodeInterval same_code_interval_{SameCodeInterval::MS_500};             ///< Current same code interval
+};
+
+/// Trigger fired whenever a barcode is successfully decoded.
+/// Use via `on_barcode:` in YAML to run automations with the scanned code as `x`.
+class BarcodeTrigger : public Trigger<std::string> {
+ public:
+  explicit BarcodeTrigger(BarcodeScanner *parent) {
+    parent->add_on_barcode_callback([this](std::string barcode) { this->trigger(std::move(barcode)); });
+  }
 };
 
 }  // namespace m5stack_barcode

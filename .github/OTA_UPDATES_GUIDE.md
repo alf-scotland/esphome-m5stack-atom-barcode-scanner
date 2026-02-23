@@ -44,63 +44,47 @@ The easiest way to get started with OTA updates is to use our pre-built OTA-enab
    - Download the firmware artifact
    - This firmware is pre-configured to update from the PR branch
 
-### Method 2: Custom OTA Configuration
+### Method 2: OTA from a Direct URL
 
-You can create your own OTA-enabled firmware by modifying the `firmware.yaml`:
+Use the `http_request` OTA platform to flash a specific binary hosted on GitHub Releases:
 
 ```yaml
-# Enable OTA updates with repository support
 ota:
-  - platform: esphome  # Standard OTA
+  - platform: esphome
     password: !secret ota_password
-  - platform: repository  # Git repository OTA
-    repository:
-      type: git
-      url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner
-      ref: main  # Change to a specific branch or tag as needed
-      path: firmware.yaml
-      refresh: 24h  # Check for updates once per day
+  - platform: http_request
+
+http_request:
+  verify_ssl: false
+
+button:
+  - platform: template
+    name: "Update Firmware"
+    on_press:
+      - ota.http_request.flash:
+          url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner/releases/latest/download/firmware.bin
+          verify_ssl: false
 ```
 
-Key configuration options:
-
-- **ref**: The branch or tag to update from (e.g., `main`, `v2024.6.0`, `feature/new-feature`)
-- **path**: Path to the YAML file in the repository
-- **refresh**: How often to check for updates (e.g., `1h`, `24h`, `7d`)
+Change the URL to point to a specific release tag binary when you need a particular version.
 
 ## Using OTA for Different Purposes
 
+Download the matching firmware binary from the
+[GitHub Releases page](https://github.com/scotland/esphome-m5stack-atom-barcode-scanner/releases)
+and flash it via the ESPHome dashboard or the `http_request` OTA button above.
+
 ### Stable Channel
 
-For the most stable experience, point to a release tag:
-
-```yaml
-ref: v2024.6.0  # Replace with actual version
-```
+Download `firmware.bin` from the latest stable release tag (e.g., `v2024.6.0`).
 
 ### Beta Testing Channel
 
-For beta testing new features:
-
-```yaml
-ref: v2024.6.0-beta.1  # Replace with actual beta version
-```
+Download `firmware.bin` from the desired pre-release tag (e.g., `v2024.6.0-beta.1`).
 
 ### Development Channel
 
-For cutting-edge features and fixes:
-
-```yaml
-ref: main  # Main development branch
-```
-
-### Feature Testing
-
-For testing a specific feature:
-
-```yaml
-ref: feature/my-new-feature  # Feature branch name
-```
+Compile locally from the `main` branch using the ESPHome CLI or dashboard.
 
 ## Common OTA Issues and Solutions
 
@@ -132,52 +116,31 @@ The OTA update process will be logged in the device logs. You can monitor:
 
 ## Advanced OTA Configuration
 
-### Disabling Safe Mode
+### Safe Mode
 
-For testing experimental updates, you may want to disable safe mode:
+ESPHome's `safe_mode` component automatically boots into a recovery mode after repeated
+crash loops, allowing you to re-flash the device. Add it to `firmware.yaml`:
 
 ```yaml
-ota:
-  - platform: repository
-    safe_mode: false  # Disables automatic rollback
-    repository:
-      # configuration continues...
+safe_mode:
+  reboot_timeout: 3min
+  num_attempts: 5
 ```
 
-### Custom Update Intervals
+### OTA with Password Protection
 
-You can customize how often the device checks for updates:
+Always protect OTA with a password in production to prevent unauthorized updates:
 
 ```yaml
 ota:
-  - platform: repository
-    repository:
-      refresh: 1h  # Check every hour
+  - platform: esphome
+    password: !secret ota_password
 ```
 
-### Conditional Updates
-
-For advanced use cases, you can make updates conditional:
+Store the password in `secrets.yaml`:
 
 ```yaml
-ota:
-  - platform: repository
-    on_update:
-      then:
-        - if:
-            condition:
-              # Only update during night hours
-              time.is_in_range:
-                start: "02:00:00"
-                end: "05:00:00"
-            then:
-              # Proceed with update
-              - logger.log: "Updating firmware during maintenance window"
-            else:
-              # Postpone update
-              - logger.log: "Update available but outside maintenance window"
-              - delay: 6h
-              - repository.check_update:
+ota_password: "your-strong-password-here"
 ```
 
 ## Best Practices

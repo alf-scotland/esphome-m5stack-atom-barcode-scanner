@@ -6,7 +6,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import automation
 from esphome.components import event, text_sensor, uart
-from esphome.const import CONF_ID
+from esphome.const import CONF_ID, CONF_TRIGGER_ID
 
 # Dependencies
 DEPENDENCIES = ["uart"]
@@ -28,10 +28,8 @@ BarcodeScanner = m5stack_barcode_ns.class_(
 )
 
 # Configuration constants
-CONF_BARCODE_SENSOR = "barcode_sensor"
 CONF_BARCODE_ID = "barcode_id"
 CONF_VERSION_ID = "version_id"
-CONF_VERSION_SENSOR = "version_sensor"
 CONF_ON_BARCODE = "on_barcode"
 CONF_BARCODE_EVENT = "barcode_event"
 
@@ -221,6 +219,12 @@ ProcessCurrentBufferAction = m5stack_barcode_ns.class_(
     automation.Action,
 )
 
+# Triggers
+BarcodeTrigger = m5stack_barcode_ns.class_(
+    "BarcodeTrigger",
+    automation.Trigger.template(cg.std_string),
+)
+
 # Conditions
 IsContinuousModeCondition = m5stack_barcode_ns.class_(
     "IsContinuousModeCondition",
@@ -244,6 +248,11 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_BARCODE_ID): cv.use_id(text_sensor.TextSensor),
         cv.Optional(CONF_VERSION_ID): cv.use_id(text_sensor.TextSensor),
         cv.Optional(CONF_BARCODE_EVENT): cv.use_id(event.Event),
+        cv.Optional(CONF_ON_BARCODE): automation.validate_automation(
+            {
+                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger),
+            }
+        ),
         cv.Optional(CONF_OPERATION_MODE, default="host"): cv.enum(
             OPERATION_MODES,
             lower=True,
@@ -348,6 +357,11 @@ async def to_code(config: dict[str, Any]) -> None:
     if CONF_BARCODE_EVENT in config:
         event_var = await cg.get_variable(config[CONF_BARCODE_EVENT])
         cg.add(var.set_barcode_event(event_var))
+
+    # Register on_barcode automation triggers
+    for conf in config.get(CONF_ON_BARCODE, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
+        await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
 
 
 # Action registrations
