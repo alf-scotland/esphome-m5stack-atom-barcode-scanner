@@ -63,6 +63,7 @@ light:
     name: "${friendly_name} Status LED"
     id: atom_status_led
     pin: GPIO27
+    rmt_channel: 0
     default_transition_length: 0s
     chipset: SK6812
     num_leds: 1
@@ -469,7 +470,17 @@ select:
       - m5stack_barcode.set_scan_duration:
           id: barcode_scanner
           scan_duration: !lambda "return x;"
-          global_ms_var: timeout_ms
+      - globals.set:
+          id: timeout_ms
+          value: !lambda |-
+            if (x == "500ms") return 500;
+            if (x == "1s") return 1000;
+            if (x == "3s") return 3000;
+            if (x == "5s") return 5000;
+            if (x == "10s") return 10000;
+            if (x == "15s") return 15000;
+            if (x == "20s") return 20000;
+            return 2000000000;  // unlimited: effectively no hardware timeout
 
   - platform: template
     name: "Stable Induction Time"
