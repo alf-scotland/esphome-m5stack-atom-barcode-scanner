@@ -678,7 +678,7 @@ async def barcode_set_light_mode_to_code(
     """Register set light mode action."""
     var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
     template_ = await cg.templatable(config[CONF_LIGHT_MODE], args, cg.std_string)
-    cg.add(var.set_mode(template_))
+    cg.add(var.set_light_mode(template_))
     return var
 
 
@@ -707,7 +707,7 @@ async def barcode_set_locate_light_mode_to_code(
         args,
         cg.std_string,
     )
-    cg.add(var.set_mode(template_))
+    cg.add(var.set_locate_light_mode(template_))
     return var
 
 
@@ -732,7 +732,7 @@ async def barcode_set_sound_mode_to_code(
     """Register set sound mode action."""
     var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
     template_ = await cg.templatable(config[CONF_SOUND_MODE], args, cg.std_string)
-    cg.add(var.set_mode(template_))
+    cg.add(var.set_sound_mode(template_))
     return var
 
 
@@ -786,7 +786,7 @@ async def barcode_set_decoding_success_light_mode_to_code(
         args,
         cg.std_string,
     )
-    cg.add(var.set_mode(template_))
+    cg.add(var.set_decoding_success_light_mode(template_))
     return var
 
 
@@ -811,7 +811,7 @@ async def barcode_set_boot_sound_mode_to_code(
     """Register set boot sound mode action."""
     var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
     template_ = await cg.templatable(config[CONF_BOOT_SOUND_MODE], args, cg.std_string)
-    cg.add(var.set_mode(template_))
+    cg.add(var.set_boot_sound_mode(template_))
     return var
 
 
@@ -840,7 +840,7 @@ async def barcode_set_decode_sound_mode_to_code(
         args,
         cg.std_string,
     )
-    cg.add(var.set_mode(template_))
+    cg.add(var.set_decode_sound_mode(template_))
     return var
 
 

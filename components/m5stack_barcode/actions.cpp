@@ -61,11 +61,11 @@ template<typename... Ts> void SetLightModeAction<Ts...>::play(Ts... x) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
   }
-  if (!this->mode_.has_value()) {
+  if (!this->light_mode_.has_value()) {
     ESP_LOGW(TAG_ACTION, "No light mode value provided");
     return;
   }
-  std::string val = this->mode_.value(x...);
+  std::string val = this->light_mode_.value(x...);
   LightMode mode;
   if (!parse_light_mode(val, mode)) {
     ESP_LOGW(TAG_ACTION, "Invalid light mode: %s", val.c_str());
@@ -79,11 +79,11 @@ template<typename... Ts> void SetLocateLightModeAction<Ts...>::play(Ts... x) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
   }
-  if (!this->mode_.has_value()) {
+  if (!this->locate_light_mode_.has_value()) {
     ESP_LOGW(TAG_ACTION, "No locate light mode value provided");
     return;
   }
-  std::string val = this->mode_.value(x...);
+  std::string val = this->locate_light_mode_.value(x...);
   LocateLightMode mode;
   if (!parse_locate_light_mode(val, mode)) {
     ESP_LOGW(TAG_ACTION, "Invalid locate light mode: %s", val.c_str());
@@ -97,7 +97,7 @@ template<typename... Ts> void SetSoundModeAction<Ts...>::play(Ts... x) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
   }
-  std::string val = this->mode_.value(x...);
+  std::string val = this->sound_mode_.value(x...);
   SoundMode mode;
   if (!parse_sound_mode(val, mode)) {
     ESP_LOGW(TAG_ACTION, "Unknown sound mode: %s", val.c_str());
@@ -130,11 +130,11 @@ template<typename... Ts> void SetDecodingSuccessLightModeAction<Ts...>::play(Ts.
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
   }
-  if (!this->mode_.has_value()) {
+  if (!this->decoding_success_light_mode_.has_value()) {
     ESP_LOGW(TAG_ACTION, "No decoding success light mode value provided");
     return;
   }
-  std::string val = this->mode_.value(x...);
+  std::string val = this->decoding_success_light_mode_.value(x...);
   DecodingSuccessLightMode mode;
   if (!parse_decoding_success_light_mode(val, mode)) {
     ESP_LOGW(TAG_ACTION, "Invalid decoding success light mode: %s", val.c_str());
@@ -148,7 +148,7 @@ template<typename... Ts> void SetBootSoundModeAction<Ts...>::play(Ts... x) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
   }
-  std::string val = this->mode_.value(x...);
+  std::string val = this->boot_sound_mode_.value(x...);
   BootSoundMode mode;
   if (!parse_boot_sound_mode(val, mode)) {
     ESP_LOGW(TAG_ACTION, "Unknown boot sound mode: %s", val.c_str());
@@ -163,7 +163,7 @@ template<typename... Ts> void SetDecodeSoundModeAction<Ts...>::play(Ts... x) {
     ESP_LOGW(TAG_ACTION, "No scanner available");
     return;
   }
-  std::string val = this->mode_.value(x...);
+  std::string val = this->decode_sound_mode_.value(x...);
   DecodeSoundMode mode;
   if (!parse_decode_sound_mode(val, mode)) {
     ESP_LOGW(TAG_ACTION, "Unknown decode sound mode: %s", val.c_str());

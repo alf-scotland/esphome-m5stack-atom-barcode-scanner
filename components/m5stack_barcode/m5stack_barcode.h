@@ -706,12 +706,12 @@ class ScanDurationSelect : public select::Select {
     switch (duration) {
       case ScanDuration::MS_500: return "500ms";
       case ScanDuration::MS_1000: return "1s";
+      case ScanDuration::MS_3000: return "3s";
       case ScanDuration::MS_5000: return "5s";
       case ScanDuration::MS_10000: return "10s";
       case ScanDuration::MS_15000: return "15s";
       case ScanDuration::MS_20000: return "20s";
       case ScanDuration::UNLIMITED: return "unlimited";
-      default: return "3s";
     }
   }
 

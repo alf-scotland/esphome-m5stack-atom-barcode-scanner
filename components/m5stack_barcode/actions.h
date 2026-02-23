@@ -70,7 +70,7 @@ template<typename... Ts> class SetLightModeAction : public Action<Ts...> {
    * @param scanner Reference to the barcode scanner instance
    */
   explicit SetLightModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
+  TEMPLATABLE_VALUE(std::string, light_mode)
 
   void play(Ts... x) override;
 
@@ -81,7 +81,7 @@ template<typename... Ts> class SetLightModeAction : public Action<Ts...> {
 template<typename... Ts> class SetLocateLightModeAction : public Action<Ts...> {
  public:
   explicit SetLocateLightModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
+  TEMPLATABLE_VALUE(std::string, locate_light_mode)
   void play(Ts... x) override;
 
  protected:
@@ -96,7 +96,7 @@ template<typename... Ts> class SetSoundModeAction : public Action<Ts...> {
    * @param scanner Reference to the barcode scanner instance
    */
   explicit SetSoundModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
+  TEMPLATABLE_VALUE(std::string, sound_mode)
 
   void play(Ts... x) override;
 
@@ -120,7 +120,7 @@ template<typename... Ts> class SetBuzzerVolumeAction : public Action<Ts...> {
 template<typename... Ts> class SetDecodingSuccessLightModeAction : public Action<Ts...> {
  public:
   explicit SetDecodingSuccessLightModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
+  TEMPLATABLE_VALUE(std::string, decoding_success_light_mode)
   void play(Ts... x) override;
 
  protected:
@@ -131,7 +131,7 @@ template<typename... Ts> class SetDecodingSuccessLightModeAction : public Action
 template<typename... Ts> class SetBootSoundModeAction : public Action<Ts...> {
  public:
   explicit SetBootSoundModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
+  TEMPLATABLE_VALUE(std::string, boot_sound_mode)
   void play(Ts... x) override;
 
  protected:
@@ -142,7 +142,7 @@ template<typename... Ts> class SetBootSoundModeAction : public Action<Ts...> {
 template<typename... Ts> class SetDecodeSoundModeAction : public Action<Ts...> {
  public:
   explicit SetDecodeSoundModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
+  TEMPLATABLE_VALUE(std::string, decode_sound_mode)
   void play(Ts... x) override;
 
  protected:
