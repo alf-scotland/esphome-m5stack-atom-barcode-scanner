@@ -24,11 +24,6 @@ static const size_t MAX_QUEUE_SIZE = 20;  // Maximum number of commands queued a
 static const size_t MAX_BARCODE_LENGTH = 128;  // Maximum barcode data length
 static const size_t MAX_VERSION_LENGTH = 32;   // Maximum version string length
 
-// Custom implementation of make_unique for C++11 compatibility
-template<typename T, typename... Args> std::unique_ptr<T> make_unique(Args &&...args) {
-  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-}
-
 // Methods moved from header file
 bool BarcodeScanner::is_continuous_mode() const {
   return this->operation_mode_ == OperationMode::CONTINUOUS || this->operation_mode_ == OperationMode::AUTO_SENSE;
@@ -320,7 +315,7 @@ void BarcodeScanner::queue_command(std::unique_ptr<CommandBase> command) {
     return;
   }
 
-  command->log_command_data(TAG_SCANNER, "Queing");
+  command->log_command_data(TAG_SCANNER, "Queuing");
   this->command_queue_.push_back(std::move(command));
 }
 

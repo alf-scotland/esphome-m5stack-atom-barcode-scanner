@@ -154,7 +154,6 @@ template<typename... Ts> class SetScanDurationAction : public Action<Ts...> {
  public:
   explicit SetScanDurationAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, duration)
-  TEMPLATABLE_VALUE(std::string, global_ms_var)
   void play(Ts... x) override;
 
  protected:
@@ -228,17 +227,6 @@ template<typename... Ts> class IsContinuousModeCondition : public Condition<Ts..
   explicit IsContinuousModeCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
 
   bool check(Ts... x) override;
-
- protected:
-  BarcodeScanner *scanner_;
-};
-
-template<typename... Ts> class GetScanDurationMsAction : public Action<Ts...> {
- public:
-  explicit GetScanDurationMsAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, variable)
-
-  void play(Ts... x) override;
 
  protected:
   BarcodeScanner *scanner_;

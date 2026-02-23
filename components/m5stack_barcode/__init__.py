@@ -33,7 +33,6 @@ CONF_BARCODE_ID = "barcode_id"
 CONF_VERSION_ID = "version_id"
 CONF_VERSION_SENSOR = "version_sensor"
 CONF_ON_BARCODE = "on_barcode"
-CONF_GLOBAL_MS_VAR = "global_ms_var"
 CONF_BARCODE_EVENT = "barcode_event"
 
 # Event types
@@ -238,18 +237,13 @@ IsIdleCondition = m5stack_barcode_ns.class_(
     automation.Condition,
 )
 
-GetScanDurationMsAction = m5stack_barcode_ns.class_(
-    "GetScanDurationMsAction",
-    automation.Action,
-)
-
 # Configuration schema
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(BarcodeScanner),
         cv.Optional(CONF_BARCODE_ID): cv.use_id(text_sensor.TextSensor),
         cv.Optional(CONF_VERSION_ID): cv.use_id(text_sensor.TextSensor),
-        cv.Required(CONF_BARCODE_EVENT): cv.use_id(event.Event),
+        cv.Optional(CONF_BARCODE_EVENT): cv.use_id(event.Event),
         cv.Optional(CONF_OPERATION_MODE, default="host"): cv.enum(
             OPERATION_MODES,
             lower=True,
@@ -291,73 +285,51 @@ async def handle_sensor_config(var: Any, config: dict[str, Any]) -> None:
 async def handle_operation_config(var: Any, config: dict[str, Any]) -> None:
     """Handle operation mode and terminator configuration."""
     if CONF_OPERATION_MODE in config:
-        cg.add(var.set_operation_mode(OPERATION_MODES[config[CONF_OPERATION_MODE]]))
+        cg.add(var.set_operation_mode(config[CONF_OPERATION_MODE]))
     if CONF_TERMINATOR in config:
-        cg.add(var.set_terminator(TERMINATORS[config[CONF_TERMINATOR]]))
+        cg.add(var.set_terminator(config[CONF_TERMINATOR]))
 
 
 async def handle_light_config(var: Any, config: dict[str, Any]) -> None:
     """Handle light-related configuration."""
     if CONF_LIGHT_MODE in config:
-        cg.add(var.set_light_mode(LIGHT_MODES[config[CONF_LIGHT_MODE]]))
+        cg.add(var.set_light_mode(config[CONF_LIGHT_MODE]))
 
     if CONF_LOCATE_LIGHT_MODE in config:
-        cg.add(
-            var.set_locate_light_mode(
-                LOCATE_LIGHT_MODES[config[CONF_LOCATE_LIGHT_MODE]],
-            ),
-        )
+        cg.add(var.set_locate_light_mode(config[CONF_LOCATE_LIGHT_MODE]))
 
     if CONF_DECODING_SUCCESS_LIGHT_MODE in config:
-        cg.add(
-            var.set_decoding_success_light_mode(
-                DECODING_SUCCESS_LIGHT_MODES[config[CONF_DECODING_SUCCESS_LIGHT_MODE]],
-            ),
-        )
+        cg.add(var.set_decoding_success_light_mode(config[CONF_DECODING_SUCCESS_LIGHT_MODE]))
 
 
 async def handle_sound_config(var: Any, config: dict[str, Any]) -> None:
     """Handle sound-related configuration."""
     if CONF_SOUND_MODE in config:
-        cg.add(var.set_sound_mode(SOUND_MODES[config[CONF_SOUND_MODE]]))
+        cg.add(var.set_sound_mode(config[CONF_SOUND_MODE]))
 
     if CONF_BUZZER_VOLUME in config:
-        cg.add(var.set_buzzer_volume(BUZZER_VOLUMES[config[CONF_BUZZER_VOLUME]]))
+        cg.add(var.set_buzzer_volume(config[CONF_BUZZER_VOLUME]))
 
     if CONF_BOOT_SOUND_MODE in config:
-        cg.add(var.set_boot_sound_mode(BOOT_SOUND_MODES[config[CONF_BOOT_SOUND_MODE]]))
+        cg.add(var.set_boot_sound_mode(config[CONF_BOOT_SOUND_MODE]))
 
     if CONF_DECODE_SOUND_MODE in config:
-        cg.add(
-            var.set_decode_sound_mode(
-                DECODE_SOUND_MODES[config[CONF_DECODE_SOUND_MODE]],
-            ),
-        )
+        cg.add(var.set_decode_sound_mode(config[CONF_DECODE_SOUND_MODE]))
 
 
 async def handle_timing_config(var: Any, config: dict[str, Any]) -> None:
     """Handle timing-related configuration."""
     if CONF_SCAN_DURATION in config:
-        cg.add(var.set_scan_duration(SCAN_DURATIONS[config[CONF_SCAN_DURATION]]))
+        cg.add(var.set_scan_duration(config[CONF_SCAN_DURATION]))
 
     if CONF_STABLE_INDUCTION_TIME in config:
-        cg.add(
-            var.set_stable_induction_time(
-                STABLE_INDUCTION_TIMES[config[CONF_STABLE_INDUCTION_TIME]],
-            ),
-        )
+        cg.add(var.set_stable_induction_time(config[CONF_STABLE_INDUCTION_TIME]))
 
     if CONF_READING_INTERVAL in config:
-        cg.add(
-            var.set_reading_interval(READING_INTERVALS[config[CONF_READING_INTERVAL]]),
-        )
+        cg.add(var.set_reading_interval(config[CONF_READING_INTERVAL]))
 
     if CONF_SAME_CODE_INTERVAL in config:
-        cg.add(
-            var.set_same_code_interval(
-                SAME_CODE_INTERVALS[config[CONF_SAME_CODE_INTERVAL]],
-            ),
-        )
+        cg.add(var.set_same_code_interval(config[CONF_SAME_CODE_INTERVAL]))
 
 
 async def to_code(config: dict[str, Any]) -> None:
@@ -655,7 +627,6 @@ async def barcode_set_decode_sound_mode_to_code(
             cv.Required(CONF_SCAN_DURATION): cv.templatable(
                 cv.enum(SCAN_DURATIONS, lower=True),
             ),
-            cv.Optional(CONF_GLOBAL_MS_VAR): cv.templatable(cv.string),
         },
     ),
 )
@@ -669,15 +640,6 @@ async def barcode_set_scan_duration_to_code(
     var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
     template_ = await cg.templatable(config[CONF_SCAN_DURATION], args, cg.std_string)
     cg.add(var.set_duration(template_))
-
-    if CONF_GLOBAL_MS_VAR in config:
-        template_ = await cg.templatable(
-            config[CONF_GLOBAL_MS_VAR],
-            args,
-            cg.std_string,
-        )
-        cg.add(var.set_global_ms_var(template_))
-
     return var
 
 
@@ -824,25 +786,3 @@ async def barcode_is_idle_to_code(
     return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
 
 
-@automation.register_action(
-    "m5stack_barcode.get_scan_duration_ms",
-    GetScanDurationMsAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Optional("variable"): cv.templatable(cv.string),
-        },
-    ),
-)
-async def barcode_get_scan_duration_ms_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> GetScanDurationMsAction:
-    """Register get scan duration ms action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    if "variable" in config:
-        template_ = await cg.templatable(config["variable"], args, cg.std_string)
-        cg.add(var.set_variable(template_))
-    return var

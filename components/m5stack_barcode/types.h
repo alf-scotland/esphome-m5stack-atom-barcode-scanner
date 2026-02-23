@@ -2,7 +2,8 @@
 
 #include <cstdint>  // For uint8_t
 
-namespace esphome::m5stack_barcode {
+namespace esphome {
+namespace m5stack_barcode {
 
 // Scanner operation modes
 enum class OperationMode {
@@ -147,4 +148,5 @@ auto scan_state_to_string(ScanState state) -> const char *;
 // Duration conversion helper
 auto scan_duration_to_ms(ScanDuration duration) -> uint32_t;
 
-}  // namespace esphome::m5stack_barcode
+}  // namespace m5stack_barcode
+}  // namespace esphome

@@ -90,19 +90,22 @@ template<typename... Ts> void SetLightModeAction<Ts...>::play(Ts... x) {
     return;
   }
 
+  if (!this->mode_.has_value()) {
+    ESP_LOGW(TAG_ACTION, "No light mode value provided");
+    return;
+  }
+
+  auto val = this->mode_.value(x...);
   LightMode mode;
-  if (this->mode_.has_value()) {
-    auto val = this->mode_.value(x...);
-    if (val == "on_when_reading") {
-      mode = LightMode::LIGHT_ON_WHEN_READING;
-    } else if (val == "always_on") {
-      mode = LightMode::LIGHT_ALWAYS_ON;
-    } else if (val == "always_off") {
-      mode = LightMode::LIGHT_ALWAYS_OFF;
-    } else {
-      ESP_LOGW(TAG_ACTION, "Invalid light mode: %s", val.c_str());
-      return;
-    }
+  if (val == "on_when_reading") {
+    mode = LightMode::LIGHT_ON_WHEN_READING;
+  } else if (val == "always_on") {
+    mode = LightMode::LIGHT_ALWAYS_ON;
+  } else if (val == "always_off") {
+    mode = LightMode::LIGHT_ALWAYS_OFF;
+  } else {
+    ESP_LOGW(TAG_ACTION, "Invalid light mode: %s", val.c_str());
+    return;
   }
   this->scanner_->set_light_mode(mode);
 }
@@ -113,19 +116,22 @@ template<typename... Ts> void SetLocateLightModeAction<Ts...>::play(Ts... x) {
     return;
   }
 
+  if (!this->mode_.has_value()) {
+    ESP_LOGW(TAG_ACTION, "No locate light mode value provided");
+    return;
+  }
+
+  auto val = this->mode_.value(x...);
   LocateLightMode mode;
-  if (this->mode_.has_value()) {
-    auto val = this->mode_.value(x...);
-    if (val == "on_when_reading") {
-      mode = LocateLightMode::LOCATE_LIGHT_ON_WHEN_READING;
-    } else if (val == "always_on") {
-      mode = LocateLightMode::LOCATE_LIGHT_ALWAYS_ON;
-    } else if (val == "always_off") {
-      mode = LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF;
-    } else {
-      ESP_LOGW(TAG_ACTION, "Invalid locate light mode: %s", val.c_str());
-      return;
-    }
+  if (val == "on_when_reading") {
+    mode = LocateLightMode::LOCATE_LIGHT_ON_WHEN_READING;
+  } else if (val == "always_on") {
+    mode = LocateLightMode::LOCATE_LIGHT_ALWAYS_ON;
+  } else if (val == "always_off") {
+    mode = LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF;
+  } else {
+    ESP_LOGW(TAG_ACTION, "Invalid locate light mode: %s", val.c_str());
+    return;
   }
   this->scanner_->set_locate_light_mode(mode);
 }
@@ -158,19 +164,22 @@ template<typename... Ts> void SetBuzzerVolumeAction<Ts...>::play(Ts... x) {
     return;
   }
 
+  if (!this->volume_.has_value()) {
+    ESP_LOGW(TAG_ACTION, "No buzzer volume value provided");
+    return;
+  }
+
+  auto val = this->volume_.value(x...);
   BuzzerVolume volume;
-  if (this->volume_.has_value()) {
-    auto val = this->volume_.value(x...);
-    if (val == "high") {
-      volume = BuzzerVolume::BUZZER_VOLUME_HIGH;
-    } else if (val == "medium") {
-      volume = BuzzerVolume::BUZZER_VOLUME_MEDIUM;
-    } else if (val == "low") {
-      volume = BuzzerVolume::BUZZER_VOLUME_LOW;
-    } else {
-      ESP_LOGW(TAG_ACTION, "Invalid buzzer volume: %s", val.c_str());
-      return;
-    }
+  if (val == "high") {
+    volume = BuzzerVolume::BUZZER_VOLUME_HIGH;
+  } else if (val == "medium") {
+    volume = BuzzerVolume::BUZZER_VOLUME_MEDIUM;
+  } else if (val == "low") {
+    volume = BuzzerVolume::BUZZER_VOLUME_LOW;
+  } else {
+    ESP_LOGW(TAG_ACTION, "Invalid buzzer volume: %s", val.c_str());
+    return;
   }
   this->scanner_->set_buzzer_volume(volume);
 }
@@ -183,17 +192,20 @@ template<typename... Ts> void SetDecodingSuccessLightModeAction<Ts...>::play(Ts.
     return;
   }
 
+  if (!this->mode_.has_value()) {
+    ESP_LOGW(TAG_ACTION, "No decoding success light mode value provided");
+    return;
+  }
+
+  auto val = this->mode_.value(x...);
   DecodingSuccessLightMode mode;
-  if (this->mode_.has_value()) {
-    auto val = this->mode_.value(x...);
-    if (val == "enabled") {
-      mode = DecodingSuccessLightMode::DECODING_LIGHT_ENABLED;
-    } else if (val == "disabled") {
-      mode = DecodingSuccessLightMode::DECODING_LIGHT_DISABLED;
-    } else {
-      ESP_LOGW(TAG_ACTION, "Invalid decoding success light mode: %s", val.c_str());
-      return;
-    }
+  if (val == "enabled") {
+    mode = DecodingSuccessLightMode::DECODING_LIGHT_ENABLED;
+  } else if (val == "disabled") {
+    mode = DecodingSuccessLightMode::DECODING_LIGHT_DISABLED;
+  } else {
+    ESP_LOGW(TAG_ACTION, "Invalid decoding success light mode: %s", val.c_str());
+    return;
   }
   this->scanner_->set_decoding_success_light_mode(mode);
 }
@@ -274,16 +286,6 @@ template<typename... Ts> void SetScanDurationAction<Ts...>::play(Ts... x) {
 
   ESP_LOGD(TAG_ACTION, "Setting scan duration to: %s", duration_str.c_str());
   this->scanner_->set_scan_duration(duration);
-
-  // Update the global variable with the duration in milliseconds
-  if (this->global_ms_var_.has_value()) {
-    std::string var_name = this->global_ms_var_.value(x...);
-    if (!var_name.empty()) {
-      uint32_t duration_ms = this->scanner_->get_scan_duration_ms();
-      ESP_LOGD(TAG_ACTION, "Updating global variable %s with duration %u ms", var_name.c_str(), duration_ms);
-      id(var_name) = static_cast<int>(duration_ms);
-    }
-  }
 }
 
 template<typename... Ts> void SetStableInductionTimeAction<Ts...>::play(Ts... x) {
@@ -406,23 +408,6 @@ template<typename... Ts> bool IsContinuousModeCondition<Ts...>::check(Ts... x) {
   return this->scanner_->is_continuous_mode();
 }
 
-template<typename... Ts> void GetScanDurationMsAction<Ts...>::play(Ts... x) {
-  if (this->scanner_ == nullptr) {
-    ESP_LOGW(TAG_ACTION, "No scanner available");
-    return;
-  }
-
-  uint32_t duration_ms = this->scanner_->get_scan_duration_ms();
-  ESP_LOGD(TAG_ACTION, "Scan duration: %u ms", duration_ms);
-
-  if (this->variable_.has_value()) {
-    std::string var_name = this->variable_.value(x...);
-    if (!var_name.empty()) {
-      id(var_name) = static_cast<int>(duration_ms);
-    }
-  }
-}
-
 // Explicit template instantiations
 template class StartAction<>;
 template class StartAction<bool>;
@@ -451,7 +436,6 @@ template class ProcessCurrentBufferAction<std::string, int>;
 template class IsManualScanningCondition<>;
 template class IsIdleCondition<>;
 template class IsContinuousModeCondition<>;
-template class GetScanDurationMsAction<>;
 
 // Explicit template instantiations for the types used in YAML
 template class StartAction<std::string, unsigned int>;

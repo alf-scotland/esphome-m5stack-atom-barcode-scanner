@@ -356,6 +356,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   template<typename... Ts> friend class SetReadingIntervalAction;
   template<typename... Ts> friend class SetSameCodeIntervalAction;
 
+
   // Protected state setter methods for use by commands
   void set_terminator_state(Terminator term);
   void set_light_mode_state(LightMode mode);
