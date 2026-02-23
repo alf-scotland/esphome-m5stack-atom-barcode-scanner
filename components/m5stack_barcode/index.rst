@@ -48,7 +48,18 @@ Component Options
 - **id** (*Optional*, :ref:`config-id`): Manually specify the ID for this component.
 - **on_barcode** (*Optional*, :ref:`Automation <automation>`): Automation to run whenever a barcode is successfully decoded. The scanned string is available as the variable ``x``.
 - **on_scan_timeout** (*Optional*, :ref:`Automation <automation>`): Automation to run when a HOST-mode scan times out without producing a result (after ``scan_duration`` has elapsed). Use this to give user feedback or retry logic. Not triggered when ``scan_duration`` is set to ``unlimited``.
-- **operation_mode_select** (*Optional*): Expose the scanner's operation mode as a Home Assistant ``select`` entity for runtime switching. Accepts standard entity options (``name``, ``icon``, etc.).
+- **scanning_binary_sensor** (*Optional*): Expose the current scan state as a Home Assistant ``binary_sensor`` entity. ``on`` while scanning, ``off`` when idle.
+- **start_button** (*Optional*): Expose a Home Assistant ``button`` entity that starts a HOST-mode scan when pressed.
+- **stop_button** (*Optional*): Expose a Home Assistant ``button`` entity that stops the current HOST-mode scan when pressed.
+- **sound_switch** (*Optional*): Expose ``sound_mode`` as a Home Assistant ``switch`` entity. ``on`` = sound enabled, ``off`` = disabled.
+- **boot_sound_switch** (*Optional*): Expose ``boot_sound_mode`` as a Home Assistant ``switch`` entity.
+- **decode_sound_switch** (*Optional*): Expose ``decode_sound_mode`` as a Home Assistant ``switch`` entity.
+- **decoding_success_light_switch** (*Optional*): Expose ``decoding_success_light_mode`` as a Home Assistant ``switch`` entity.
+- **operation_mode_select** (*Optional*): Expose the scanner's operation mode as a Home Assistant ``select`` entity for runtime switching.
+- **buzzer_volume_select** (*Optional*): Expose ``buzzer_volume`` as a Home Assistant ``select`` entity. Options: ``low``, ``medium``, ``high``.
+- **light_mode_select** (*Optional*): Expose ``light_mode`` (main illumination) as a Home Assistant ``select`` entity.
+- **locate_light_mode_select** (*Optional*): Expose ``locate_light_mode`` (aiming pattern) as a Home Assistant ``select`` entity.
+- **scan_duration_select** (*Optional*): Expose ``scan_duration`` as a Home Assistant ``select`` entity.
 
 - **operation_mode** (*Optional*): Set the scanner operation mode.
 
@@ -439,6 +450,119 @@ implement retry logic in Home Assistant automations.
 Sub-components
 --------------
 
+All sub-components are optional inline entities. They stay in bidirectional sync with the
+scanner: changing a setting in Home Assistant queues the UART command, and the entity only
+updates its displayed state after the scanner ACKs — no optimistic state is shown.
+
+.. _m5stack_barcode-scanning_binary_sensor:
+
+``scanning_binary_sensor``
+**************************
+
+Exposes the scanner's current scan state as a binary sensor. Reports ``on`` while a HOST-mode
+scan is in progress and ``off`` when idle. Updates automatically as scans start, complete,
+or time out.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      scanning_binary_sensor:
+        name: "Scanner Active"
+        device_class: running
+
+.. _m5stack_barcode-start_button:
+
+``start_button``
+****************
+
+A button entity that calls ``m5stack_barcode.start`` when pressed. Only has an effect when
+the scanner is in HOST mode.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      operation_mode: host
+      start_button:
+        name: "Start Scan"
+        icon: "mdi:barcode-scan"
+
+.. _m5stack_barcode-stop_button:
+
+``stop_button``
+***************
+
+A button entity that calls ``m5stack_barcode.stop`` when pressed.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      stop_button:
+        name: "Stop Scan"
+        icon: "mdi:stop-circle-outline"
+
+.. _m5stack_barcode-sound_switch:
+
+``sound_switch``
+****************
+
+Exposes ``sound_mode`` as a switch. Toggle off to silence the scanner entirely; toggle on
+to re-enable sounds. State is confirmed by the scanner ACK before the entity updates in HA.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      sound_switch:
+        name: "Scanner Sound"
+        icon: "mdi:volume-high"
+
+.. _m5stack_barcode-boot_sound_switch:
+
+``boot_sound_switch``
+*********************
+
+Exposes ``boot_sound_mode`` as a switch. Controls whether the scanner beeps when powered on.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      boot_sound_switch:
+        name: "Boot Sound"
+
+.. _m5stack_barcode-decode_sound_switch:
+
+``decode_sound_switch``
+***********************
+
+Exposes ``decode_sound_mode`` as a switch. Controls whether the scanner beeps on a
+successful decode.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      decode_sound_switch:
+        name: "Decode Sound"
+
+.. _m5stack_barcode-decoding_success_light_switch:
+
+``decoding_success_light_switch``
+**********************************
+
+Exposes ``decoding_success_light_mode`` as a switch. Controls whether the scanner flashes
+its light on a successful decode.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      decoding_success_light_switch:
+        name: "Success Light"
+
 .. _m5stack_barcode-operation_mode_select:
 
 ``operation_mode_select``
@@ -460,6 +584,69 @@ the entity in Home Assistant.
 
 The available options match the ``operation_mode`` keys:
 ``host``, ``level``, ``pulse``, ``continuous``, ``auto_sense``.
+
+.. _m5stack_barcode-buzzer_volume_select:
+
+``buzzer_volume_select``
+************************
+
+Exposes ``buzzer_volume`` as a select entity. Options: ``low``, ``medium``, ``high``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      buzzer_volume_select:
+        name: "Buzzer Volume"
+        icon: "mdi:volume-medium"
+
+.. _m5stack_barcode-light_mode_select:
+
+``light_mode_select``
+*********************
+
+Exposes the main illumination light mode as a select entity.
+Options: ``on_when_reading``, ``always_on``, ``always_off``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      light_mode_select:
+        name: "Light Mode"
+        icon: "mdi:flashlight"
+
+.. _m5stack_barcode-locate_light_mode_select:
+
+``locate_light_mode_select``
+****************************
+
+Exposes the locate (aiming pattern) light mode as a select entity.
+Options: ``on_when_reading``, ``always_on``, ``always_off``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      locate_light_mode_select:
+        name: "Locate Light Mode"
+
+.. _m5stack_barcode-scan_duration_select:
+
+``scan_duration_select``
+************************
+
+Exposes the scan duration as a select entity, letting users tune how long the scanner
+attempts to read a barcode before giving up.
+Options: ``500ms``, ``1s``, ``3s``, ``5s``, ``10s``, ``15s``, ``20s``, ``unlimited``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      scan_duration_select:
+        name: "Scan Duration"
+        icon: "mdi:timer-outline"
 
 Conditions
 ----------
@@ -580,36 +767,63 @@ The M5Stack Barcode Scanner supports a wide range of barcode types:
 Control with Home Assistant
 --------------------------
 
-You can create UI controls in Home Assistant to change scanner settings:
+Use the native sub-components to expose full scanner control as first-class Home Assistant
+entities. All entities stay in bidirectional sync with the scanner hardware — no template
+workarounds needed.
 
 .. code-block:: yaml
 
-    # Button to start scanning
-    button:
-      - platform: template
-        name: "Start Scan"
-        icon: "mdi:play-circle-outline"
-        on_press:
-          - m5stack_barcode.start:
-              id: barcode_scanner
+    m5stack_barcode:
+      id: barcode_scanner
+      operation_mode: host
 
-    # Select to change the operation mode
-    select:
-      - platform: template
+      # Triggers
+      on_barcode:
+        - text_sensor.template.publish:
+            id: last_barcode
+            state: !lambda "return x;"
+      on_scan_timeout:
+        - logger.log: "Scan timed out — no barcode found"
+
+      # Binary sensor: true while scanning
+      scanning_binary_sensor:
+        name: "Scanner Active"
+        device_class: running
+
+      # Buttons
+      start_button:
+        name: "Start Scan"
+        icon: "mdi:barcode-scan"
+      stop_button:
+        name: "Stop Scan"
+        icon: "mdi:stop-circle-outline"
+
+      # Mode and duration selects
+      operation_mode_select:
         name: "Operation Mode"
         icon: "mdi:tune"
-        options:
-          - "host"
-          - "level"
-          - "pulse"
-          - "continuous"
-          - "auto_sense"
-        initial_option: "host"
-        optimistic: true
-        on_value:
-          - m5stack_barcode.set_mode:
-              id: barcode_scanner
-              operation_mode: !lambda "return x;"
+      scan_duration_select:
+        name: "Scan Duration"
+        icon: "mdi:timer-outline"
+
+      # Sound switches
+      sound_switch:
+        name: "Sound"
+        icon: "mdi:volume-high"
+      decode_sound_switch:
+        name: "Decode Sound"
+      boot_sound_switch:
+        name: "Boot Sound"
+
+      # Light switches and selects
+      decoding_success_light_switch:
+        name: "Success Flash"
+      light_mode_select:
+        name: "Light Mode"
+        icon: "mdi:flashlight"
+      buzzer_volume_select:
+        name: "Buzzer Volume"
+        icon: "mdi:volume-medium"
 
 Troubleshooting
 --------------

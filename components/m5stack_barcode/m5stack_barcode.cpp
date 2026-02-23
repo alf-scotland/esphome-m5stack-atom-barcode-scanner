@@ -37,6 +37,8 @@ void BarcodeScanner::set_scan_state(ScanState state) {
   if (this->scan_state_ != state) {
     ESP_LOGD(TAG_SCANNER, "Scan state changed from %d to %d", (int) this->scan_state_, (int) state);
     this->scan_state_ = state;
+    if (this->scanning_binary_sensor_ != nullptr)
+      this->scanning_binary_sensor_->publish_state(state != ScanState::IDLE);
   }
 }
 
@@ -54,12 +56,31 @@ void BarcodeScanner::setup() {
   // Configure settings, skipping any that the scanner already has from a previous boot
   this->configure_defaults_();
 
-  // Publish initial operation-mode state to the HA select entity (if wired)
-  if (this->operation_mode_select_ != nullptr) {
+  // Publish initial states to all optional sub-components so HA shows the correct values
+  // immediately after boot, before any UART commands are sent.
+  if (this->operation_mode_select_ != nullptr)
     this->operation_mode_select_->publish_state(OperationModeSelect::mode_to_key(this->operation_mode_));
-  }
+  if (this->buzzer_volume_select_ != nullptr)
+    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::volume_to_key(this->buzzer_volume_));
+  if (this->light_mode_select_ != nullptr)
+    this->light_mode_select_->publish_state(LightModeSelect::mode_to_key(this->light_mode_));
+  if (this->locate_light_mode_select_ != nullptr)
+    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::mode_to_key(this->locate_light_mode_));
+  if (this->scan_duration_select_ != nullptr)
+    this->scan_duration_select_->publish_state(ScanDurationSelect::duration_to_key(this->scan_duration_));
+  if (this->sound_switch_ != nullptr)
+    this->sound_switch_->publish_state(this->sound_mode_ == SoundMode::SOUND_ENABLED);
+  if (this->boot_sound_switch_ != nullptr)
+    this->boot_sound_switch_->publish_state(this->boot_sound_mode_ == BootSoundMode::BOOT_SOUND_ENABLED);
+  if (this->decode_sound_switch_ != nullptr)
+    this->decode_sound_switch_->publish_state(this->decode_sound_mode_ == DecodeSoundMode::DECODE_SOUND_ENABLED);
+  if (this->decoding_success_light_switch_ != nullptr)
+    this->decoding_success_light_switch_->publish_state(this->decoding_success_light_mode_ ==
+                                                        DecodingSuccessLightMode::DECODING_LIGHT_ENABLED);
+  if (this->scanning_binary_sensor_ != nullptr)
+    this->scanning_binary_sensor_->publish_state(this->scan_state_ != ScanState::IDLE);
 
-  // Then request version information (optional)
+  // Request firmware version if a version sensor is wired
   if (this->version_sensor_ != nullptr) {
     this->request_version_();
   }
@@ -717,48 +738,64 @@ void BarcodeScanner::set_light_mode_state(LightMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting light mode to %s", light_mode_to_string(mode));
   this->light_mode_ = mode;
   this->save_settings_();
+  if (this->light_mode_select_ != nullptr)
+    this->light_mode_select_->publish_state(LightModeSelect::mode_to_key(mode));
 }
 
 void BarcodeScanner::set_locate_light_mode_state(LocateLightMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting locate light mode to %s", locate_light_mode_to_string(mode));
   this->locate_light_mode_ = mode;
   this->save_settings_();
+  if (this->locate_light_mode_select_ != nullptr)
+    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::mode_to_key(mode));
 }
 
 void BarcodeScanner::set_sound_mode_state(SoundMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting sound mode to %s", sound_mode_to_string(mode));
   this->sound_mode_ = mode;
   this->save_settings_();
+  if (this->sound_switch_ != nullptr)
+    this->sound_switch_->publish_state(mode == SoundMode::SOUND_ENABLED);
 }
 
 void BarcodeScanner::set_buzzer_volume_state(BuzzerVolume volume) {
   ESP_LOGD(TAG_SCANNER, "Setting buzzer volume to %s", buzzer_volume_to_string(volume));
   this->buzzer_volume_ = volume;
   this->save_settings_();
+  if (this->buzzer_volume_select_ != nullptr)
+    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::volume_to_key(volume));
 }
 
 void BarcodeScanner::set_decoding_success_light_mode_state(DecodingSuccessLightMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting decoding success light mode to %s", decoding_success_light_mode_to_string(mode));
   this->decoding_success_light_mode_ = mode;
   this->save_settings_();
+  if (this->decoding_success_light_switch_ != nullptr)
+    this->decoding_success_light_switch_->publish_state(mode == DecodingSuccessLightMode::DECODING_LIGHT_ENABLED);
 }
 
 void BarcodeScanner::set_boot_sound_mode_state(BootSoundMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting boot sound mode to %s", boot_sound_mode_to_string(mode));
   this->boot_sound_mode_ = mode;
   this->save_settings_();
+  if (this->boot_sound_switch_ != nullptr)
+    this->boot_sound_switch_->publish_state(mode == BootSoundMode::BOOT_SOUND_ENABLED);
 }
 
 void BarcodeScanner::set_decode_sound_mode_state(DecodeSoundMode mode) {
   ESP_LOGD(TAG_SCANNER, "Setting decode sound mode to %s", decode_sound_mode_to_string(mode));
   this->decode_sound_mode_ = mode;
   this->save_settings_();
+  if (this->decode_sound_switch_ != nullptr)
+    this->decode_sound_switch_->publish_state(mode == DecodeSoundMode::DECODE_SOUND_ENABLED);
 }
 
 void BarcodeScanner::set_scan_duration_state(ScanDuration duration) {
   ESP_LOGD(TAG_SCANNER, "Setting scan duration to %s", scan_duration_to_string(duration));
   this->scan_duration_ = duration;
   this->save_settings_();
+  if (this->scan_duration_select_ != nullptr)
+    this->scan_duration_select_->publish_state(ScanDurationSelect::duration_to_key(duration));
 }
 
 void BarcodeScanner::set_stable_induction_time_state(StableInductionTime time) {
@@ -802,6 +839,102 @@ void OperationModeSelect::control(const std::string &value) {
   }
   scanner_->set_operation_mode(mode);
   // publish_state is deferred until set_operation_mode_state() fires after the scanner ACKs
+}
+
+void BuzzerVolumeSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "BuzzerVolumeSelect: no scanner attached");
+    return;
+  }
+  BuzzerVolume vol;
+  if (!parse_buzzer_volume(value, vol)) {
+    ESP_LOGW(TAG_SCANNER, "BuzzerVolumeSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_buzzer_volume(vol);
+}
+
+void LightModeSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "LightModeSelect: no scanner attached");
+    return;
+  }
+  LightMode mode;
+  if (!parse_light_mode(value, mode)) {
+    ESP_LOGW(TAG_SCANNER, "LightModeSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_light_mode(mode);
+}
+
+void LocateLightModeSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "LocateLightModeSelect: no scanner attached");
+    return;
+  }
+  LocateLightMode mode;
+  if (!parse_locate_light_mode(value, mode)) {
+    ESP_LOGW(TAG_SCANNER, "LocateLightModeSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_locate_light_mode(mode);
+}
+
+void ScanDurationSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "ScanDurationSelect: no scanner attached");
+    return;
+  }
+  ScanDuration dur;
+  if (!parse_scan_duration(value, dur)) {
+    ESP_LOGW(TAG_SCANNER, "ScanDurationSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_scan_duration(dur);
+}
+
+void SoundSwitch::write_state(bool state) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "SoundSwitch: no scanner attached");
+    return;
+  }
+  scanner_->set_sound_mode(state ? SoundMode::SOUND_ENABLED : SoundMode::SOUND_DISABLED);
+  // publish_state deferred until set_sound_mode_state() fires after the scanner ACKs
+}
+
+void BootSoundSwitch::write_state(bool state) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "BootSoundSwitch: no scanner attached");
+    return;
+  }
+  scanner_->set_boot_sound_mode(state ? BootSoundMode::BOOT_SOUND_ENABLED : BootSoundMode::BOOT_SOUND_DISABLED);
+}
+
+void DecodeSoundSwitch::write_state(bool state) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "DecodeSoundSwitch: no scanner attached");
+    return;
+  }
+  scanner_->set_decode_sound_mode(state ? DecodeSoundMode::DECODE_SOUND_ENABLED : DecodeSoundMode::DECODE_SOUND_DISABLED);
+}
+
+void DecodingSuccessLightSwitch::write_state(bool state) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "DecodingSuccessLightSwitch: no scanner attached");
+    return;
+  }
+  scanner_->set_decoding_success_light_mode(state ? DecodingSuccessLightMode::DECODING_LIGHT_ENABLED
+                                                   : DecodingSuccessLightMode::DECODING_LIGHT_DISABLED);
+}
+
+void StartButton::press_action() {
+  if (scanner_ != nullptr)
+    scanner_->start_scan();
+}
+
+void StopButton::press_action() {
+  if (scanner_ != nullptr)
+    scanner_->stop_scan();
 }
 
 }  // namespace m5stack_barcode

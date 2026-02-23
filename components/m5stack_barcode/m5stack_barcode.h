@@ -7,7 +7,10 @@
 #include "actions.h"
 #include "command_handlers.h"
 #include "commands.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/button/button.h"
 #include "esphome/components/select/select.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/event/event.h"
@@ -47,6 +50,14 @@ struct ScannerPreferences {
 // Forward declarations
 template<typename T> class StateCommand;
 class OperationModeSelect;
+class BuzzerVolumeSelect;
+class LightModeSelect;
+class LocateLightModeSelect;
+class ScanDurationSelect;
+class SoundSwitch;
+class BootSoundSwitch;
+class DecodeSoundSwitch;
+class DecodingSuccessLightSwitch;
 
 // Logging tag for this component
 extern const char *const TAG_SCANNER;
@@ -178,6 +189,19 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
 
   /// Attach the optional operation-mode select sub-component.
   void set_operation_mode_select(OperationModeSelect *select) { this->operation_mode_select_ = select; }
+
+  // Optional HA sub-component attachment — call from codegen to wire up entities.
+  void set_scanning_binary_sensor(binary_sensor::BinarySensor *bs) { this->scanning_binary_sensor_ = bs; }
+  void set_sound_switch(SoundSwitch *sw) { this->sound_switch_ = sw; }
+  void set_boot_sound_switch(BootSoundSwitch *sw) { this->boot_sound_switch_ = sw; }
+  void set_decode_sound_switch(DecodeSoundSwitch *sw) { this->decode_sound_switch_ = sw; }
+  void set_decoding_success_light_switch(DecodingSuccessLightSwitch *sw) {
+    this->decoding_success_light_switch_ = sw;
+  }
+  void set_buzzer_volume_select(BuzzerVolumeSelect *sel) { this->buzzer_volume_select_ = sel; }
+  void set_light_mode_select(LightModeSelect *sel) { this->light_mode_select_ = sel; }
+  void set_locate_light_mode_select(LocateLightModeSelect *sel) { this->locate_light_mode_select_ = sel; }
+  void set_scan_duration_select(ScanDurationSelect *sel) { this->scan_duration_select_ = sel; }
 
   // Scanner Control Methods
   /**
@@ -532,7 +556,16 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   text_sensor::TextSensor *text_sensor_{nullptr};     ///< Sensor for barcode output
   text_sensor::TextSensor *version_sensor_{nullptr};  ///< Sensor for firmware version
   event::Event *barcode_event_{nullptr};              ///< Event for barcode scans
-  OperationModeSelect *operation_mode_select_{nullptr};  ///< Optional HA select for operation mode
+  OperationModeSelect *operation_mode_select_{nullptr};        ///< Optional HA select for operation mode
+  BuzzerVolumeSelect *buzzer_volume_select_{nullptr};          ///< Optional HA select for buzzer volume
+  LightModeSelect *light_mode_select_{nullptr};                ///< Optional HA select for light mode
+  LocateLightModeSelect *locate_light_mode_select_{nullptr};   ///< Optional HA select for locate light mode
+  ScanDurationSelect *scan_duration_select_{nullptr};          ///< Optional HA select for scan duration
+  SoundSwitch *sound_switch_{nullptr};                         ///< Optional HA switch for sound mode
+  BootSoundSwitch *boot_sound_switch_{nullptr};                ///< Optional HA switch for boot sound mode
+  DecodeSoundSwitch *decode_sound_switch_{nullptr};            ///< Optional HA switch for decode sound mode
+  DecodingSuccessLightSwitch *decoding_success_light_switch_{nullptr};  ///< Optional HA switch for success light
+  binary_sensor::BinarySensor *scanning_binary_sensor_{nullptr};        ///< Optional HA binary sensor for scan state
 
   std::vector<uint8_t> rx_buffer_;                           ///< Buffer for received data
   std::vector<std::unique_ptr<CommandBase>> command_queue_;  ///< Queue of pending commands
@@ -599,6 +632,163 @@ class OperationModeSelect : public select::Select {
 
  protected:
   void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Select sub-component for buzzer_volume. Exposes the three volume levels as a HA select.
+class BuzzerVolumeSelect : public select::Select {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  static const char *volume_to_key(BuzzerVolume volume) {
+    switch (volume) {
+      case BuzzerVolume::BUZZER_VOLUME_HIGH: return "high";
+      case BuzzerVolume::BUZZER_VOLUME_MEDIUM: return "medium";
+      default: return "low";
+    }
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Select sub-component for light_mode (main illumination light).
+class LightModeSelect : public select::Select {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  static const char *mode_to_key(LightMode mode) {
+    switch (mode) {
+      case LightMode::LIGHT_ALWAYS_ON: return "always_on";
+      case LightMode::LIGHT_ALWAYS_OFF: return "always_off";
+      default: return "on_when_reading";
+    }
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Select sub-component for locate_light_mode (aiming pattern light).
+class LocateLightModeSelect : public select::Select {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  static const char *mode_to_key(LocateLightMode mode) {
+    switch (mode) {
+      case LocateLightMode::LOCATE_LIGHT_ALWAYS_ON: return "always_on";
+      case LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF: return "always_off";
+      default: return "on_when_reading";
+    }
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Select sub-component for scan_duration (how long the scanner tries before giving up).
+class ScanDurationSelect : public select::Select {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  static const char *duration_to_key(ScanDuration duration) {
+    switch (duration) {
+      case ScanDuration::MS_500: return "500ms";
+      case ScanDuration::MS_1000: return "1s";
+      case ScanDuration::MS_5000: return "5s";
+      case ScanDuration::MS_10000: return "10s";
+      case ScanDuration::MS_15000: return "15s";
+      case ScanDuration::MS_20000: return "20s";
+      case ScanDuration::UNLIMITED: return "unlimited";
+      default: return "3s";
+    }
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Switch sub-component for sound_mode — maps the HA toggle to SOUND_ENABLED / SOUND_DISABLED.
+class SoundSwitch : public switch_::Switch {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void write_state(bool state) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Switch sub-component for boot_sound_mode — controls whether the scanner beeps on power-up.
+class BootSoundSwitch : public switch_::Switch {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void write_state(bool state) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Switch sub-component for decode_sound_mode — controls whether the scanner beeps on decode.
+class DecodeSoundSwitch : public switch_::Switch {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void write_state(bool state) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Switch sub-component for decoding_success_light_mode — controls the success flash.
+class DecodingSuccessLightSwitch : public switch_::Switch {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void write_state(bool state) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Button sub-component that starts a HOST-mode scan when pressed in Home Assistant.
+class StartButton : public button::Button {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void press_action() override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Button sub-component that stops the current HOST-mode scan when pressed in Home Assistant.
+class StopButton : public button::Button {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void press_action() override;
 
  private:
   BarcodeScanner *scanner_{nullptr};
