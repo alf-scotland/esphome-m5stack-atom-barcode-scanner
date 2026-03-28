@@ -150,8 +150,13 @@ void BarcodeScanner::loop() {
 
   // Handle command acknowledgments
   if (this->waiting_for_ack_) {
-    // Check if we've received an acknowledgment
-    if (!this->rx_buffer_.empty() && this->is_ack_sequence_(this->rx_buffer_.data(), this->rx_buffer_.size())) {
+    // Configuration commands always elicit the 6-byte HOST ACK regardless of the
+    // current operation mode (is_ack_sequence_ uses the mode to select the format,
+    // which is wrong here — mode may not have changed yet when checking the ACK for
+    // a mode-change command).
+    const bool got_ack = this->rx_buffer_.size() >= Commands::Responses::ACK_SIZE &&
+                         memcmp(this->rx_buffer_.data(), Commands::Responses::ACK, Commands::Responses::ACK_SIZE) == 0;
+    if (got_ack) {
       ESP_LOGD(TAG_SCANNER, "Command acknowledged");
 
       // Get the current command
@@ -196,10 +201,15 @@ void BarcodeScanner::loop() {
 
   // Process version information if requested
   if (this->expected_response_ == ResponseType::VERSION) {
-    // If we have data and we're not waiting for more (wait for COMMAND_TIMEOUT_MS)
-    if (!this->rx_buffer_.empty() && millis() - this->last_command_time_ > COMMAND_TIMEOUT_MS) {
-      // Process any data received as version information
-      this->process_version_();
+    // Wait COMMAND_TIMEOUT_MS for all version data to arrive, then process
+    // whatever is in the buffer (may be empty if the scanner did not respond).
+    if (millis() - this->last_command_time_ > COMMAND_TIMEOUT_MS) {
+      if (!this->rx_buffer_.empty()) {
+        this->process_version_();
+      } else {
+        ESP_LOGW(TAG_SCANNER, "Version request timed out with no response");
+        this->clear_buffer_();
+      }
       this->expected_response_ = ResponseType::NONE;
     }
     return;
@@ -284,9 +294,12 @@ void BarcodeScanner::set_expected_response_(ResponseType type) { this->expected_
 
 // Command Processing Methods
 void BarcodeScanner::process_command_queue_() {
-  // Only process commands if we're not waiting for an acknowledgment
+  // Only process commands if we're not waiting for an acknowledgment or a version response
   if (this->waiting_for_ack_ || this->command_queue_.empty()) {
     return;
+  }
+  if (this->expected_response_ == ResponseType::VERSION) {
+    return;  // Block queue while waiting for version data to arrive
   }
 
   // Get the current command
@@ -325,8 +338,11 @@ void BarcodeScanner::write_command_(const std::unique_ptr<CommandBase> &command)
 
   this->write_array(command->get_data(), command->get_length());
 
-  // Update state tracking
-  this->waiting_for_ack_ = true;
+  // Update state tracking.  VERSION commands are special: the scanner responds
+  // with raw version data (not an ACK byte sequence), so we must not block on
+  // the ACK path.  The VERSION response is handled by the dedicated branch in
+  // loop() once COMMAND_TIMEOUT_MS has elapsed to let all data arrive.
+  this->waiting_for_ack_ = (this->expected_response_ != ResponseType::VERSION);
   this->last_command_time_ = millis();
   this->command_state_ = CommandState::COMMAND_SENT;
 }
