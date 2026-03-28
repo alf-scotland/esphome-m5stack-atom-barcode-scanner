@@ -73,20 +73,34 @@ To use pre-releases with Home Assistant:
 
 ### OTA Configuration (Advanced)
 
-You can customize OTA behavior in your `firmware.yaml`:
+You can customize OTA behavior in your `firmware.yaml`. Use the modern list format
+(ESPHome 2024.6+):
 
 ```yaml
-# Enable OTA updates
+# Standard OTA via ESPHome dashboard
 ota:
-  password: !secret ota_password
-  safe_mode: true  # Set to false for pre-releases to avoid rollbacks
+  - platform: esphome
+    password: !secret ota_password
 
-  # For automated updates from a specific GitHub repository
-  repository:
-    type: git
-    url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner
-    ref: main  # Or a specific branch/tag like vYYYY.MM.0-beta.1
-    path: firmware.yaml
+# Optional: enable safe mode recovery (recommended)
+safe_mode:
+  reboot_timeout: 3min
+  num_attempts: 5
+
+# Optional: OTA from a direct URL (e.g., GitHub Release binary)
+ota:
+  - platform: http_request
+
+http_request:
+  verify_ssl: false
+
+button:
+  - platform: template
+    name: "Flash Pre-release"
+    on_press:
+      - ota.http_request.flash:
+          url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner/releases/download/vYYYY.MM.0-beta.1/firmware.bin
+          verify_ssl: false
 ```
 
 ## Testing Pre-releases

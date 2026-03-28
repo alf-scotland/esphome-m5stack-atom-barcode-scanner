@@ -16,7 +16,7 @@ extern const char *const TAG_ACTION;
 template<typename... Ts> class StartAction : public Action<Ts...> {
  public:
   explicit StartAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -25,7 +25,7 @@ template<typename... Ts> class StartAction : public Action<Ts...> {
 template<typename... Ts> class StopAction : public Action<Ts...> {
  public:
   explicit StopAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -41,7 +41,7 @@ template<typename... Ts> class SetModeAction : public Action<Ts...> {
   explicit SetModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, mode)
 
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -56,7 +56,7 @@ template<typename... Ts> class SetTerminatorAction : public Action<Ts...> {
   explicit SetTerminatorAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, terminator)
 
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -70,9 +70,9 @@ template<typename... Ts> class SetLightModeAction : public Action<Ts...> {
    * @param scanner Reference to the barcode scanner instance
    */
   explicit SetLightModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
+  TEMPLATABLE_VALUE(std::string, light_mode)
 
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -81,8 +81,8 @@ template<typename... Ts> class SetLightModeAction : public Action<Ts...> {
 template<typename... Ts> class SetLocateLightModeAction : public Action<Ts...> {
  public:
   explicit SetLocateLightModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
-  void play(Ts... x) override;
+  TEMPLATABLE_VALUE(std::string, locate_light_mode)
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -96,9 +96,9 @@ template<typename... Ts> class SetSoundModeAction : public Action<Ts...> {
    * @param scanner Reference to the barcode scanner instance
    */
   explicit SetSoundModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
+  TEMPLATABLE_VALUE(std::string, sound_mode)
 
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -108,7 +108,7 @@ template<typename... Ts> class SetBuzzerVolumeAction : public Action<Ts...> {
  public:
   explicit SetBuzzerVolumeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, volume)
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -120,8 +120,8 @@ template<typename... Ts> class SetBuzzerVolumeAction : public Action<Ts...> {
 template<typename... Ts> class SetDecodingSuccessLightModeAction : public Action<Ts...> {
  public:
   explicit SetDecodingSuccessLightModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
-  void play(Ts... x) override;
+  TEMPLATABLE_VALUE(std::string, decoding_success_light_mode)
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -131,8 +131,8 @@ template<typename... Ts> class SetDecodingSuccessLightModeAction : public Action
 template<typename... Ts> class SetBootSoundModeAction : public Action<Ts...> {
  public:
   explicit SetBootSoundModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
-  void play(Ts... x) override;
+  TEMPLATABLE_VALUE(std::string, boot_sound_mode)
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -142,8 +142,8 @@ template<typename... Ts> class SetBootSoundModeAction : public Action<Ts...> {
 template<typename... Ts> class SetDecodeSoundModeAction : public Action<Ts...> {
  public:
   explicit SetDecodeSoundModeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, mode)
-  void play(Ts... x) override;
+  TEMPLATABLE_VALUE(std::string, decode_sound_mode)
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -154,8 +154,7 @@ template<typename... Ts> class SetScanDurationAction : public Action<Ts...> {
  public:
   explicit SetScanDurationAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, duration)
-  TEMPLATABLE_VALUE(std::string, global_ms_var)
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -166,7 +165,7 @@ template<typename... Ts> class SetStableInductionTimeAction : public Action<Ts..
  public:
   explicit SetStableInductionTimeAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, time)
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -177,7 +176,7 @@ template<typename... Ts> class SetReadingIntervalAction : public Action<Ts...> {
  public:
   explicit SetReadingIntervalAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, interval)
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -188,7 +187,7 @@ template<typename... Ts> class SetSameCodeIntervalAction : public Action<Ts...> 
  public:
   explicit SetSameCodeIntervalAction(BarcodeScanner *scanner) : scanner_(scanner) {}
   TEMPLATABLE_VALUE(std::string, interval)
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -197,7 +196,7 @@ template<typename... Ts> class SetSameCodeIntervalAction : public Action<Ts...> 
 template<typename... Ts> class ProcessCurrentBufferAction : public Action<Ts...> {
  public:
   explicit ProcessCurrentBufferAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  void play(Ts... x) override;
+  void play(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -207,7 +206,7 @@ template<typename... Ts> class IsManualScanningCondition : public Condition<Ts..
  public:
   explicit IsManualScanningCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
 
-  bool check(Ts... x) override;
+  bool check(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -217,7 +216,7 @@ template<typename... Ts> class IsIdleCondition : public Condition<Ts...> {
  public:
   explicit IsIdleCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
 
-  bool check(Ts... x) override;
+  bool check(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;
@@ -227,18 +226,7 @@ template<typename... Ts> class IsContinuousModeCondition : public Condition<Ts..
  public:
   explicit IsContinuousModeCondition(BarcodeScanner *scanner) : scanner_(scanner) {}
 
-  bool check(Ts... x) override;
-
- protected:
-  BarcodeScanner *scanner_;
-};
-
-template<typename... Ts> class GetScanDurationMsAction : public Action<Ts...> {
- public:
-  explicit GetScanDurationMsAction(BarcodeScanner *scanner) : scanner_(scanner) {}
-  TEMPLATABLE_VALUE(std::string, variable)
-
-  void play(Ts... x) override;
+  bool check(const Ts &...x) override;
 
  protected:
   BarcodeScanner *scanner_;

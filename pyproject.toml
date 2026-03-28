@@ -1,11 +1,13 @@
 [project]
 name = "esphome-m5stack-atom-barcode-scanner"
 version = "0.1.0"
-description = "Add your description here"
+description = "ESPHome external component for the M5Stack Atom QR Code Scanner"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "esphome>=2025.5.0",
+    "fatfs-ng>=0.1.15",
+    "littlefs-python>=0.17.1",
 ]
 
 [dependency-groups]

@@ -32,19 +32,22 @@ uart:
   tx_pin: GPIO19
   rx_pin: GPIO22
 
-# Define text sensors for barcode data
+# Configure the barcode scanner component
+m5stack_barcode:
+  id: barcode_scanner
+  uart_id: uart_bus
+  operation_mode: host
+  on_barcode:
+    - logger.log:
+        format: "Scanned: %s"
+        args: [ 'x.c_str()' ]
+
+# Optional: expose barcode as a text sensor in Home Assistant
 text_sensor:
   - platform: template
     name: "Last Barcode"
     id: last_barcode
     icon: "mdi:barcode"
-
-# Configure the barcode scanner component
-m5stack_barcode:
-  id: barcode_scanner
-  barcode_id: last_barcode
-  operation_mode: host
-  uart_id: uart_bus
 ```
 
 For complete documentation on all available options, actions, and conditions, see the [component documentation](components/m5stack_barcode/index.rst).
@@ -138,7 +141,7 @@ pytest tests/
 
 ## Documentation
 
-The official M5Stack documentation for the scanner module is included in `components/m5stack_barcode/docs/`.
+Full component documentation — all configuration options, actions, triggers, and conditions — is in [`components/m5stack_barcode/index.rst`](components/m5stack_barcode/index.rst).
 
 ## License
 

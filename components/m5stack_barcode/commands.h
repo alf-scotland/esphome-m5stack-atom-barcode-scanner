@@ -1,6 +1,3 @@
-#ifndef ESPHOME_M5STACK_BARCODE_COMMANDS_H
-#define ESPHOME_M5STACK_BARCODE_COMMANDS_H
-
 #pragma once
 
 /**
@@ -12,7 +9,8 @@
 #include <cstddef>  // For size_t
 #include <cstdint>  // For uint8_t, etc.
 
-namespace esphome::m5stack_barcode {
+namespace esphome {
+namespace m5stack_barcode {
 
 /**
  * All command codes for the barcode scanner.
@@ -242,6 +240,5 @@ class Commands {
   };
 };
 
-}  // namespace esphome::m5stack_barcode
-
-#endif
+}  // namespace m5stack_barcode
+}  // namespace esphome
