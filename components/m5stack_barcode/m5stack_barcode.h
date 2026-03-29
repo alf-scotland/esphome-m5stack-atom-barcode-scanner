@@ -489,6 +489,12 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
 
   // Response Processing Methods
   /**
+   * @brief Check whether the configured terminator sequence is present at the end of rx_buffer_.
+   * Used to gate barcode processing so partial UART data is not fired as an event.
+   */
+  bool has_terminator_in_buffer_() const;
+
+  /**
    * @brief Process received barcode data.
    */
   void process_barcode_();

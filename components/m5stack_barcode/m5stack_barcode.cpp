@@ -23,7 +23,7 @@ static const size_t MAX_QUEUE_SIZE = 20;  // Maximum number of commands queued a
 
 // Data size limits
 static const size_t MAX_BARCODE_LENGTH = 128;  // Maximum barcode data length
-static const size_t MAX_VERSION_LENGTH = 32;   // Maximum version string length
+static const size_t MAX_VERSION_LENGTH = 128;  // Maximum version response length (binary frame + ASCII string)
 
 // Methods moved from header file
 bool BarcodeScanner::is_continuous_mode() const {
@@ -211,6 +211,10 @@ void BarcodeScanner::loop() {
         this->clear_buffer_();
       }
       this->expected_response_ = ResponseType::NONE;
+      // Remove from queue so it is not re-sent on the next iteration
+      if (!this->command_queue_.empty()) {
+        this->command_queue_.erase(this->command_queue_.begin());
+      }
     }
     return;
   }
@@ -219,9 +223,10 @@ void BarcodeScanner::loop() {
   if (this->expected_response_ == ResponseType::BARCODE || this->expected_response_ == ResponseType::NONE) {
     bool should_process = false;
 
-    // In host mode, we process the barcode immediately when we have data
+    // In HOST mode, wait until the configured terminator arrives so we don't fire
+    // on partial data (UART bytes trickle in across multiple loop() iterations).
     if (this->operation_mode_ == OperationMode::HOST) {
-      should_process = true;
+      should_process = this->has_terminator_in_buffer_();
     } else {
       // In non-host modes, we look for the acknowledgment sequence at the end
       if (!this->rx_buffer_.empty() && this->is_ack_sequence_(this->rx_buffer_.data(), this->rx_buffer_.size())) {
@@ -378,6 +383,27 @@ void BarcodeScanner::queue_command(std::unique_ptr<CommandBase> command) {
   this->command_queue_.push_back(std::move(command));
 }
 
+bool BarcodeScanner::has_terminator_in_buffer_() const {
+  const size_t len = this->rx_buffer_.size();
+  switch (this->terminator_) {
+    case Terminator::NONE:
+      return len > 0;
+    case Terminator::CR:
+      return len >= 1 && this->rx_buffer_[len - 1] == '\r';
+    case Terminator::CRLF:
+      return len >= 2 && this->rx_buffer_[len - 2] == '\r' && this->rx_buffer_[len - 1] == '\n';
+    case Terminator::TAB:
+      return len >= 1 && this->rx_buffer_[len - 1] == '\t';
+    case Terminator::CRCR:
+      return len >= 2 && this->rx_buffer_[len - 2] == '\r' && this->rx_buffer_[len - 1] == '\r';
+    case Terminator::CRLFCRLF:
+      return len >= 4 && this->rx_buffer_[len - 4] == '\r' && this->rx_buffer_[len - 3] == '\n' &&
+             this->rx_buffer_[len - 2] == '\r' && this->rx_buffer_[len - 1] == '\n';
+    default:
+      return len > 0;
+  }
+}
+
 bool BarcodeScanner::is_ack_sequence_(const uint8_t *data, size_t len, size_t offset) const {
   // Enhanced input validation
   if (data == nullptr) {
@@ -412,9 +438,9 @@ void BarcodeScanner::process_barcode_() {
     return;
   }
 
-  // If we're in continuous mode and have a terminator, we need to handle it
+  // Strip the configured terminator from the end of the barcode data.
   size_t data_length = this->rx_buffer_.size();
-  if (this->is_continuous_mode() && this->terminator_ != Terminator::NONE) {
+  if (this->terminator_ != Terminator::NONE) {
     // Find the terminator sequence
     size_t term_pos = 0;
     switch (this->terminator_) {
@@ -501,14 +527,31 @@ void BarcodeScanner::process_version_() {
     this->rx_buffer_.resize(MAX_VERSION_LENGTH);
   }
 
-  // Convert the buffer to a string with explicit size limit
+  // The scanner response is a binary-framed packet; the actual version string is
+  // embedded as printable ASCII after protocol header bytes. Find the first
+  // printable character and read until the run of printable chars ends.
+  size_t start = 0;
+  while (start < this->rx_buffer_.size() && (this->rx_buffer_[start] < 0x20 || this->rx_buffer_[start] > 0x7E)) {
+    start++;
+  }
+  size_t end = start;
+  while (end < this->rx_buffer_.size() && this->rx_buffer_[end] >= 0x20 && this->rx_buffer_[end] <= 0x7E) {
+    end++;
+  }
+
   std::string version;
-  version.assign(reinterpret_cast<char *>(this->rx_buffer_.data()), this->rx_buffer_.size());
+  if (end > start) {
+    version.assign(reinterpret_cast<char *>(this->rx_buffer_.data() + start), end - start);
+  }
 
   // Publish the version
   if (this->version_sensor_ != nullptr) {
-    this->version_sensor_->publish_state(version);
-    ESP_LOGD(TAG_SCANNER, "Firmware version: %s", version.c_str());
+    if (!version.empty()) {
+      this->version_sensor_->publish_state(version);
+      ESP_LOGD(TAG_SCANNER, "Firmware version: %s", version.c_str());
+    } else {
+      ESP_LOGW(TAG_SCANNER, "Version response contained no printable ASCII (raw %u bytes)", this->rx_buffer_.size());
+    }
   }
 
   // Clear the buffer
