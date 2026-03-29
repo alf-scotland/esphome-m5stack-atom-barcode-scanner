@@ -580,6 +580,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   uint32_t scan_started_at_{0};                         ///< millis() when start_scan() was called; 0 = idle
   CommandState command_state_{CommandState::IDLE};      ///< Current command processing state
   ResponseType expected_response_{ResponseType::NONE};  ///< Expected response type
+  uint8_t command_attempts_{0};  ///< Send attempts for the current front-of-queue command; reset on success or drop
 
   // Scanner Settings
   OperationMode operation_mode_{OperationMode::HOST};                                 ///< Current operation mode
