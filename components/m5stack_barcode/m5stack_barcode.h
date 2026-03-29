@@ -47,6 +47,10 @@ struct ScannerPreferences {
   uint8_t same_code_interval;
 } __attribute__((packed));
 
+// Catch struct layout changes (added/removed fields, unexpected padding) at compile time.
+// Increment SETTINGS_VERSION whenever the struct changes so stale NVS data is discarded.
+static_assert(sizeof(ScannerPreferences) == 14, "ScannerPreferences size changed — bump SETTINGS_VERSION");
+
 // Forward declarations
 template<typename T> class StateCommand;
 class OperationModeSelect;

@@ -92,12 +92,33 @@ void BarcodeScanner::setup() {
   }
 }
 
+// Returns true only if every stored enum field falls within its declared range.
+// An out-of-range value means the struct was written by a different firmware version
+// or the NVS slot is corrupt — treat the whole entry as invalid rather than casting
+// a garbage byte into a C++ enum.
+static bool prefs_in_range(const ScannerPreferences &p) {
+  return p.operation_mode <= static_cast<uint8_t>(OperationMode::AUTO_SENSE) &&
+         p.terminator <= static_cast<uint8_t>(Terminator::CRLFCRLF) &&
+         p.light_mode <= static_cast<uint8_t>(LightMode::LIGHT_ALWAYS_OFF) &&
+         p.locate_light_mode <= static_cast<uint8_t>(LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF) &&
+         p.sound_mode <= static_cast<uint8_t>(SoundMode::SOUND_ENABLED) &&
+         p.buzzer_volume <= static_cast<uint8_t>(BuzzerVolume::BUZZER_VOLUME_LOW) &&
+         p.decoding_success_light_mode <= static_cast<uint8_t>(DecodingSuccessLightMode::DECODING_LIGHT_ENABLED) &&
+         p.boot_sound_mode <= static_cast<uint8_t>(BootSoundMode::BOOT_SOUND_ENABLED) &&
+         p.decode_sound_mode <= static_cast<uint8_t>(DecodeSoundMode::DECODE_SOUND_ENABLED) &&
+         p.scan_duration <= static_cast<uint8_t>(ScanDuration::UNLIMITED) &&
+         p.stable_induction_time <= static_cast<uint8_t>(StableInductionTime::MS_1000) &&
+         p.reading_interval <= static_cast<uint8_t>(ReadingInterval::MS_2000) &&
+         p.same_code_interval <= static_cast<uint8_t>(SameCodeInterval::MS_2000);
+}
+
 void BarcodeScanner::configure_defaults_() {
   // Load previously-saved settings from NVS flash.  A valid entry means the
   // scanner was already programmed with those values and does not need them
   // resent unless they have changed in the YAML configuration.
   ScannerPreferences stored{};
-  const bool has_valid_prefs = this->pref_.load(&stored) && stored.version == SETTINGS_VERSION;
+  const bool has_valid_prefs =
+      this->pref_.load(&stored) && stored.version == SETTINGS_VERSION && prefs_in_range(stored);
 
   ESP_LOGD(TAG_SCANNER, "Configuring scanner defaults (cached prefs valid=%s)", has_valid_prefs ? "yes" : "no");
 
@@ -143,7 +164,9 @@ void BarcodeScanner::save_settings_() {
   prefs.stable_induction_time = static_cast<uint8_t>(this->stable_induction_time_);
   prefs.reading_interval = static_cast<uint8_t>(this->reading_interval_);
   prefs.same_code_interval = static_cast<uint8_t>(this->same_code_interval_);
-  this->pref_.save(&prefs);
+  if (!this->pref_.save(&prefs)) {
+    ESP_LOGW(TAG_SCANNER, "Failed to save scanner preferences to NVS");
+  }
 }
 
 void BarcodeScanner::loop() {
