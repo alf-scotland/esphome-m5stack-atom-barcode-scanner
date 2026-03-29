@@ -69,7 +69,7 @@ This component uses ESPHome's standard development tools.
 ### Prerequisites
 
 - Python 3.13 or higher
-- ESPHome 2025.2.0 or higher
+- ESPHome 2025.5.0 or higher
 - uv (for dependency management)
 - pre-commit (for development)
 
