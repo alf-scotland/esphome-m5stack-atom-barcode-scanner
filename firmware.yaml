@@ -50,13 +50,6 @@ wifi:
 # Enable captive portal for easy WiFi setup
 captive_portal:
 
-# Global variables for timeout handling
-globals:
-  - id: timeout_ms
-    type: int
-    restore_value: no
-    initial_value: '3000'
-
 # Status LED - Atom's built-in LED
 light:
   - platform: esp32_rmt_led_strip
@@ -158,7 +151,7 @@ script:
     then:
       - script.execute: led_manual_scan_start
       - switch.turn_on: scanner_trigger_internal
-      - delay: !lambda 'return id(timeout_ms);'
+      - delay: !lambda 'return id(barcode_scanner).get_scan_duration_ms();'
       - if:
           condition:
             switch.is_on: scanner_trigger_internal
@@ -334,154 +327,6 @@ select:
           terminator: !lambda "return x;"
 
   - platform: template
-    name: "Light Mode"
-    id: light_mode
-    entity_category: "config"
-    icon: "mdi:lightbulb"
-    setup_priority: 100
-    options:
-      - "on_when_reading"
-      - "always_on"
-      - "always_off"
-    initial_option: "on_when_reading"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_light_mode:
-          id: barcode_scanner
-          light_mode: !lambda "return x;"
-
-  - platform: template
-    name: "Locate Light Mode"
-    id: locate_light_mode
-    entity_category: "config"
-    icon: "mdi:crosshairs"
-    setup_priority: 100
-    options:
-      - "on_when_reading"
-      - "always_on"
-      - "always_off"
-    initial_option: "on_when_reading"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_locate_light_mode:
-          id: barcode_scanner
-          locate_light_mode: !lambda "return x;"
-
-  - platform: template
-    name: "Decoding Success Light"
-    id: decoding_success_light
-    entity_category: "config"
-    icon: "mdi:led-on"
-    setup_priority: 100
-    options:
-      - "enabled"
-      - "disabled"
-    initial_option: "enabled"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_decoding_success_light_mode:
-          id: barcode_scanner
-          decoding_success_light_mode: !lambda "return x;"
-
-  - platform: template
-    name: "Sound Mode"
-    id: sound_mode
-    entity_category: "config"
-    icon: "mdi:volume-high"
-    setup_priority: 100
-    options:
-      - "disabled"
-      - "enabled"
-    initial_option: "disabled"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_sound_mode:
-          id: barcode_scanner
-          sound_mode: !lambda "return x;"
-
-  - platform: template
-    name: "Boot Sound"
-    id: boot_sound
-    entity_category: "config"
-    icon: "mdi:power"
-    setup_priority: 100
-    options:
-      - "enabled"
-      - "disabled"
-    initial_option: "enabled"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_boot_sound_mode:
-          id: barcode_scanner
-          boot_sound_mode: !lambda "return x;"
-
-  - platform: template
-    name: "Decode Sound"
-    id: decode_sound
-    entity_category: "config"
-    icon: "mdi:volume-source"
-    setup_priority: 100
-    options:
-      - "enabled"
-      - "disabled"
-    initial_option: "enabled"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_decode_sound_mode:
-          id: barcode_scanner
-          decode_sound_mode: !lambda "return x;"
-
-  - platform: template
-    name: "Volume"
-    id: volume
-    entity_category: "config"
-    icon: "mdi:volume-medium"
-    setup_priority: 100
-    options:
-      - "high"
-      - "medium"
-      - "low"
-    initial_option: "medium"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_buzzer_volume:
-          id: barcode_scanner
-          buzzer_volume: !lambda "return x;"
-
-  - platform: template
-    name: "Scan Duration"
-    id: scan_duration
-    entity_category: "config"
-    icon: "mdi:timer"
-    setup_priority: 100
-    options:
-      - "500ms"
-      - "1s"
-      - "3s"
-      - "5s"
-      - "10s"
-      - "15s"
-      - "20s"
-      - "unlimited"
-    initial_option: "3s"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_scan_duration:
-          id: barcode_scanner
-          scan_duration: !lambda "return x;"
-      - globals.set:
-          id: timeout_ms
-          value: !lambda |-
-            if (x == "500ms") return 500;
-            if (x == "1s") return 1000;
-            if (x == "3s") return 3000;
-            if (x == "5s") return 5000;
-            if (x == "10s") return 10000;
-            if (x == "15s") return 15000;
-            if (x == "20s") return 20000;
-            return 2000000000;  // unlimited: effectively no hardware timeout
-
-  - platform: template
     name: "Stable Induction Time"
     id: stable_induction_time
     entity_category: "config"
@@ -560,5 +405,46 @@ m5stack_barcode:
   version_id: scanner_version
   operation_mode: host
   terminator: crlf
+  buzzer_volume: medium
   uart_id: uart_bus
   barcode_event: scanner_events
+
+  light_mode_select:
+    name: "Light Mode"
+    entity_category: "config"
+    icon: "mdi:lightbulb"
+
+  locate_light_mode_select:
+    name: "Locate Light Mode"
+    entity_category: "config"
+    icon: "mdi:crosshairs"
+
+  scan_duration_select:
+    name: "Scan Duration"
+    entity_category: "config"
+    icon: "mdi:timer"
+
+  buzzer_volume_select:
+    name: "Volume"
+    entity_category: "config"
+    icon: "mdi:volume-medium"
+
+  sound_switch:
+    name: "Sound"
+    entity_category: "config"
+    icon: "mdi:volume-high"
+
+  boot_sound_switch:
+    name: "Boot Sound"
+    entity_category: "config"
+    icon: "mdi:power"
+
+  decode_sound_switch:
+    name: "Decode Sound"
+    entity_category: "config"
+    icon: "mdi:volume-source"
+
+  decoding_success_light_switch:
+    name: "Decoding Success Light"
+    entity_category: "config"
+    icon: "mdi:led-on"

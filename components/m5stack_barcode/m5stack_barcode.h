@@ -489,6 +489,12 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
 
   // Response Processing Methods
   /**
+   * @brief Check whether the configured terminator sequence is present at the end of rx_buffer_.
+   * Used to gate barcode processing so partial UART data is not fired as an event.
+   */
+  bool has_terminator_in_buffer_() const;
+
+  /**
    * @brief Process received barcode data.
    */
   void process_barcode_();
@@ -613,7 +619,7 @@ class ScanTimeoutTrigger : public Trigger<> {
 /// Select sub-component that exposes the scanner's operation mode as a Home Assistant
 /// select entity. Changing the select in HA sends the appropriate UART command and waits
 /// for the scanner ACK before publishing the new confirmed state.
-class OperationModeSelect : public select::Select {
+class OperationModeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -641,7 +647,7 @@ class OperationModeSelect : public select::Select {
 };
 
 /// Select sub-component for buzzer_volume. Exposes the three volume levels as a HA select.
-class BuzzerVolumeSelect : public select::Select {
+class BuzzerVolumeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -664,7 +670,7 @@ class BuzzerVolumeSelect : public select::Select {
 };
 
 /// Select sub-component for light_mode (main illumination light).
-class LightModeSelect : public select::Select {
+class LightModeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -687,7 +693,7 @@ class LightModeSelect : public select::Select {
 };
 
 /// Select sub-component for locate_light_mode (aiming pattern light).
-class LocateLightModeSelect : public select::Select {
+class LocateLightModeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -710,7 +716,7 @@ class LocateLightModeSelect : public select::Select {
 };
 
 /// Select sub-component for scan_duration (how long the scanner tries before giving up).
-class ScanDurationSelect : public select::Select {
+class ScanDurationSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -744,7 +750,7 @@ class ScanDurationSelect : public select::Select {
 };
 
 /// Switch sub-component for sound_mode — maps the HA toggle to SOUND_ENABLED / SOUND_DISABLED.
-class SoundSwitch : public switch_::Switch {
+class SoundSwitch : public switch_::Switch, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -756,7 +762,7 @@ class SoundSwitch : public switch_::Switch {
 };
 
 /// Switch sub-component for boot_sound_mode — controls whether the scanner beeps on power-up.
-class BootSoundSwitch : public switch_::Switch {
+class BootSoundSwitch : public switch_::Switch, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -768,7 +774,7 @@ class BootSoundSwitch : public switch_::Switch {
 };
 
 /// Switch sub-component for decode_sound_mode — controls whether the scanner beeps on decode.
-class DecodeSoundSwitch : public switch_::Switch {
+class DecodeSoundSwitch : public switch_::Switch, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -780,7 +786,7 @@ class DecodeSoundSwitch : public switch_::Switch {
 };
 
 /// Switch sub-component for decoding_success_light_mode — controls the success flash.
-class DecodingSuccessLightSwitch : public switch_::Switch {
+class DecodingSuccessLightSwitch : public switch_::Switch, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -792,7 +798,7 @@ class DecodingSuccessLightSwitch : public switch_::Switch {
 };
 
 /// Button sub-component that starts a HOST-mode scan when pressed in Home Assistant.
-class StartButton : public button::Button {
+class StartButton : public button::Button, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
@@ -804,7 +810,7 @@ class StartButton : public button::Button {
 };
 
 /// Button sub-component that stops the current HOST-mode scan when pressed in Home Assistant.
-class StopButton : public button::Button {
+class StopButton : public button::Button, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 

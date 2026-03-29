@@ -256,50 +256,61 @@ ScanTimeoutTrigger = m5stack_barcode_ns.class_(
 OperationModeSelect = m5stack_barcode_ns.class_(
     "OperationModeSelect",
     select.Select,
+    cg.Component,
 )
 BuzzerVolumeSelect = m5stack_barcode_ns.class_(
     "BuzzerVolumeSelect",
     select.Select,
+    cg.Component,
 )
 LightModeSelect = m5stack_barcode_ns.class_(
     "LightModeSelect",
     select.Select,
+    cg.Component,
 )
 LocateLightModeSelect = m5stack_barcode_ns.class_(
     "LocateLightModeSelect",
     select.Select,
+    cg.Component,
 )
 ScanDurationSelect = m5stack_barcode_ns.class_(
     "ScanDurationSelect",
     select.Select,
+    cg.Component,
 )
 
 # Sub-components — switch
 SoundSwitch = m5stack_barcode_ns.class_(
     "SoundSwitch",
     switch.Switch,
+    cg.Component,
 )
 BootSoundSwitch = m5stack_barcode_ns.class_(
     "BootSoundSwitch",
     switch.Switch,
+    cg.Component,
 )
 DecodeSoundSwitch = m5stack_barcode_ns.class_(
     "DecodeSoundSwitch",
     switch.Switch,
+    cg.Component,
 )
 DecodingSuccessLightSwitch = m5stack_barcode_ns.class_(
     "DecodingSuccessLightSwitch",
     switch.Switch,
+    cg.Component,
 )
 
 # Sub-components — button
 StartButton = m5stack_barcode_ns.class_(
     "StartButton",
     button.Button,
+    cg.Component,
 )
 StopButton = m5stack_barcode_ns.class_(
     "StopButton",
     button.Button,
+    cg.Component,
 )
 
 # Conditions
