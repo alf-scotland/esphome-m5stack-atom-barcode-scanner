@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Improvement plan
+
+All identified improvements are tracked in `.github/IMPROVEMENT_PLAN.md` with tier structure, branch names, and ⬜/🔄/✅ status markers. **Check this file before starting any new work** — complete Tier 1 before anything else.
+
 ## Project goal
 
 The end goal is to contribute this component to ESPHome core so it ships with ESPHome out of the box. Until that happens it is maintained as an external component. All design and quality decisions should be made as if this code is going through the ESPHome core review process.
