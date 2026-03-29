@@ -13,7 +13,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 
 | # | Status | Branch | What |
 |---|--------|--------|------|
-| 1 | ⬜ | `fix/ci-release-failures` | Release workflow silently succeeds with no binaries (`\|\| echo` → `\|\| exit 1`); uses `secrets.GH_TOKEN` instead of built-in `github.token`; tag format not validated before `sed` |
+| 1 | ✅ | `fix/ci-release-failures` | Release workflow silently succeeds with no binaries (`\|\| echo` → `\|\| exit 1`); uses `secrets.GH_TOKEN` instead of built-in `github.token`; tag format not validated before `sed` |
 | 2 | ⬜ | `fix/rx-buffer-overflow` | `read_buffer_()` appends bytes with no size cap; `MAX_BARCODE_LENGTH` defined but never enforced in the read path |
 | 3 | ⬜ | `fix/command-queue-state` | `queue_command()` doesn't check whether an ACK is currently pending; timed-out commands are silently dropped with no retry or logging of which command failed |
 | 4 | ⬜ | `fix/nvs-preferences-robustness` | Loaded NVS enum fields not range-validated before casting; `pref_.save()` return value unchecked; no `static_assert` on struct size to catch padding changes |
