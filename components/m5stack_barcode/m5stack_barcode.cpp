@@ -24,6 +24,10 @@ static const size_t MAX_QUEUE_SIZE = 20;  // Maximum number of commands queued a
 // Data size limits
 static const size_t MAX_BARCODE_LENGTH = 128;  // Maximum barcode data length
 static const size_t MAX_VERSION_LENGTH = 128;  // Maximum version response length (binary frame + ASCII string)
+// Safety cap for the raw RX accumulation buffer. Sized to fit the largest legitimate
+// response (128-byte barcode + 4-byte CRLFCRLF terminator) with comfortable margin.
+// If this is exceeded the data is corrupt or from an unexpected source; discard and recover.
+static const size_t MAX_RX_BUFFER_SIZE = 256;
 
 // Methods moved from header file
 bool BarcodeScanner::is_continuous_mode() const {
@@ -288,10 +292,14 @@ void BarcodeScanner::dump_config() {
 void BarcodeScanner::clear_buffer_() { this->rx_buffer_.clear(); }
 
 void BarcodeScanner::read_buffer_() {
-  // Read available data
   while (this->available()) {
     uint8_t byte = this->read();
     this->rx_buffer_.push_back(byte);
+  }
+  if (this->rx_buffer_.size() > MAX_RX_BUFFER_SIZE) {
+    ESP_LOGW(TAG_SCANNER, "RX buffer overflow (%u bytes); discarding — check for UART noise or scanner malfunction",
+             this->rx_buffer_.size());
+    this->clear_buffer_();
   }
 }
 
