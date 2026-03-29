@@ -47,6 +47,10 @@ struct ScannerPreferences {
   uint8_t same_code_interval;
 } __attribute__((packed));
 
+// Catch struct layout changes (added/removed fields, unexpected padding) at compile time.
+// Increment SETTINGS_VERSION whenever the struct changes so stale NVS data is discarded.
+static_assert(sizeof(ScannerPreferences) == 14, "ScannerPreferences size changed — bump SETTINGS_VERSION");
+
 // Forward declarations
 template<typename T> class StateCommand;
 class OperationModeSelect;
@@ -591,7 +595,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   BuzzerVolume buzzer_volume_{BuzzerVolume::BUZZER_VOLUME_LOW};                       ///< Current buzzer volume
   DecodingSuccessLightMode decoding_success_light_mode_{
       DecodingSuccessLightMode::DECODING_LIGHT_ENABLED};                      ///< Current decoding success light mode
-  BootSoundMode boot_sound_mode_{BootSoundMode::BOOT_SOUND_ENABLED};          ///< Current boot sound mode
+  BootSoundMode boot_sound_mode_{BootSoundMode::BOOT_SOUND_DISABLED};         ///< Current boot sound mode
   DecodeSoundMode decode_sound_mode_{DecodeSoundMode::DECODE_SOUND_ENABLED};  ///< Current decode sound mode
   ScanDuration scan_duration_{ScanDuration::MS_3000};                         ///< Current scan duration
   StableInductionTime stable_induction_time_{StableInductionTime::MS_500};    ///< Current stable induction time
