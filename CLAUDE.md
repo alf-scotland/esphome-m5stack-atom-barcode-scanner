@@ -146,6 +146,6 @@ Use the PDFs as the source of truth for what the scanner *can do*. Use the C++ t
 
 ## ESPHome version constraints
 
-- Pinned to `esphome>=2025.5.0` in `pyproject.toml`; manage with `uv`, not pip
+- Pinned to `esphome==2026.3.1` in `pyproject.toml`; manage with `uv`, not pip (`uv add "esphome==X.Y.Z"` to upgrade)
 - `rmt_channel` was removed from `esp32_rmt_led_strip` in 2025.x — do not add it back
 - Schema factory functions (`select_schema`, `switch_schema`, etc.) replaced the old `.extend()` pattern in 2025.x — do not revert

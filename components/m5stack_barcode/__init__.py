@@ -604,6 +604,7 @@ async def to_code(config: dict[str, Any]) -> None:
     "m5stack_barcode.start",
     StartAction,
     cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    synchronous=False,
 )
 async def barcode_start_to_code(
     config: dict[str, Any],
@@ -619,6 +620,7 @@ async def barcode_start_to_code(
     "m5stack_barcode.stop",
     StopAction,
     cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    synchronous=False,
 )
 async def barcode_stop_to_code(
     config: dict[str, Any],
@@ -641,6 +643,7 @@ async def barcode_stop_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_mode_to_code(
     config: dict[str, Any],
@@ -666,6 +669,7 @@ async def barcode_set_mode_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_terminator_to_code(
     config: dict[str, Any],
@@ -691,6 +695,7 @@ async def barcode_set_terminator_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_light_mode_to_code(
     config: dict[str, Any],
@@ -716,6 +721,7 @@ async def barcode_set_light_mode_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_locate_light_mode_to_code(
     config: dict[str, Any],
@@ -745,6 +751,7 @@ async def barcode_set_locate_light_mode_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_sound_mode_to_code(
     config: dict[str, Any],
@@ -770,6 +777,7 @@ async def barcode_set_sound_mode_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_buzzer_volume_to_code(
     config: dict[str, Any],
@@ -795,6 +803,7 @@ async def barcode_set_buzzer_volume_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_decoding_success_light_mode_to_code(
     config: dict[str, Any],
@@ -824,6 +833,7 @@ async def barcode_set_decoding_success_light_mode_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_boot_sound_mode_to_code(
     config: dict[str, Any],
@@ -849,6 +859,7 @@ async def barcode_set_boot_sound_mode_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_decode_sound_mode_to_code(
     config: dict[str, Any],
@@ -878,6 +889,7 @@ async def barcode_set_decode_sound_mode_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_scan_duration_to_code(
     config: dict[str, Any],
@@ -903,6 +915,7 @@ async def barcode_set_scan_duration_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_stable_induction_time_to_code(
     config: dict[str, Any],
@@ -932,6 +945,7 @@ async def barcode_set_stable_induction_time_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_reading_interval_to_code(
     config: dict[str, Any],
@@ -957,6 +971,7 @@ async def barcode_set_reading_interval_to_code(
             ),
         },
     ),
+    synchronous=False,
 )
 async def barcode_set_same_code_interval_to_code(
     config: dict[str, Any],
@@ -979,6 +994,7 @@ async def barcode_set_same_code_interval_to_code(
     "m5stack_barcode.process_current_buffer",
     ProcessCurrentBufferAction,
     cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    synchronous=False,
 )
 async def barcode_process_current_buffer_to_code(
     config: dict[str, Any],
