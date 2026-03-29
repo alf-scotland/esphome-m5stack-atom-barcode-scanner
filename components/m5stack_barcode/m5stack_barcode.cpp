@@ -56,8 +56,10 @@ uint32_t BarcodeScanner::get_scan_duration_ms() const {
 void BarcodeScanner::setup() {
   ESP_LOGCONFIG(TAG_SCANNER, "Setting up M5Stack Barcode Scanner");
 
-  // Initialise preference storage keyed to this component instance
-  this->pref_ = global_preferences->make_preference<ScannerPreferences>(fnv1_hash("m5stack_barcode"));
+  // Initialise preference storage keyed to this component instance.
+  // pref_hash_ is set by set_pref_hash() from the YAML component ID in to_code(),
+  // so two scanner instances on the same device get distinct NVS slots.
+  this->pref_ = global_preferences->make_preference<ScannerPreferences>(this->pref_hash_);
 
   // Configure settings, skipping any that the scanner already has from a previous boot
   this->configure_defaults_();

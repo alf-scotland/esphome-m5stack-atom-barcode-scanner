@@ -190,6 +190,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_stable_induction_time_initial(StableInductionTime time) { this->stable_induction_time_ = time; }
   void set_reading_interval_initial(ReadingInterval interval) { this->reading_interval_ = interval; }
   void set_same_code_interval_initial(SameCodeInterval interval) { this->same_code_interval_ = interval; }
+  void set_pref_hash(uint32_t hash) { this->pref_hash_ = hash; }
 
   /// Attach the optional operation-mode select sub-component.
   void set_operation_mode_select(OperationModeSelect *select) { this->operation_mode_select_ = select; }
@@ -554,7 +555,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void write_command_(const std::unique_ptr<CommandBase> &command);
 
   // Preferences
-  ESPPreferenceObject pref_;  ///< NVS storage for persisting scanner settings across reboots
+  uint32_t pref_hash_{fnv1_hash("m5stack_barcode")};  ///< NVS slot key — set per-instance from YAML ID in to_code()
+  ESPPreferenceObject pref_;                          ///< NVS storage for persisting scanner settings across reboots
 
   // Callbacks
   CallbackManager<void(std::string)> barcode_callback_;  ///< on_barcode automation triggers

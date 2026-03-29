@@ -575,11 +575,24 @@ async def handle_automation_triggers(var: Any, config: dict[str, Any]) -> None:
         await automation.build_automation(trigger, [], conf)
 
 
+def _fnv1_hash(s: str) -> int:
+    """Compute ESPHome's fnv1_hash() in Python for a per-instance NVS slot key."""
+    h = 2166136261  # FNV offset basis
+    for c in s.encode():
+        h = (h * 16777619) & 0xFFFFFFFF  # FNV prime, keep 32-bit
+        h ^= c
+    return h
+
+
 async def to_code(config: dict[str, Any]) -> None:
     """Generate C++ code for component."""
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
+
+    # Give every instance its own NVS slot so two scanners on the same device
+    # don't collide.  The hash is derived from the YAML component ID.
+    cg.add(var.set_pref_hash(_fnv1_hash(str(config[CONF_ID]))))
 
     await handle_sensor_config(var, config)
     await handle_operation_config(var, config)
