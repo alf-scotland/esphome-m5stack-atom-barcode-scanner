@@ -19,7 +19,8 @@ static const uint32_t WAKEUP_DELAY_MS = 50;       // Delay between wake-up and c
 static const uint32_t COMMAND_TIMEOUT_MS = 2000;  // Timeout for command acknowledgment
 
 // Command queue size
-static const size_t MAX_QUEUE_SIZE = 20;  // Maximum number of commands queued at once
+static const size_t MAX_QUEUE_SIZE = 20;        // Maximum number of commands queued at once
+static const uint8_t MAX_COMMAND_ATTEMPTS = 2;  // Send attempts before dropping a command (1 retry)
 
 // Data size limits
 static const size_t MAX_BARCODE_LENGTH = 128;  // Maximum barcode data length
@@ -175,6 +176,7 @@ void BarcodeScanner::loop() {
       // Reset state
       this->waiting_for_ack_ = false;
       this->command_state_ = CommandState::IDLE;
+      this->command_attempts_ = 0;
 
       // Clear the buffer except for version responses
       if (this->expected_response_ != ResponseType::VERSION) {
@@ -183,20 +185,30 @@ void BarcodeScanner::loop() {
     }
     // Check for command timeout (COMMAND_TIMEOUT_MS)
     else if (millis() - this->last_command_time_ > COMMAND_TIMEOUT_MS) {
-      // Get the current command
       auto &command = this->command_queue_.front();
 
-      // Mark as failed and invoke callback
-      ESP_LOGD(TAG_SCANNER, "Command '%s' timed out", command->get_description());
-      command->on_failure(this);
-      this->command_queue_.erase(this->command_queue_.begin());
-
-      // Reset state
-      this->waiting_for_ack_ = false;
-      this->command_state_ = CommandState::IDLE;
-      this->expected_response_ = ResponseType::NONE;
-
-      this->clear_buffer_();
+      if (this->command_attempts_ < MAX_COMMAND_ATTEMPTS) {
+        // First timeout: reset to IDLE so process_command_queue_() retries with a fresh
+        // wake-up + send cycle on the next loop() iteration.
+        ESP_LOGD(TAG_SCANNER, "Command '%s' timed out (attempt %u/%u), retrying", command->get_description(),
+                 this->command_attempts_, MAX_COMMAND_ATTEMPTS);
+        this->waiting_for_ack_ = false;
+        this->command_state_ = CommandState::IDLE;
+        this->expected_response_ = ResponseType::NONE;
+        this->clear_buffer_();
+      } else {
+        // All attempts exhausted: log at WARN so the failure is visible in normal log output,
+        // invoke the failure callback, then drop the command.
+        ESP_LOGW(TAG_SCANNER, "Command '%s' failed after %u attempts — scanner not responding",
+                 command->get_description(), this->command_attempts_);
+        command->on_failure(this);
+        this->command_queue_.erase(this->command_queue_.begin());
+        this->waiting_for_ack_ = false;
+        this->command_state_ = CommandState::IDLE;
+        this->expected_response_ = ResponseType::NONE;
+        this->command_attempts_ = 0;
+        this->clear_buffer_();
+      }
     }
 
     // Skip other processing while waiting for acknowledgment
@@ -335,15 +347,16 @@ void BarcodeScanner::process_command_queue_() {
     }
 
     case CommandState::COMMAND_SENT:
-      // Should not get here - this state is handled in the response path
+      // Should not reach here — this state is handled in the ACK/timeout path in loop().
       this->command_state_ = CommandState::IDLE;
+      this->command_attempts_ = 0;
       break;
   }
 }
 
 // Add new method implementation before wake_up_
 void BarcodeScanner::write_command_(const std::unique_ptr<CommandBase> &command) {
-  // Now we can send the actual command
+  this->command_attempts_++;
   command->log_command_data(TAG_SCANNER, "Sending");
 
   // Set the expected response type based on the command
