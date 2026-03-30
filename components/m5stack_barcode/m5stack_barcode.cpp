@@ -17,6 +17,7 @@ const char *const TAG_SCANNER = "m5stack_barcode";
 // Time constants (in milliseconds)
 static const uint32_t WAKEUP_DELAY_MS = 50;       // Delay between wake-up and command send
 static const uint32_t COMMAND_TIMEOUT_MS = 2000;  // Timeout for command acknowledgment
+static const uint32_t VERSION_SETTLE_MS = 50;     // Extra wait after first version byte arrives
 
 // Command queue size
 static const size_t MAX_QUEUE_SIZE = 20;        // Maximum number of commands queued at once
@@ -240,9 +241,11 @@ void BarcodeScanner::loop() {
 
   // Process version information if requested
   if (this->expected_response_ == ResponseType::VERSION) {
-    // Wait COMMAND_TIMEOUT_MS for all version data to arrive, then process
-    // whatever is in the buffer (may be empty if the scanner did not respond).
-    if (millis() - this->last_command_time_ > COMMAND_TIMEOUT_MS) {
+    // Once the first byte arrives, allow VERSION_SETTLE_MS for trailing bytes before
+    // processing.  If nothing arrives at all, fall back to COMMAND_TIMEOUT_MS so the
+    // queue is not blocked indefinitely when the scanner fails to respond.
+    const uint32_t version_wait = this->rx_buffer_.empty() ? COMMAND_TIMEOUT_MS : VERSION_SETTLE_MS;
+    if (millis() - this->last_command_time_ > version_wait) {
       if (!this->rx_buffer_.empty()) {
         this->process_version_();
       } else {
