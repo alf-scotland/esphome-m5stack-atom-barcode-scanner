@@ -19,9 +19,10 @@ void CommandBase::log_command_data(const char *tag, const char *prefix) const {
     return;
   }
 
-  constexpr size_t MAX_LOG_LENGTH = 64;  // Maximum buffer size for logging
+  constexpr size_t MAX_LOG_LENGTH = 64;  // hex buffer size: 16 bytes × 3 chars each + null
+  constexpr size_t MAX_LOG_BYTES = 16;   // maximum number of command bytes logged
   char hex_buffer[MAX_LOG_LENGTH] = {0};
-  size_t log_len = std::min(this->get_length(), size_t(16));  // Log at most 16 bytes
+  size_t log_len = std::min(this->get_length(), MAX_LOG_BYTES);
 
   for (size_t i = 0; i < log_len; i++) {
     snprintf(hex_buffer + (i * 3), 4, "%02X ", this->get_data()[i]);
