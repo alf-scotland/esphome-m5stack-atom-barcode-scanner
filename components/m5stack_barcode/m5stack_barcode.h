@@ -828,3 +828,7 @@ class StopButton : public button::Button, public Component {
 
 }  // namespace m5stack_barcode
 }  // namespace esphome
+
+// Include action/condition template bodies now that BarcodeScanner is fully defined.
+// Must be at end-of-file so BarcodeScanner is complete when the bodies are compiled.
+#include "actions_impl.h"
