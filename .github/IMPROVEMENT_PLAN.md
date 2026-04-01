@@ -39,8 +39,9 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 | # | Status | Branch | What |
 |---|--------|--------|------|
 | 12 | ⬜ | `fix/firmware-security` | Three security issues: (a) `api:` has no `encryption:` key; (b) `ota: platform: esphome` has no `password:`; (c) `http_request: verify_ssl: false` globally disables TLS — critical to fix before OTA manifest work. Also: `safe_mode: disabled: true` should be removed for reference firmware |
-| 13 | ⬜ | `fix/firmware-on-barcode-example` | `on_barcode` trigger is never used in the reference firmware — add a minimal example automation so users understand the primary usage pattern |
-| 14 | ⬜ | `fix/firmware-version-management` | `project_version` is a hardcoded string patched by `sed` in CI — fragile; switch to a `substitutions:` block so the version is defined once at the top of the file |
+| 13 | ⬜ | `fix/firmware-operation-mode-select` | Operation mode uses a template select + `on_value` automation (to drive `update_mode_led`) while all other settings use native subcomponent selects; move the LED logic so it reacts to confirmed scanner state, then replace the template select with the native `operation_mode_select` |
+| 14 | ⬜ | `fix/firmware-on-barcode-example` | `on_barcode` trigger is never used in the reference firmware — add a minimal example automation so users understand the primary usage pattern |
+| 15 | ⬜ | `fix/firmware-version-management` | `project_version` is a hardcoded string patched by `sed` in CI — fragile; switch to a `substitutions:` block so the version is defined once at the top of the file |
 
 ---
 
@@ -48,10 +49,10 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 
 | # | Status | Branch | What |
 |---|--------|--------|------|
-| 15 | ⬜ | `ci/add-cpp-static-analysis` | `lint.yml` job named `cpp-check` only runs `clang-format`; rename to `cpp-format` and add a real `cpp-lint` job running `cppcheck` (already configured in `.pre-commit-config.yaml`) |
-| 16 | ⬜ | `ci/normalize-uv-sync` | `lint.yml` uses `uv sync --all-extras --dev`; firmware build workflows use `uv sync --all-extras` — inconsistency should be intentional and documented; firmware builds don't need dev deps |
-| 17 | ⬜ | `ci/pin-action-shas` | All three workflows use floating tags (`actions/checkout@v4` etc.); pin to immutable commit SHAs; add Dependabot to keep them updated |
-| 18 | ⬜ | `ci/add-dependabot` | No `.github/dependabot.yml` — add entries for `github-actions`, `pip` (pyproject.toml), and pre-commit hook revs |
+| 16 | ⬜ | `ci/add-cpp-static-analysis` | `lint.yml` job named `cpp-check` only runs `clang-format`; rename to `cpp-format` and add a real `cpp-lint` job running `cppcheck` (already configured in `.pre-commit-config.yaml`) |
+| 17 | ⬜ | `ci/normalize-uv-sync` | `lint.yml` uses `uv sync --all-extras --dev`; firmware build workflows use `uv sync --all-extras` — inconsistency should be intentional and documented; firmware builds don't need dev deps |
+| 18 | ⬜ | `ci/pin-action-shas` | All three workflows use floating tags (`actions/checkout@v4` etc.); pin to immutable commit SHAs; add Dependabot to keep them updated |
+| 19 | ⬜ | `ci/add-dependabot` | No `.github/dependabot.yml` — add entries for `github-actions`, `pip` (pyproject.toml), and pre-commit hook revs |
 
 ---
 
@@ -59,9 +60,9 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 
 | # | Status | Branch | What |
 |---|--------|--------|------|
-| 19 | ⬜ | `docs/fix-contributing-guide` | `CONTRIBUTING.md` references non-existent `requirements-dev.txt` (should be `uv sync`); doesn't mention the manual `clang-tidy` pre-commit stage; doesn't include `uv run esphome compile firmware.yaml` as a verification step |
-| 20 | ⬜ | `docs/fix-ota-guides` | `OTA_UPDATES_GUIDE.md` and `PRERELEASE_AND_OTA.md` reference `firmware-ota.bin` (doesn't exist; actual output is `firmware.ota.bin`); `OTA_UPDATES_GUIDE.md` describes "Git Repository OTA" not implemented anywhere — remove or implement; `PRERELEASE_AND_OTA.md` has a YAML sample with duplicate `ota:` blocks |
-| 21 | ⬜ | `docs/rewrite-component-docs` | `index.rst` is LLM-generated and unreliable; full rewrite required — document every config key, action, trigger, condition, and entity; validate every claim against the PDFs and the current `__init__.py` schema |
+| 20 | ⬜ | `docs/fix-contributing-guide` | `CONTRIBUTING.md` references non-existent `requirements-dev.txt` (should be `uv sync`); doesn't mention the manual `clang-tidy` pre-commit stage; doesn't include `uv run esphome compile firmware.yaml` as a verification step |
+| 21 | ⬜ | `docs/fix-ota-guides` | `OTA_UPDATES_GUIDE.md` and `PRERELEASE_AND_OTA.md` reference `firmware-ota.bin` (doesn't exist; actual output is `firmware.ota.bin`); `OTA_UPDATES_GUIDE.md` describes "Git Repository OTA" not implemented anywhere — remove or implement; `PRERELEASE_AND_OTA.md` has a YAML sample with duplicate `ota:` blocks |
+| 22 | ⬜ | `docs/rewrite-component-docs` | `index.rst` is LLM-generated and unreliable; full rewrite required — document every config key, action, trigger, condition, and entity; validate every claim against the PDFs and the current `__init__.py` schema |
 
 ---
 
@@ -69,10 +70,10 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 
 | # | Status | Branch | What |
 |---|--------|--------|------|
-| 22 | ⬜ | `feat/multi-device-yaml-split` | Split `firmware.yaml` into `core.yaml` (shared component config, scripts, LED logic) + `atom_lite.yaml` (`!include core.yaml` + board/GPIO specifics); update `release.yml` to build each device independently; `firmware.yaml` is the current placeholder |
-| 23 | ⬜ | `feat/ota-manifest-and-update-component` | Generate a `manifest.json` per device in `release.yml` (name, version, binary URL → GitHub Release asset); publish to `gh-pages` or `main:manifests/`; add `update:` platform to firmware pointing at the manifest URL; fix `verify_ssl: false` first (item 12) |
-| 24 | ⬜ | `feat/protocol-coverage-<feature>` | Audit every command in `ATOM_QRCODE_CMD_EN.pdf` against exposed HA entities/actions/conditions; one branch per gap found |
-| 25 | ⬜ | `chore/esphome-core-prep` | Final pass before opening PR against esphome/esphome: verify component namespace, add `CODEOWNERS` entry, pass ESPHome's own test runner (`pytest tests/`), verify Python passes ESPHome's ruff config, verify C++ passes ESPHome's clang-tidy, document migration path away from `external_components:` |
+| 23 | ⬜ | `feat/multi-device-yaml-split` | Split `firmware.yaml` into `core.yaml` (shared component config, scripts, LED logic) + `atom_lite.yaml` (`!include core.yaml` + board/GPIO specifics); update `release.yml` to build each device independently; `firmware.yaml` is the current placeholder |
+| 24 | ⬜ | `feat/ota-manifest-and-update-component` | Generate a `manifest.json` per device in `release.yml` (name, version, binary URL → GitHub Release asset); publish to `gh-pages` or `main:manifests/`; add `update:` platform to firmware pointing at the manifest URL; fix `verify_ssl: false` first (item 12) |
+| 25 | ⬜ | `feat/protocol-coverage-<feature>` | Audit every command in `ATOM_QRCODE_CMD_EN.pdf` against exposed HA entities/actions/conditions; one branch per gap found |
+| 26 | ⬜ | `chore/esphome-core-prep` | Final pass before opening PR against esphome/esphome: verify component namespace, add `CODEOWNERS` entry, pass ESPHome's own test runner (`pytest tests/`), verify Python passes ESPHome's ruff config, verify C++ passes ESPHome's clang-tidy, document migration path away from `external_components:` |
 
 ---
 
