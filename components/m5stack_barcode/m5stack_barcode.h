@@ -533,9 +533,9 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   /**
    * @brief Publish the current in-memory values to every registered sub-component.
    *
-   * Called at the end of configure_defaults_() so that HA entities always reflect
-   * the scanner's intended state immediately, even for settings whose NVS value
-   * already matches the target and therefore never trigger an ACK.
+   * Called once from setup() after configure_defaults_() so that HA entities always
+   * reflect the scanner's intended state immediately on boot, even for settings whose
+   * NVS value already matches the target and therefore never trigger an ACK.
    */
   void publish_initial_states_();
 

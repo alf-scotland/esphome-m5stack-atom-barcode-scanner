@@ -64,26 +64,8 @@ void BarcodeScanner::setup() {
   this->configure_defaults_();
 
   // Publish initial states to all optional sub-components so HA shows the correct values
-  // immediately after boot, before any UART commands are sent.
-  if (this->operation_mode_select_ != nullptr)
-    this->operation_mode_select_->publish_state(OperationModeSelect::to_key(this->operation_mode_));
-  if (this->buzzer_volume_select_ != nullptr)
-    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::to_key(this->buzzer_volume_));
-  if (this->light_mode_select_ != nullptr)
-    this->light_mode_select_->publish_state(LightModeSelect::to_key(this->light_mode_));
-  if (this->locate_light_mode_select_ != nullptr)
-    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::to_key(this->locate_light_mode_));
-  if (this->scan_duration_select_ != nullptr)
-    this->scan_duration_select_->publish_state(ScanDurationSelect::to_key(this->scan_duration_));
-  if (this->sound_switch_ != nullptr)
-    this->sound_switch_->publish_state(this->sound_mode_ == SoundMode::SOUND_ENABLED);
-  if (this->boot_sound_switch_ != nullptr)
-    this->boot_sound_switch_->publish_state(this->boot_sound_mode_ == BootSoundMode::BOOT_SOUND_ENABLED);
-  if (this->decode_sound_switch_ != nullptr)
-    this->decode_sound_switch_->publish_state(this->decode_sound_mode_ == DecodeSoundMode::DECODE_SOUND_ENABLED);
-  if (this->decoding_success_light_switch_ != nullptr)
-    this->decoding_success_light_switch_->publish_state(this->decoding_success_light_mode_ ==
-                                                        DecodingSuccessLightMode::DECODING_LIGHT_ENABLED);
+  // immediately after boot, before any UART commands are sent or ACKed.
+  this->publish_initial_states_();
   if (this->scanning_binary_sensor_ != nullptr)
     this->scanning_binary_sensor_->publish_state(this->scan_state_ != ScanState::IDLE);
 
@@ -147,8 +129,6 @@ void BarcodeScanner::configure_defaults_() {
   QUEUE_IF_CHANGED(same_code_interval, CommandFactory::create_same_code_interval_command, this->same_code_interval_)
 
 #undef QUEUE_IF_CHANGED
-
-  this->publish_initial_states_();
 }
 
 void BarcodeScanner::publish_initial_states_() {
