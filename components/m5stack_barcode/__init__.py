@@ -388,24 +388,51 @@ CONFIG_SCHEMA = cv.Schema(
             OPERATION_MODES,
             lower=True,
         ),
-        cv.Optional(CONF_TERMINATOR, default="crlf"): cv.enum(TERMINATORS, lower=True),
-        cv.Optional(CONF_LIGHT_MODE): cv.enum(LIGHT_MODES, lower=True),
-        cv.Optional(CONF_LOCATE_LIGHT_MODE): cv.enum(LOCATE_LIGHT_MODES, lower=True),
-        cv.Optional(CONF_SOUND_MODE): cv.enum(SOUND_MODES, lower=True),
-        cv.Optional(CONF_BUZZER_VOLUME): cv.enum(BUZZER_VOLUMES, lower=True),
-        cv.Optional(CONF_DECODING_SUCCESS_LIGHT_MODE): cv.enum(
+        cv.Optional(CONF_TERMINATOR, default="none"): cv.enum(TERMINATORS, lower=True),
+        cv.Optional(CONF_LIGHT_MODE, default="on_when_reading"): cv.enum(
+            LIGHT_MODES,
+            lower=True,
+        ),
+        cv.Optional(CONF_LOCATE_LIGHT_MODE, default="on_when_reading"): cv.enum(
+            LOCATE_LIGHT_MODES,
+            lower=True,
+        ),
+        cv.Optional(CONF_SOUND_MODE, default="disabled"): cv.enum(
+            SOUND_MODES,
+            lower=True,
+        ),
+        cv.Optional(CONF_BUZZER_VOLUME, default="low"): cv.enum(
+            BUZZER_VOLUMES,
+            lower=True,
+        ),
+        cv.Optional(CONF_DECODING_SUCCESS_LIGHT_MODE, default="enabled"): cv.enum(
             DECODING_SUCCESS_LIGHT_MODES,
             lower=True,
         ),
-        cv.Optional(CONF_BOOT_SOUND_MODE): cv.enum(BOOT_SOUND_MODES, lower=True),
-        cv.Optional(CONF_DECODE_SOUND_MODE): cv.enum(DECODE_SOUND_MODES, lower=True),
-        cv.Optional(CONF_SCAN_DURATION): cv.enum(SCAN_DURATIONS, lower=True),
-        cv.Optional(CONF_STABLE_INDUCTION_TIME): cv.enum(
+        cv.Optional(CONF_BOOT_SOUND_MODE, default="disabled"): cv.enum(
+            BOOT_SOUND_MODES,
+            lower=True,
+        ),
+        cv.Optional(CONF_DECODE_SOUND_MODE, default="enabled"): cv.enum(
+            DECODE_SOUND_MODES,
+            lower=True,
+        ),
+        cv.Optional(CONF_SCAN_DURATION, default="3s"): cv.enum(
+            SCAN_DURATIONS,
+            lower=True,
+        ),
+        cv.Optional(CONF_STABLE_INDUCTION_TIME, default="500ms"): cv.enum(
             STABLE_INDUCTION_TIMES,
             lower=True,
         ),
-        cv.Optional(CONF_READING_INTERVAL): cv.enum(READING_INTERVALS, lower=True),
-        cv.Optional(CONF_SAME_CODE_INTERVAL): cv.enum(SAME_CODE_INTERVALS, lower=True),
+        cv.Optional(CONF_READING_INTERVAL, default="500ms"): cv.enum(
+            READING_INTERVALS,
+            lower=True,
+        ),
+        cv.Optional(CONF_SAME_CODE_INTERVAL, default="500ms"): cv.enum(
+            SAME_CODE_INTERVALS,
+            lower=True,
+        ),
     },
 ).extend(uart.UART_DEVICE_SCHEMA)
 
