@@ -839,6 +839,8 @@ void BarcodeScanner::set_terminator_state(Terminator term) {
   ESP_LOGD(TAG_SCANNER, "Setting terminator to %s", terminator_to_string(term));
   this->terminator_ = term;
   this->save_settings_();
+  if (this->terminator_select_ != nullptr)
+    this->terminator_select_->publish_state(TerminatorSelect::terminator_to_key(term));
 }
 
 void BarcodeScanner::set_light_mode_state(LightMode mode) {
@@ -909,18 +911,24 @@ void BarcodeScanner::set_stable_induction_time_state(StableInductionTime time) {
   ESP_LOGD(TAG_SCANNER, "Setting stable induction time to %s", stable_induction_time_to_string(time));
   this->stable_induction_time_ = time;
   this->save_settings_();
+  if (this->stable_induction_time_select_ != nullptr)
+    this->stable_induction_time_select_->publish_state(StableInductionTimeSelect::time_to_key(time));
 }
 
 void BarcodeScanner::set_reading_interval_state(ReadingInterval interval) {
   ESP_LOGD(TAG_SCANNER, "Setting reading interval to %s", reading_interval_to_string(interval));
   this->reading_interval_ = interval;
   this->save_settings_();
+  if (this->reading_interval_select_ != nullptr)
+    this->reading_interval_select_->publish_state(ReadingIntervalSelect::interval_to_key(interval));
 }
 
 void BarcodeScanner::set_same_code_interval_state(SameCodeInterval interval) {
   ESP_LOGD(TAG_SCANNER, "Setting same code interval to %s", same_code_interval_to_string(interval));
   this->same_code_interval_ = interval;
   this->save_settings_();
+  if (this->same_code_interval_select_ != nullptr)
+    this->same_code_interval_select_->publish_state(SameCodeIntervalSelect::interval_to_key(interval));
 }
 
 void BarcodeScanner::set_operation_mode_state(OperationMode mode) {
@@ -998,6 +1006,58 @@ void ScanDurationSelect::control(const std::string &value) {
     return;
   }
   scanner_->set_scan_duration(dur);
+}
+
+void TerminatorSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "TerminatorSelect: no scanner attached");
+    return;
+  }
+  Terminator term;
+  if (!parse_terminator(value, term)) {
+    ESP_LOGW(TAG_SCANNER, "TerminatorSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_terminator(term);
+}
+
+void StableInductionTimeSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "StableInductionTimeSelect: no scanner attached");
+    return;
+  }
+  StableInductionTime time;
+  if (!parse_stable_induction_time(value, time)) {
+    ESP_LOGW(TAG_SCANNER, "StableInductionTimeSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_stable_induction_time(time);
+}
+
+void ReadingIntervalSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "ReadingIntervalSelect: no scanner attached");
+    return;
+  }
+  ReadingInterval interval;
+  if (!parse_reading_interval(value, interval)) {
+    ESP_LOGW(TAG_SCANNER, "ReadingIntervalSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_reading_interval(interval);
+}
+
+void SameCodeIntervalSelect::control(const std::string &value) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "SameCodeIntervalSelect: no scanner attached");
+    return;
+  }
+  SameCodeInterval interval;
+  if (!parse_same_code_interval(value, interval)) {
+    ESP_LOGW(TAG_SCANNER, "SameCodeIntervalSelect: unknown value '%s'", value.c_str());
+    return;
+  }
+  scanner_->set_same_code_interval(interval);
 }
 
 void SoundSwitch::write_state(bool state) {
