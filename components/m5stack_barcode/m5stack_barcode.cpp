@@ -598,13 +598,23 @@ void BarcodeScanner::process_version_() {
     this->rx_buffer_.resize(MAX_VERSION_LENGTH);
   }
 
-  // The scanner version response is a binary-framed packet; the protocol format is
-  // undocumented but observed to be: [binary header] "Firmware version:X.Y.Z" [checksum].
-  // Strategy: find the first contiguous printable-ASCII run, then take only the
-  // value after the last colon (stripping any label prefix like "Firmware version:").
-  // All bytes must be 7-bit clean; trailing checksum bytes (> 0x7E) abort the parse
-  // rather than being published — non-ASCII bytes in a protobuf string field cause
-  // google.protobuf.DecodeError on the HA side which breaks the API connection.
+  // Log the raw bytes at WARN level so the actual scanner response format can be
+  // confirmed without needing DEBUG log level enabled.
+  {
+    const size_t log_len = std::min(this->rx_buffer_.size(), static_cast<size_t>(32));
+    char hex_buf[3 * 32 + 1];
+    char *p = hex_buf;
+    for (size_t i = 0; i < log_len; i++) {
+      p += snprintf(p, 4, "%02X ", this->rx_buffer_[i]);
+    }
+    ESP_LOGW(TAG_SCANNER, "Version raw (%u bytes)%s: %s", this->rx_buffer_.size(),
+             this->rx_buffer_.size() > 32 ? " (truncated)" : "", hex_buf);
+  }
+
+  // The scanner version response format is undocumented. Observed responses carry a
+  // label like "Firmware version:X.Y.Z" surrounded by binary framing and a trailing
+  // checksum.  Strategy: find the first contiguous printable-ASCII run (0x20–0x7E),
+  // then take only the value after the last colon to strip the label prefix.
   size_t run_start = 0;
   while (run_start < this->rx_buffer_.size() &&
          (this->rx_buffer_[run_start] < 0x20 || this->rx_buffer_[run_start] > 0x7E)) {
@@ -615,35 +625,18 @@ void BarcodeScanner::process_version_() {
     run_end++;
   }
 
-  // Reject the run if it contains any byte outside strict 7-bit ASCII.
-  bool clean = true;
-  for (size_t i = run_start; i < run_end; i++) {
-    if (this->rx_buffer_[i] < 0x20 || this->rx_buffer_[i] > 0x7E) {
-      clean = false;
-      break;
-    }
-  }
-
   std::string version;
-  if (!clean) {
-    ESP_LOGW(TAG_SCANNER,
-             "Version response contains non-ASCII bytes — discarding to protect HA API connection (raw %u bytes)",
-             this->rx_buffer_.size());
-  } else if (run_end > run_start) {
-    // If the run contains a colon (e.g. "Firmware version:2.2.18"), take only the
-    // value part after the last colon so the sensor shows "2.2.18" not the label.
-    size_t colon = run_end;
+  if (run_end > run_start) {
+    size_t colon = run_end;  // sentinel: no colon found
     for (size_t i = run_start; i < run_end; i++) {
       if (this->rx_buffer_[i] == ':') {
         colon = i;
       }
     }
     size_t val_start = (colon < run_end) ? colon + 1 : run_start;
-    // Trim leading spaces after the colon.
     while (val_start < run_end && this->rx_buffer_[val_start] == ' ') {
       val_start++;
     }
-    // Trim trailing spaces.
     size_t val_end = run_end;
     while (val_end > val_start && this->rx_buffer_[val_end - 1] == ' ') {
       val_end--;
@@ -653,12 +646,26 @@ void BarcodeScanner::process_version_() {
     }
   }
 
+  // SAFETY: reject the extracted string if any byte is outside strict 7-bit ASCII.
+  // This check is on the final extracted slice (not the wider run) to catch cases
+  // where the run-end loop does not stop cleanly at a non-ASCII byte.  Publishing a
+  // string with non-ASCII bytes causes google.protobuf.DecodeError in aioesphomeapi,
+  // which makes HA close the API connection and reconnect in a tight loop.
+  for (char c : version) {
+    if (static_cast<uint8_t>(c) < 0x20 || static_cast<uint8_t>(c) > 0x7E) {
+      ESP_LOGW(TAG_SCANNER, "Version string contains non-ASCII byte 0x%02X — discarding to protect HA API connection",
+               static_cast<uint8_t>(c));
+      version.clear();
+      break;
+    }
+  }
+
   if (this->version_sensor_ != nullptr) {
     if (!version.empty()) {
+      ESP_LOGW(TAG_SCANNER, "Publishing version: '%s'", version.c_str());
       this->version_sensor_->publish_state(version);
-      ESP_LOGD(TAG_SCANNER, "Firmware version: %s", version.c_str());
     } else {
-      ESP_LOGW(TAG_SCANNER, "Version response contained no valid ASCII (raw %u bytes)", this->rx_buffer_.size());
+      ESP_LOGW(TAG_SCANNER, "Version response yielded no publishable string (%u raw bytes)", this->rx_buffer_.size());
     }
   }
 
