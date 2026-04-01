@@ -58,6 +58,10 @@ class BuzzerVolumeSelect;
 class LightModeSelect;
 class LocateLightModeSelect;
 class ScanDurationSelect;
+class TerminatorSelect;
+class StableInductionTimeSelect;
+class ReadingIntervalSelect;
+class SameCodeIntervalSelect;
 class SoundSwitch;
 class BootSoundSwitch;
 class DecodeSoundSwitch;
@@ -204,6 +208,10 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_light_mode_select(LightModeSelect *sel) { this->light_mode_select_ = sel; }
   void set_locate_light_mode_select(LocateLightModeSelect *sel) { this->locate_light_mode_select_ = sel; }
   void set_scan_duration_select(ScanDurationSelect *sel) { this->scan_duration_select_ = sel; }
+  void set_terminator_select(TerminatorSelect *sel) { this->terminator_select_ = sel; }
+  void set_stable_induction_time_select(StableInductionTimeSelect *sel) { this->stable_induction_time_select_ = sel; }
+  void set_reading_interval_select(ReadingIntervalSelect *sel) { this->reading_interval_select_ = sel; }
+  void set_same_code_interval_select(SameCodeIntervalSelect *sel) { this->same_code_interval_select_ = sel; }
 
   // Scanner Control Methods
   /**
@@ -523,6 +531,15 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void configure_defaults_();
 
   /**
+   * @brief Publish the current in-memory values to every registered sub-component.
+   *
+   * Called once from setup() after configure_defaults_() so that HA entities always
+   * reflect the scanner's intended state immediately on boot, even for settings whose
+   * NVS value already matches the target and therefore never trigger an ACK.
+   */
+  void publish_initial_states_();
+
+  /**
    * @brief Persist all current scanner settings to ESPHome preferences (NVS flash).
    *
    * Called after each successful command ACK so that subsequent boots can skip
@@ -561,17 +578,21 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   CallbackManager<void()> scan_timeout_callback_;        ///< on_scan_timeout automation triggers
 
   // Component State
-  text_sensor::TextSensor *text_sensor_{nullptr};                       ///< Sensor for barcode output
-  text_sensor::TextSensor *version_sensor_{nullptr};                    ///< Sensor for firmware version
-  event::Event *barcode_event_{nullptr};                                ///< Event for barcode scans
-  OperationModeSelect *operation_mode_select_{nullptr};                 ///< Optional HA select for operation mode
-  BuzzerVolumeSelect *buzzer_volume_select_{nullptr};                   ///< Optional HA select for buzzer volume
-  LightModeSelect *light_mode_select_{nullptr};                         ///< Optional HA select for light mode
-  LocateLightModeSelect *locate_light_mode_select_{nullptr};            ///< Optional HA select for locate light mode
-  ScanDurationSelect *scan_duration_select_{nullptr};                   ///< Optional HA select for scan duration
-  SoundSwitch *sound_switch_{nullptr};                                  ///< Optional HA switch for sound mode
-  BootSoundSwitch *boot_sound_switch_{nullptr};                         ///< Optional HA switch for boot sound mode
-  DecodeSoundSwitch *decode_sound_switch_{nullptr};                     ///< Optional HA switch for decode sound mode
+  text_sensor::TextSensor *text_sensor_{nullptr};                     ///< Sensor for barcode output
+  text_sensor::TextSensor *version_sensor_{nullptr};                  ///< Sensor for firmware version
+  event::Event *barcode_event_{nullptr};                              ///< Event for barcode scans
+  OperationModeSelect *operation_mode_select_{nullptr};               ///< Optional HA select for operation mode
+  BuzzerVolumeSelect *buzzer_volume_select_{nullptr};                 ///< Optional HA select for buzzer volume
+  LightModeSelect *light_mode_select_{nullptr};                       ///< Optional HA select for light mode
+  LocateLightModeSelect *locate_light_mode_select_{nullptr};          ///< Optional HA select for locate light mode
+  ScanDurationSelect *scan_duration_select_{nullptr};                 ///< Optional HA select for scan duration
+  TerminatorSelect *terminator_select_{nullptr};                      ///< Optional HA select for terminator
+  StableInductionTimeSelect *stable_induction_time_select_{nullptr};  ///< Optional HA select for stable induction time
+  ReadingIntervalSelect *reading_interval_select_{nullptr};           ///< Optional HA select for reading interval
+  SameCodeIntervalSelect *same_code_interval_select_{nullptr};        ///< Optional HA select for same code interval
+  SoundSwitch *sound_switch_{nullptr};                                ///< Optional HA switch for sound mode
+  BootSoundSwitch *boot_sound_switch_{nullptr};                       ///< Optional HA switch for boot sound mode
+  DecodeSoundSwitch *decode_sound_switch_{nullptr};                   ///< Optional HA switch for decode sound mode
   DecodingSuccessLightSwitch *decoding_success_light_switch_{nullptr};  ///< Optional HA switch for success light
   binary_sensor::BinarySensor *scanning_binary_sensor_{nullptr};        ///< Optional HA binary sensor for scan state
 
@@ -580,6 +601,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
 
   ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
   bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
+  bool initial_states_published_{false};                ///< Guard for one-shot publish_initial_states_() in loop()
   uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
   uint32_t scan_started_at_{0};                         ///< millis() when start_scan() was called; 0 = idle
   CommandState command_state_{CommandState::IDLE};      ///< Current command processing state
@@ -629,7 +651,7 @@ class OperationModeSelect : public select::Select, public Component {
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
   /// Returns the YAML key string for an OperationMode enum value (used when publishing state).
-  static const char *mode_to_key(OperationMode mode) {
+  static const char *to_key(OperationMode mode) {
     switch (mode) {
       case OperationMode::LEVEL:
         return "level";
@@ -656,7 +678,7 @@ class BuzzerVolumeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *volume_to_key(BuzzerVolume volume) {
+  static const char *to_key(BuzzerVolume volume) {
     switch (volume) {
       case BuzzerVolume::BUZZER_VOLUME_HIGH:
         return "high";
@@ -679,7 +701,7 @@ class LightModeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *mode_to_key(LightMode mode) {
+  static const char *to_key(LightMode mode) {
     switch (mode) {
       case LightMode::LIGHT_ALWAYS_ON:
         return "always_on";
@@ -702,7 +724,7 @@ class LocateLightModeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *mode_to_key(LocateLightMode mode) {
+  static const char *to_key(LocateLightMode mode) {
     switch (mode) {
       case LocateLightMode::LOCATE_LIGHT_ALWAYS_ON:
         return "always_on";
@@ -725,7 +747,7 @@ class ScanDurationSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *duration_to_key(ScanDuration duration) {
+  static const char *to_key(ScanDuration duration) {
     switch (duration) {
       case ScanDuration::MS_500:
         return "500ms";
@@ -745,6 +767,124 @@ class ScanDurationSelect : public select::Select, public Component {
         return "unlimited";
     }
     return nullptr;  // Unreachable: all enum values handled above
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Select sub-component for terminator (suffix appended to each barcode output).
+class TerminatorSelect : public select::Select, public Component {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  static const char *to_key(Terminator term) {
+    switch (term) {
+      case Terminator::CRLF:
+        return "crlf";
+      case Terminator::CR:
+        return "cr";
+      case Terminator::TAB:
+        return "tab";
+      case Terminator::CRCR:
+        return "crcr";
+      case Terminator::CRLFCRLF:
+        return "crlfcrlf";
+      default:
+        return "none";
+    }
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Select sub-component for stable_induction_time (how long the scanner waits before triggering).
+class StableInductionTimeSelect : public select::Select, public Component {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  static const char *to_key(StableInductionTime time) {
+    switch (time) {
+      case StableInductionTime::MS_0:
+        return "0ms";
+      case StableInductionTime::MS_100:
+        return "100ms";
+      case StableInductionTime::MS_300:
+        return "300ms";
+      case StableInductionTime::MS_1000:
+        return "1s";
+      default:
+        return "500ms";
+    }
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Select sub-component for reading_interval (minimum time between scans in continuous mode).
+class ReadingIntervalSelect : public select::Select, public Component {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  static const char *to_key(ReadingInterval interval) {
+    switch (interval) {
+      case ReadingInterval::MS_0:
+        return "0ms";
+      case ReadingInterval::MS_100:
+        return "100ms";
+      case ReadingInterval::MS_300:
+        return "300ms";
+      case ReadingInterval::MS_1000:
+        return "1s";
+      case ReadingInterval::MS_1500:
+        return "1.5s";
+      case ReadingInterval::MS_2000:
+        return "2s";
+      default:
+        return "500ms";
+    }
+  }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Select sub-component for same_code_interval (minimum time before the same barcode is re-reported).
+class SameCodeIntervalSelect : public select::Select, public Component {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+  static const char *to_key(SameCodeInterval interval) {
+    switch (interval) {
+      case SameCodeInterval::MS_0:
+        return "0ms";
+      case SameCodeInterval::MS_100:
+        return "100ms";
+      case SameCodeInterval::MS_300:
+        return "300ms";
+      case SameCodeInterval::MS_1000:
+        return "1s";
+      case SameCodeInterval::MS_1500:
+        return "1.5s";
+      case SameCodeInterval::MS_2000:
+        return "2s";
+      default:
+        return "500ms";
+    }
   }
 
  protected:

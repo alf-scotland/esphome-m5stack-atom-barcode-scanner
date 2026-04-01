@@ -48,6 +48,10 @@ CONF_BUZZER_VOLUME_SELECT = "buzzer_volume_select"
 CONF_LIGHT_MODE_SELECT = "light_mode_select"
 CONF_LOCATE_LIGHT_MODE_SELECT = "locate_light_mode_select"
 CONF_SCAN_DURATION_SELECT = "scan_duration_select"
+CONF_TERMINATOR_SELECT = "terminator_select"
+CONF_STABLE_INDUCTION_TIME_SELECT = "stable_induction_time_select"
+CONF_READING_INTERVAL_SELECT = "reading_interval_select"
+CONF_SAME_CODE_INTERVAL_SELECT = "same_code_interval_select"
 CONF_SOUND_SWITCH = "sound_switch"
 CONF_BOOT_SOUND_SWITCH = "boot_sound_switch"
 CONF_DECODE_SOUND_SWITCH = "decode_sound_switch"
@@ -278,6 +282,26 @@ ScanDurationSelect = m5stack_barcode_ns.class_(
     select.Select,
     cg.Component,
 )
+TerminatorSelect = m5stack_barcode_ns.class_(
+    "TerminatorSelect",
+    select.Select,
+    cg.Component,
+)
+StableInductionTimeSelect = m5stack_barcode_ns.class_(
+    "StableInductionTimeSelect",
+    select.Select,
+    cg.Component,
+)
+ReadingIntervalSelect = m5stack_barcode_ns.class_(
+    "ReadingIntervalSelect",
+    select.Select,
+    cg.Component,
+)
+SameCodeIntervalSelect = m5stack_barcode_ns.class_(
+    "SameCodeIntervalSelect",
+    select.Select,
+    cg.Component,
+)
 
 # Sub-components — switch
 SoundSwitch = m5stack_barcode_ns.class_(
@@ -360,6 +384,18 @@ CONFIG_SCHEMA = cv.Schema(
         ).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_SCAN_DURATION_SELECT): select.select_schema(
             ScanDurationSelect,
+        ).extend(cv.COMPONENT_SCHEMA),
+        cv.Optional(CONF_TERMINATOR_SELECT): select.select_schema(
+            TerminatorSelect,
+        ).extend(cv.COMPONENT_SCHEMA),
+        cv.Optional(CONF_STABLE_INDUCTION_TIME_SELECT): select.select_schema(
+            StableInductionTimeSelect,
+        ).extend(cv.COMPONENT_SCHEMA),
+        cv.Optional(CONF_READING_INTERVAL_SELECT): select.select_schema(
+            ReadingIntervalSelect,
+        ).extend(cv.COMPONENT_SCHEMA),
+        cv.Optional(CONF_SAME_CODE_INTERVAL_SELECT): select.select_schema(
+            SameCodeIntervalSelect,
         ).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_SOUND_SWITCH): switch.switch_schema(
             SoundSwitch,
@@ -555,6 +591,34 @@ async def handle_select_subcomponents(var: Any, config: dict[str, Any]) -> None:
             config[CONF_SCAN_DURATION_SELECT],
             list(SCAN_DURATIONS.keys()),
             var.set_scan_duration_select,
+        )
+    if CONF_TERMINATOR_SELECT in config:
+        await _register_select(
+            var,
+            config[CONF_TERMINATOR_SELECT],
+            list(TERMINATORS.keys()),
+            var.set_terminator_select,
+        )
+    if CONF_STABLE_INDUCTION_TIME_SELECT in config:
+        await _register_select(
+            var,
+            config[CONF_STABLE_INDUCTION_TIME_SELECT],
+            list(STABLE_INDUCTION_TIMES.keys()),
+            var.set_stable_induction_time_select,
+        )
+    if CONF_READING_INTERVAL_SELECT in config:
+        await _register_select(
+            var,
+            config[CONF_READING_INTERVAL_SELECT],
+            list(READING_INTERVALS.keys()),
+            var.set_reading_interval_select,
+        )
+    if CONF_SAME_CODE_INTERVAL_SELECT in config:
+        await _register_select(
+            var,
+            config[CONF_SAME_CODE_INTERVAL_SELECT],
+            list(SAME_CODE_INTERVALS.keys()),
+            var.set_same_code_interval_select,
         )
 
 
