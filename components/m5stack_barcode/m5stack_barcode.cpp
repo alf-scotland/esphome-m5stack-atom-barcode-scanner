@@ -57,6 +57,14 @@ uint32_t BarcodeScanner::get_scan_duration_ms() const {
 void BarcodeScanner::setup() {
   ESP_LOGCONFIG(TAG_SCANNER, "Setting up M5Stack Barcode Scanner");
 
+  // Drain any bytes that accumulated in the UART hardware FIFO before our firmware
+  // started.  After an OTA software reset the scanner stays powered and may be
+  // transmitting; stale bytes left in the buffer corrupt ACK detection and version
+  // parsing for the first commands we send.
+  while (this->available()) {
+    this->read();
+  }
+
   // Initialise preference storage keyed to this component instance
   this->pref_ = global_preferences->make_preference<ScannerPreferences>(fnv1_hash("m5stack_barcode"));
 
@@ -590,46 +598,58 @@ void BarcodeScanner::process_version_() {
     this->rx_buffer_.resize(MAX_VERSION_LENGTH);
   }
 
-  // The scanner version response is a binary-framed packet; the version string is
-  // embedded as printable ASCII after protocol header bytes and before a trailing
-  // checksum.  Find the first contiguous printable-ASCII run.
-  size_t start = 0;
-  while (start < this->rx_buffer_.size() && (this->rx_buffer_[start] < 0x20 || this->rx_buffer_[start] > 0x7E)) {
-    start++;
+  // The scanner version response is a binary-framed packet; the protocol format is
+  // undocumented but observed to be: [binary header] "Firmware version:X.Y.Z" [checksum].
+  // Strategy: find the first contiguous printable-ASCII run, then take only the
+  // value after the last colon (stripping any label prefix like "Firmware version:").
+  // All bytes must be 7-bit clean; trailing checksum bytes (> 0x7E) abort the parse
+  // rather than being published — non-ASCII bytes in a protobuf string field cause
+  // google.protobuf.DecodeError on the HA side which breaks the API connection.
+  size_t run_start = 0;
+  while (run_start < this->rx_buffer_.size() &&
+         (this->rx_buffer_[run_start] < 0x20 || this->rx_buffer_[run_start] > 0x7E)) {
+    run_start++;
   }
-  size_t end = start;
-  while (end < this->rx_buffer_.size() && this->rx_buffer_[end] >= 0x20 && this->rx_buffer_[end] <= 0x7E) {
-    end++;
+  size_t run_end = run_start;
+  while (run_end < this->rx_buffer_.size() && this->rx_buffer_[run_end] >= 0x20 && this->rx_buffer_[run_end] <= 0x7E) {
+    run_end++;
   }
 
-  // Trim leading/trailing spaces from the printable run.
-  while (start < end && this->rx_buffer_[start] == ' ') {
-    start++;
-  }
-  while (end > start && this->rx_buffer_[end - 1] == ' ') {
-    end--;
+  // Reject the run if it contains any byte outside strict 7-bit ASCII.
+  bool clean = true;
+  for (size_t i = run_start; i < run_end; i++) {
+    if (this->rx_buffer_[i] < 0x20 || this->rx_buffer_[i] > 0x7E) {
+      clean = false;
+      break;
+    }
   }
 
   std::string version;
-  if (end > start) {
-    // SAFETY: reject if any byte is outside 7-bit ASCII (0x20–0x7E).
-    // Trailing checksum bytes (e.g. 0xE4, 0x44) can be included in the run when
-    // the UART buffer contains scanner-boot noise interleaved with the response.
-    // Publishing a string with non-ASCII bytes causes google.protobuf.DecodeError
-    // on the HA side, which breaks the API connection.
-    bool clean = true;
-    for (size_t i = start; i < end; i++) {
-      if (this->rx_buffer_[i] < 0x20 || this->rx_buffer_[i] > 0x7E) {
-        clean = false;
-        break;
+  if (!clean) {
+    ESP_LOGW(TAG_SCANNER,
+             "Version response contains non-ASCII bytes — discarding to protect HA API connection (raw %u bytes)",
+             this->rx_buffer_.size());
+  } else if (run_end > run_start) {
+    // If the run contains a colon (e.g. "Firmware version:2.2.18"), take only the
+    // value part after the last colon so the sensor shows "2.2.18" not the label.
+    size_t colon = run_end;
+    for (size_t i = run_start; i < run_end; i++) {
+      if (this->rx_buffer_[i] == ':') {
+        colon = i;
       }
     }
-    if (clean) {
-      version.assign(reinterpret_cast<char *>(this->rx_buffer_.data() + start), end - start);
-    } else {
-      ESP_LOGW(TAG_SCANNER,
-               "Version response contains non-ASCII bytes — discarding to protect HA API connection (raw %u bytes)",
-               this->rx_buffer_.size());
+    size_t val_start = (colon < run_end) ? colon + 1 : run_start;
+    // Trim leading spaces after the colon.
+    while (val_start < run_end && this->rx_buffer_[val_start] == ' ') {
+      val_start++;
+    }
+    // Trim trailing spaces.
+    size_t val_end = run_end;
+    while (val_end > val_start && this->rx_buffer_[val_end - 1] == ' ') {
+      val_end--;
+    }
+    if (val_end > val_start) {
+      version.assign(reinterpret_cast<char *>(this->rx_buffer_.data() + val_start), val_end - val_start);
     }
   }
 
@@ -645,17 +665,7 @@ void BarcodeScanner::process_version_() {
   this->clear_buffer_();
 }
 
-void BarcodeScanner::request_version_() {
-  // Flush any bytes already in the UART buffer before queuing the version request.
-  // After an OTA update the scanner stays powered and may have already transmitted
-  // boot or status bytes; leaving them in rx_buffer_ contaminates the version parse.
-  while (this->available()) {
-    this->read();
-  }
-  this->clear_buffer_();
-
-  this->queue_command(CommandFactory::create_version_command());
-}
+void BarcodeScanner::request_version_() { this->queue_command(CommandFactory::create_version_command()); }
 
 // Scanner Control Methods
 void BarcodeScanner::start_scan() {
