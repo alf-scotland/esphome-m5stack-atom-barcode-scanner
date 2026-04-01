@@ -306,87 +306,6 @@ select:
           id: update_mode_led
           mode: !lambda "return x;"
 
-  - platform: template
-    name: "Terminator"
-    id: terminator
-    entity_category: "config"
-    icon: "mdi:keyboard-return"
-    setup_priority: 100
-    options:
-      - "none"
-      - "crlf"
-      - "cr"
-      - "tab"
-      - "crcr"
-      - "crlfcrlf"
-    initial_option: "crlf"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_terminator:
-          id: barcode_scanner
-          terminator: !lambda "return x;"
-
-  - platform: template
-    name: "Stable Induction Time"
-    id: stable_induction_time
-    entity_category: "config"
-    icon: "mdi:timer-sand"
-    setup_priority: 100
-    options:
-      - "0ms"
-      - "100ms"
-      - "300ms"
-      - "500ms"
-      - "1s"
-    initial_option: "500ms"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_stable_induction_time:
-          id: barcode_scanner
-          stable_induction_time: !lambda "return x;"
-
-  - platform: template
-    name: "Reading Interval"
-    id: reading_interval
-    entity_category: "config"
-    icon: "mdi:timer-outline"
-    setup_priority: 100
-    options:
-      - "0ms"
-      - "100ms"
-      - "300ms"
-      - "500ms"
-      - "1s"
-      - "1.5s"
-      - "2s"
-    initial_option: "500ms"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_reading_interval:
-          id: barcode_scanner
-          reading_interval: !lambda "return x;"
-
-  - platform: template
-    name: "Same Code Interval"
-    id: same_code_interval
-    entity_category: "config"
-    icon: "mdi:timer-refresh"
-    setup_priority: 100
-    options:
-      - "0ms"
-      - "100ms"
-      - "300ms"
-      - "500ms"
-      - "1s"
-      - "1.5s"
-      - "2s"
-    initial_option: "500ms"
-    optimistic: true
-    on_value:
-      - m5stack_barcode.set_same_code_interval:
-          id: barcode_scanner
-          same_code_interval: !lambda "return x;"
-
 event:
   - platform: template
     name: "Scanner Events"
@@ -404,7 +323,7 @@ m5stack_barcode:
   barcode_id: last_barcode
   version_id: scanner_version
   operation_mode: host
-  terminator: crlf
+  terminator: none
   buzzer_volume: medium
   uart_id: uart_bus
   barcode_event: scanner_events
@@ -448,3 +367,23 @@ m5stack_barcode:
     name: "Decoding Success Light"
     entity_category: "config"
     icon: "mdi:led-on"
+
+  terminator_select:
+    name: "Terminator"
+    entity_category: "config"
+    icon: "mdi:keyboard-return"
+
+  stable_induction_time_select:
+    name: "Stable Induction Time"
+    entity_category: "config"
+    icon: "mdi:timer-sand"
+
+  reading_interval_select:
+    name: "Reading Interval"
+    entity_category: "config"
+    icon: "mdi:timer-outline"
+
+  same_code_interval_select:
+    name: "Same Code Interval"
+    entity_category: "config"
+    icon: "mdi:timer-refresh"
