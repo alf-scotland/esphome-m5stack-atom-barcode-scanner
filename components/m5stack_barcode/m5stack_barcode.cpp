@@ -63,9 +63,6 @@ void BarcodeScanner::setup() {
   // Configure settings, skipping any that the scanner already has from a previous boot
   this->configure_defaults_();
 
-  // Publish initial states to all optional sub-components so HA shows the correct values
-  // immediately after boot, before any UART commands are sent or ACKed.
-  this->publish_initial_states_();
   if (this->scanning_binary_sensor_ != nullptr)
     this->scanning_binary_sensor_->publish_state(this->scan_state_ != ScanState::IDLE);
 
@@ -183,6 +180,14 @@ void BarcodeScanner::save_settings_() {
 }
 
 void BarcodeScanner::loop() {
+  // Publish initial sub-component states on the first loop() tick, after HA has had time
+  // to complete the entity list exchange.  Doing this in setup() races with the API
+  // connection handshake and causes HA to repeatedly reconnect during boot.
+  if (!this->initial_states_published_) {
+    this->publish_initial_states_();
+    this->initial_states_published_ = true;
+  }
+
   // Process any pending commands first
   this->process_command_queue_();
 
