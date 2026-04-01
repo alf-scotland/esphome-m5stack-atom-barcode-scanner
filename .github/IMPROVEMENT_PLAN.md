@@ -26,7 +26,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 | # | Status | Branch | What |
 |---|--------|--------|------|
 | 6 | ✅ | `refactor/actions-template-headers` | Template `play()`/`check()` bodies live in `actions.cpp` with an explicit instantiation workaround; move all bodies to `actions.h`, delete the instantiation block — `actions.cpp` becomes `TAG_ACTION` only |
-| 7 | ⬜ | `fix/entity-state-publishing` | `set_terminator_state()`, `set_stable_induction_time_state()`, `set_reading_interval_state()` don't call `publish_state()` after ACK; `set_light_mode_state()` and `set_scan_duration_state()` do — inconsistent |
+| 7 | ✅ | `fix/entity-state-publishing` | `set_terminator_state()`, `set_stable_induction_time_state()`, `set_reading_interval_state()` don't call `publish_state()` after ACK; `set_light_mode_state()` and `set_scan_duration_state()` do — inconsistent |
 | 8 | ✅ | `fix/version-command-queue-blocking` | `GET_VERSION` command holds the queue for up to 2 s; all other commands serialise behind it; give it a non-blocking path or make it lower priority |
 | 9 | ✅ | `refactor/command-handler-constants` | `command_handlers.cpp:24` — `size_t(16)` is a magic number; extract to a named constant alongside `MAX_LOG_LENGTH` |
 | 10 | ⬜ | `refactor/command-handler-separation` | `StateCommand` both parses the UART response and mutates scanner state (calls `scanner->set_*_state()`); separate parsing from state mutation — handlers return parsed values via callback, scanner owns all state transitions |
