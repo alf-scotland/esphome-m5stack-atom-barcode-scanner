@@ -1,6 +1,6 @@
 #include "m5stack_barcode.h"
 
-#include "command_handlers.h"
+#include "command.h"
 #include "commands.h"
 #include "esphome/core/application.h"
 #include "esphome/core/hal.h"
@@ -410,7 +410,7 @@ void BarcodeScanner::process_command_queue_() {
 }
 
 // Add new method implementation before wake_up_
-void BarcodeScanner::write_command_(const std::unique_ptr<CommandBase> &command) {
+void BarcodeScanner::write_command_(const std::unique_ptr<Command> &command) {
   this->command_attempts_++;
   command->log_command_data(TAG_SCANNER, "Sending");
 
@@ -442,7 +442,7 @@ void BarcodeScanner::wake_up_() {
   this->command_state_ = CommandState::WAKEUP_SENT;
 }
 
-void BarcodeScanner::queue_command(std::unique_ptr<CommandBase> command) {
+void BarcodeScanner::queue_command(std::unique_ptr<Command> command) {
   if (command == nullptr) {
     ESP_LOGW(TAG_SCANNER, "Attempted to queue null command");
     return;
@@ -959,7 +959,7 @@ void BarcodeScanner::process_current_buffer() {
 }
 
 // Protected state setter implementations.
-// Each setter is called from StateCommand::on_success() after the scanner ACKs the command.
+// Each setter is called from a CommandFactory lambda after the scanner ACKs the command.
 // After updating the in-memory state, save_settings_() persists all settings to NVS so that
 // the next boot can skip re-sending settings that are already applied.
 

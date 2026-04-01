@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "actions.h"
-#include "command_handlers.h"
+#include "command.h"
 #include "commands.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/button/button.h"
@@ -52,7 +52,6 @@ struct ScannerPreferences {
 static_assert(sizeof(ScannerPreferences) == 14, "ScannerPreferences size changed — bump SETTINGS_VERSION");
 
 // Forward declarations
-template<typename T> class StateCommand;
 class OperationModeSelect;
 class BuzzerVolumeSelect;
 class LightModeSelect;
@@ -436,29 +435,10 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   uint32_t get_scan_duration_ms() const;
 
  protected:
-  friend class CommandBase;
-  template<typename T> friend class Command;
-  template<typename T> friend class StateCommand;
-  friend class SimpleCommand;
-  template<typename... Ts> friend class IsContinuousModeCondition;
-  template<typename... Ts> friend class ProcessCurrentBufferAction;
-  template<typename... Ts> friend class StartAction;
-  template<typename... Ts> friend class StopAction;
-  template<typename... Ts> friend class SetModeAction;
-  template<typename... Ts> friend class SetTerminatorAction;
-  template<typename... Ts> friend class SetLightModeAction;
-  template<typename... Ts> friend class SetLocateLightModeAction;
-  template<typename... Ts> friend class SetSoundModeAction;
-  template<typename... Ts> friend class SetBuzzerVolumeAction;
-  template<typename... Ts> friend class SetDecodingSuccessLightModeAction;
-  template<typename... Ts> friend class SetBootSoundModeAction;
-  template<typename... Ts> friend class SetDecodeSoundModeAction;
-  template<typename... Ts> friend class SetScanDurationAction;
-  template<typename... Ts> friend class SetStableInductionTimeAction;
-  template<typename... Ts> friend class SetReadingIntervalAction;
-  template<typename... Ts> friend class SetSameCodeIntervalAction;
+  // CommandFactory lambdas call set_*_state() on ACK — the only external access needed.
+  friend class CommandFactory;
 
-  // Protected state setter methods for use by commands
+  // Protected state setter methods — called by CommandFactory lambdas after ACK
   void set_terminator_state(Terminator term);
   void set_light_mode_state(LightMode mode);
   void set_locate_light_mode_state(LocateLightMode mode);
@@ -483,7 +463,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @brief Add a command to the processing queue.
    * @param command Unique pointer to the command to queue
    */
-  void queue_command(std::unique_ptr<CommandBase> command);
+  void queue_command(std::unique_ptr<Command> command);
 
   /**
    * @brief Wake up the scanner before sending a command.
@@ -568,7 +548,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @brief Write a command to the scanner and update state.
    * @param command Reference to the command to write
    */
-  void write_command_(const std::unique_ptr<CommandBase> &command);
+  void write_command_(const std::unique_ptr<Command> &command);
 
   // Preferences
   ESPPreferenceObject pref_;  ///< NVS storage for persisting scanner settings across reboots
@@ -596,8 +576,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   DecodingSuccessLightSwitch *decoding_success_light_switch_{nullptr};  ///< Optional HA switch for success light
   binary_sensor::BinarySensor *scanning_binary_sensor_{nullptr};        ///< Optional HA binary sensor for scan state
 
-  std::vector<uint8_t> rx_buffer_;                           ///< Buffer for received data
-  std::vector<std::unique_ptr<CommandBase>> command_queue_;  ///< Queue of pending commands
+  std::vector<uint8_t> rx_buffer_;                       ///< Buffer for received data
+  std::vector<std::unique_ptr<Command>> command_queue_;  ///< Queue of pending commands
 
   ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
   bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
