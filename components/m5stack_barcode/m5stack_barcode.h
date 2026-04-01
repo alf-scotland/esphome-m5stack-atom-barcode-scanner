@@ -650,7 +650,7 @@ class OperationModeSelect : public select::Select, public Component {
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
   /// Returns the YAML key string for an OperationMode enum value (used when publishing state).
-  static const char *mode_to_key(OperationMode mode) {
+  static const char *to_key(OperationMode mode) {
     switch (mode) {
       case OperationMode::LEVEL:
         return "level";
@@ -677,7 +677,7 @@ class BuzzerVolumeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *volume_to_key(BuzzerVolume volume) {
+  static const char *to_key(BuzzerVolume volume) {
     switch (volume) {
       case BuzzerVolume::BUZZER_VOLUME_HIGH:
         return "high";
@@ -700,7 +700,7 @@ class LightModeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *mode_to_key(LightMode mode) {
+  static const char *to_key(LightMode mode) {
     switch (mode) {
       case LightMode::LIGHT_ALWAYS_ON:
         return "always_on";
@@ -723,7 +723,7 @@ class LocateLightModeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *mode_to_key(LocateLightMode mode) {
+  static const char *to_key(LocateLightMode mode) {
     switch (mode) {
       case LocateLightMode::LOCATE_LIGHT_ALWAYS_ON:
         return "always_on";
@@ -746,7 +746,7 @@ class ScanDurationSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *duration_to_key(ScanDuration duration) {
+  static const char *to_key(ScanDuration duration) {
     switch (duration) {
       case ScanDuration::MS_500:
         return "500ms";
@@ -780,7 +780,7 @@ class TerminatorSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *terminator_to_key(Terminator term) {
+  static const char *to_key(Terminator term) {
     switch (term) {
       case Terminator::CRLF:
         return "crlf";
@@ -809,7 +809,7 @@ class StableInductionTimeSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *time_to_key(StableInductionTime time) {
+  static const char *to_key(StableInductionTime time) {
     switch (time) {
       case StableInductionTime::MS_0:
         return "0ms";
@@ -836,7 +836,7 @@ class ReadingIntervalSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *interval_to_key(ReadingInterval interval) {
+  static const char *to_key(ReadingInterval interval) {
     switch (interval) {
       case ReadingInterval::MS_0:
         return "0ms";
@@ -867,7 +867,7 @@ class SameCodeIntervalSelect : public select::Select, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 
-  static const char *interval_to_key(SameCodeInterval interval) {
+  static const char *to_key(SameCodeInterval interval) {
     switch (interval) {
       case SameCodeInterval::MS_0:
         return "0ms";

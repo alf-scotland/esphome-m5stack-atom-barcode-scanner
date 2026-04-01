@@ -66,15 +66,15 @@ void BarcodeScanner::setup() {
   // Publish initial states to all optional sub-components so HA shows the correct values
   // immediately after boot, before any UART commands are sent.
   if (this->operation_mode_select_ != nullptr)
-    this->operation_mode_select_->publish_state(OperationModeSelect::mode_to_key(this->operation_mode_));
+    this->operation_mode_select_->publish_state(OperationModeSelect::to_key(this->operation_mode_));
   if (this->buzzer_volume_select_ != nullptr)
-    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::volume_to_key(this->buzzer_volume_));
+    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::to_key(this->buzzer_volume_));
   if (this->light_mode_select_ != nullptr)
-    this->light_mode_select_->publish_state(LightModeSelect::mode_to_key(this->light_mode_));
+    this->light_mode_select_->publish_state(LightModeSelect::to_key(this->light_mode_));
   if (this->locate_light_mode_select_ != nullptr)
-    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::mode_to_key(this->locate_light_mode_));
+    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::to_key(this->locate_light_mode_));
   if (this->scan_duration_select_ != nullptr)
-    this->scan_duration_select_->publish_state(ScanDurationSelect::duration_to_key(this->scan_duration_));
+    this->scan_duration_select_->publish_state(ScanDurationSelect::to_key(this->scan_duration_));
   if (this->sound_switch_ != nullptr)
     this->sound_switch_->publish_state(this->sound_mode_ == SoundMode::SOUND_ENABLED);
   if (this->boot_sound_switch_ != nullptr)
@@ -153,24 +153,23 @@ void BarcodeScanner::configure_defaults_() {
 
 void BarcodeScanner::publish_initial_states_() {
   if (this->operation_mode_select_ != nullptr)
-    this->operation_mode_select_->publish_state(OperationModeSelect::mode_to_key(this->operation_mode_));
+    this->operation_mode_select_->publish_state(OperationModeSelect::to_key(this->operation_mode_));
   if (this->terminator_select_ != nullptr)
-    this->terminator_select_->publish_state(TerminatorSelect::terminator_to_key(this->terminator_));
+    this->terminator_select_->publish_state(TerminatorSelect::to_key(this->terminator_));
   if (this->light_mode_select_ != nullptr)
-    this->light_mode_select_->publish_state(LightModeSelect::mode_to_key(this->light_mode_));
+    this->light_mode_select_->publish_state(LightModeSelect::to_key(this->light_mode_));
   if (this->locate_light_mode_select_ != nullptr)
-    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::mode_to_key(this->locate_light_mode_));
+    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::to_key(this->locate_light_mode_));
   if (this->buzzer_volume_select_ != nullptr)
-    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::volume_to_key(this->buzzer_volume_));
+    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::to_key(this->buzzer_volume_));
   if (this->scan_duration_select_ != nullptr)
-    this->scan_duration_select_->publish_state(ScanDurationSelect::duration_to_key(this->scan_duration_));
+    this->scan_duration_select_->publish_state(ScanDurationSelect::to_key(this->scan_duration_));
   if (this->stable_induction_time_select_ != nullptr)
-    this->stable_induction_time_select_->publish_state(
-        StableInductionTimeSelect::time_to_key(this->stable_induction_time_));
+    this->stable_induction_time_select_->publish_state(StableInductionTimeSelect::to_key(this->stable_induction_time_));
   if (this->reading_interval_select_ != nullptr)
-    this->reading_interval_select_->publish_state(ReadingIntervalSelect::interval_to_key(this->reading_interval_));
+    this->reading_interval_select_->publish_state(ReadingIntervalSelect::to_key(this->reading_interval_));
   if (this->same_code_interval_select_ != nullptr)
-    this->same_code_interval_select_->publish_state(SameCodeIntervalSelect::interval_to_key(this->same_code_interval_));
+    this->same_code_interval_select_->publish_state(SameCodeIntervalSelect::to_key(this->same_code_interval_));
   if (this->sound_switch_ != nullptr)
     this->sound_switch_->publish_state(this->sound_mode_ == SoundMode::SOUND_ENABLED);
   if (this->boot_sound_switch_ != nullptr)
@@ -873,7 +872,7 @@ void BarcodeScanner::set_terminator_state(Terminator term) {
   this->terminator_ = term;
   this->save_settings_();
   if (this->terminator_select_ != nullptr)
-    this->terminator_select_->publish_state(TerminatorSelect::terminator_to_key(term));
+    this->terminator_select_->publish_state(TerminatorSelect::to_key(term));
 }
 
 void BarcodeScanner::set_light_mode_state(LightMode mode) {
@@ -881,7 +880,7 @@ void BarcodeScanner::set_light_mode_state(LightMode mode) {
   this->light_mode_ = mode;
   this->save_settings_();
   if (this->light_mode_select_ != nullptr)
-    this->light_mode_select_->publish_state(LightModeSelect::mode_to_key(mode));
+    this->light_mode_select_->publish_state(LightModeSelect::to_key(mode));
 }
 
 void BarcodeScanner::set_locate_light_mode_state(LocateLightMode mode) {
@@ -889,7 +888,7 @@ void BarcodeScanner::set_locate_light_mode_state(LocateLightMode mode) {
   this->locate_light_mode_ = mode;
   this->save_settings_();
   if (this->locate_light_mode_select_ != nullptr)
-    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::mode_to_key(mode));
+    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::to_key(mode));
 }
 
 void BarcodeScanner::set_sound_mode_state(SoundMode mode) {
@@ -905,7 +904,7 @@ void BarcodeScanner::set_buzzer_volume_state(BuzzerVolume volume) {
   this->buzzer_volume_ = volume;
   this->save_settings_();
   if (this->buzzer_volume_select_ != nullptr)
-    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::volume_to_key(volume));
+    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::to_key(volume));
 }
 
 void BarcodeScanner::set_decoding_success_light_mode_state(DecodingSuccessLightMode mode) {
@@ -937,7 +936,7 @@ void BarcodeScanner::set_scan_duration_state(ScanDuration duration) {
   this->scan_duration_ = duration;
   this->save_settings_();
   if (this->scan_duration_select_ != nullptr)
-    this->scan_duration_select_->publish_state(ScanDurationSelect::duration_to_key(duration));
+    this->scan_duration_select_->publish_state(ScanDurationSelect::to_key(duration));
 }
 
 void BarcodeScanner::set_stable_induction_time_state(StableInductionTime time) {
@@ -945,7 +944,7 @@ void BarcodeScanner::set_stable_induction_time_state(StableInductionTime time) {
   this->stable_induction_time_ = time;
   this->save_settings_();
   if (this->stable_induction_time_select_ != nullptr)
-    this->stable_induction_time_select_->publish_state(StableInductionTimeSelect::time_to_key(time));
+    this->stable_induction_time_select_->publish_state(StableInductionTimeSelect::to_key(time));
 }
 
 void BarcodeScanner::set_reading_interval_state(ReadingInterval interval) {
@@ -953,7 +952,7 @@ void BarcodeScanner::set_reading_interval_state(ReadingInterval interval) {
   this->reading_interval_ = interval;
   this->save_settings_();
   if (this->reading_interval_select_ != nullptr)
-    this->reading_interval_select_->publish_state(ReadingIntervalSelect::interval_to_key(interval));
+    this->reading_interval_select_->publish_state(ReadingIntervalSelect::to_key(interval));
 }
 
 void BarcodeScanner::set_same_code_interval_state(SameCodeInterval interval) {
@@ -961,7 +960,7 @@ void BarcodeScanner::set_same_code_interval_state(SameCodeInterval interval) {
   this->same_code_interval_ = interval;
   this->save_settings_();
   if (this->same_code_interval_select_ != nullptr)
-    this->same_code_interval_select_->publish_state(SameCodeIntervalSelect::interval_to_key(interval));
+    this->same_code_interval_select_->publish_state(SameCodeIntervalSelect::to_key(interval));
 }
 
 void BarcodeScanner::set_operation_mode_state(OperationMode mode) {
@@ -970,7 +969,7 @@ void BarcodeScanner::set_operation_mode_state(OperationMode mode) {
   this->save_settings_();
   // Keep the HA select entity in sync after the scanner ACKs the command
   if (this->operation_mode_select_ != nullptr) {
-    this->operation_mode_select_->publish_state(OperationModeSelect::mode_to_key(mode));
+    this->operation_mode_select_->publish_state(OperationModeSelect::to_key(mode));
   }
 }
 
