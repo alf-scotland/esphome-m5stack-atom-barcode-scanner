@@ -30,7 +30,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 | 8 | ✅ | `fix/version-command-queue-blocking` | `GET_VERSION` command holds the queue for up to 2 s; all other commands serialise behind it; give it a non-blocking path or make it lower priority |
 | 9 | ✅ | `refactor/command-handler-constants` | `command_handlers.cpp:24` — `size_t(16)` is a magic number; extract to a named constant alongside `MAX_LOG_LENGTH` |
 | 10 | ⬜ | `refactor/command-handler-separation` | `StateCommand` both parses the UART response and mutates scanner state (calls `scanner->set_*_state()`); separate parsing from state mutation — handlers return parsed values via callback, scanner owns all state transitions |
-| 11 | ⬜ | `fix/schema-defaults` | Most optional config keys in `__init__.py` have no `default=`; add defaults matching scanner factory defaults (verify against PDFs) |
+| 11 | ✅ | `fix/schema-defaults` | Most optional config keys in `__init__.py` have no `default=`; add defaults matching scanner factory defaults (verify against PDFs) |
 
 ---
 
