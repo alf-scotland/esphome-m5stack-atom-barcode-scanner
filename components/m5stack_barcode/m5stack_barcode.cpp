@@ -147,6 +147,39 @@ void BarcodeScanner::configure_defaults_() {
   QUEUE_IF_CHANGED(same_code_interval, CommandFactory::create_same_code_interval_command, this->same_code_interval_)
 
 #undef QUEUE_IF_CHANGED
+
+  this->publish_initial_states_();
+}
+
+void BarcodeScanner::publish_initial_states_() {
+  if (this->operation_mode_select_ != nullptr)
+    this->operation_mode_select_->publish_state(OperationModeSelect::mode_to_key(this->operation_mode_));
+  if (this->terminator_select_ != nullptr)
+    this->terminator_select_->publish_state(TerminatorSelect::terminator_to_key(this->terminator_));
+  if (this->light_mode_select_ != nullptr)
+    this->light_mode_select_->publish_state(LightModeSelect::mode_to_key(this->light_mode_));
+  if (this->locate_light_mode_select_ != nullptr)
+    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::mode_to_key(this->locate_light_mode_));
+  if (this->buzzer_volume_select_ != nullptr)
+    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::volume_to_key(this->buzzer_volume_));
+  if (this->scan_duration_select_ != nullptr)
+    this->scan_duration_select_->publish_state(ScanDurationSelect::duration_to_key(this->scan_duration_));
+  if (this->stable_induction_time_select_ != nullptr)
+    this->stable_induction_time_select_->publish_state(
+        StableInductionTimeSelect::time_to_key(this->stable_induction_time_));
+  if (this->reading_interval_select_ != nullptr)
+    this->reading_interval_select_->publish_state(ReadingIntervalSelect::interval_to_key(this->reading_interval_));
+  if (this->same_code_interval_select_ != nullptr)
+    this->same_code_interval_select_->publish_state(SameCodeIntervalSelect::interval_to_key(this->same_code_interval_));
+  if (this->sound_switch_ != nullptr)
+    this->sound_switch_->publish_state(this->sound_mode_ == SoundMode::SOUND_ENABLED);
+  if (this->boot_sound_switch_ != nullptr)
+    this->boot_sound_switch_->publish_state(this->boot_sound_mode_ == BootSoundMode::BOOT_SOUND_ENABLED);
+  if (this->decode_sound_switch_ != nullptr)
+    this->decode_sound_switch_->publish_state(this->decode_sound_mode_ == DecodeSoundMode::DECODE_SOUND_ENABLED);
+  if (this->decoding_success_light_switch_ != nullptr)
+    this->decoding_success_light_switch_->publish_state(this->decoding_success_light_mode_ ==
+                                                        DecodingSuccessLightMode::DECODING_LIGHT_ENABLED);
 }
 
 void BarcodeScanner::save_settings_() {
