@@ -584,16 +584,15 @@ void BarcodeScanner::process_version_() {
     return;
   }
 
-  // Add bounds checking to prevent buffer overflows
   if (this->rx_buffer_.size() > MAX_VERSION_LENGTH) {
-    ESP_LOGW(TAG_SCANNER, "Version string too long (%u bytes), truncating to %u bytes", this->rx_buffer_.size(),
+    ESP_LOGW(TAG_SCANNER, "Version response too long (%u bytes), truncating to %u bytes", this->rx_buffer_.size(),
              MAX_VERSION_LENGTH);
     this->rx_buffer_.resize(MAX_VERSION_LENGTH);
   }
 
-  // The scanner response is a binary-framed packet; the actual version string is
-  // embedded as printable ASCII after protocol header bytes. Find the first
-  // printable character and read until the run of printable chars ends.
+  // The scanner version response is a binary-framed packet; the version string is
+  // embedded as printable ASCII after protocol header bytes and before a trailing
+  // checksum.  Find the first contiguous printable-ASCII run.
   size_t start = 0;
   while (start < this->rx_buffer_.size() && (this->rx_buffer_[start] < 0x20 || this->rx_buffer_[start] > 0x7E)) {
     start++;
@@ -603,31 +602,59 @@ void BarcodeScanner::process_version_() {
     end++;
   }
 
-  std::string version;
-  if (end > start) {
-    version.assign(reinterpret_cast<char *>(this->rx_buffer_.data() + start), end - start);
+  // Trim leading/trailing spaces from the printable run.
+  while (start < end && this->rx_buffer_[start] == ' ') {
+    start++;
+  }
+  while (end > start && this->rx_buffer_[end - 1] == ' ') {
+    end--;
   }
 
-  // Publish the version
+  std::string version;
+  if (end > start) {
+    // SAFETY: reject if any byte is outside 7-bit ASCII (0x20–0x7E).
+    // Trailing checksum bytes (e.g. 0xE4, 0x44) can be included in the run when
+    // the UART buffer contains scanner-boot noise interleaved with the response.
+    // Publishing a string with non-ASCII bytes causes google.protobuf.DecodeError
+    // on the HA side, which breaks the API connection.
+    bool clean = true;
+    for (size_t i = start; i < end; i++) {
+      if (this->rx_buffer_[i] < 0x20 || this->rx_buffer_[i] > 0x7E) {
+        clean = false;
+        break;
+      }
+    }
+    if (clean) {
+      version.assign(reinterpret_cast<char *>(this->rx_buffer_.data() + start), end - start);
+    } else {
+      ESP_LOGW(TAG_SCANNER,
+               "Version response contains non-ASCII bytes — discarding to protect HA API connection (raw %u bytes)",
+               this->rx_buffer_.size());
+    }
+  }
+
   if (this->version_sensor_ != nullptr) {
     if (!version.empty()) {
       this->version_sensor_->publish_state(version);
       ESP_LOGD(TAG_SCANNER, "Firmware version: %s", version.c_str());
     } else {
-      ESP_LOGW(TAG_SCANNER, "Version response contained no printable ASCII (raw %u bytes)", this->rx_buffer_.size());
+      ESP_LOGW(TAG_SCANNER, "Version response contained no valid ASCII (raw %u bytes)", this->rx_buffer_.size());
     }
   }
 
-  // Clear the buffer
   this->clear_buffer_();
 }
 
 void BarcodeScanner::request_version_() {
-  // Request the firmware version
-  auto command = CommandFactory::create_version_command();
+  // Flush any bytes already in the UART buffer before queuing the version request.
+  // After an OTA update the scanner stays powered and may have already transmitted
+  // boot or status bytes; leaving them in rx_buffer_ contaminates the version parse.
+  while (this->available()) {
+    this->read();
+  }
+  this->clear_buffer_();
 
-  // Queue the command
-  this->queue_command(std::move(command));
+  this->queue_command(CommandFactory::create_version_command());
 }
 
 // Scanner Control Methods
