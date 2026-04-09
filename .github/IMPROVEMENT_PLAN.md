@@ -39,8 +39,8 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 | # | Status | Branch | What |
 |---|--------|--------|------|
 | 12 | ⬜ | `fix/firmware-security` | Three security issues: (a) `api:` has no `encryption:` key; (b) `ota: platform: esphome` has no `password:`; (c) `http_request: verify_ssl: false` globally disables TLS — critical to fix before OTA manifest work. Also: `safe_mode: disabled: true` should be removed for reference firmware |
-| 13 | ⬜ | `fix/firmware-operation-mode-select` | Operation mode uses a template select + `on_value` automation (to drive `update_mode_led`) while all other settings use native subcomponent selects; move the LED logic so it reacts to confirmed scanner state, then replace the template select with the native `operation_mode_select` |
-| 14 | ⬜ | `fix/firmware-on-barcode-example` | `on_barcode` trigger is never used in the reference firmware — add a minimal example automation so users understand the primary usage pattern |
+| 13 | ⬜ | `refactor/firmware-yaml-split` | (a) Replace template operation mode select + `on_value` LED automation with the native `operation_mode_select` subcomponent; LED reactions move to confirmed scanner state events rather than YAML select value. (b) Split `firmware.yaml` into `core.yaml` (component config, scripts, common entities) + `atom_lite.yaml` (`!include core.yaml` + Atom Lite board/GPIO/LED specifics); LED status patterns (connecting, connected, scanning) borrowed from ESPHome voice module style — board-specific and live in `atom_lite.yaml`; update `release.yml` to build each device YAML independently. `firmware.yaml` becomes a symlink or stub for backwards compat during transition. Replaces item 23. |
+| 14 | ⬜ | `fix/firmware-on-barcode-example` | Add `on_barcode` automation to firmware using `homeassistant.event` so the barcode value travels in the event payload — fires every scan including duplicate barcodes, no race with text sensor state. Add matching HA automation example to `README.md` showing the `esphome.barcode_scanned` trigger + `trigger.event.data.barcode` pattern (the text-sensor approach misses duplicate scans). |
 | 15 | ⬜ | `fix/firmware-version-management` | `project_version` is a hardcoded string patched by `sed` in CI — fragile; switch to a `substitutions:` block so the version is defined once at the top of the file |
 
 ---
@@ -70,7 +70,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 
 | # | Status | Branch | What |
 |---|--------|--------|------|
-| 23 | ⬜ | `feat/multi-device-yaml-split` | Split `firmware.yaml` into `core.yaml` (shared component config, scripts, LED logic) + `atom_lite.yaml` (`!include core.yaml` + board/GPIO specifics); update `release.yml` to build each device independently; `firmware.yaml` is the current placeholder |
+| 23 | ⏸ | `feat/multi-device-yaml-split` | Pulled forward into item 13 — YAML split and per-device CI builds are in scope there |
 | 24 | ⬜ | `feat/ota-manifest-and-update-component` | Generate a `manifest.json` per device in `release.yml` (name, version, binary URL → GitHub Release asset); publish to `gh-pages` or `main:manifests/`; add `update:` platform to firmware pointing at the manifest URL; fix `verify_ssl: false` first (item 12) |
 | 25 | ⬜ | `feat/protocol-coverage-<feature>` | Audit every command in `ATOM_QRCODE_CMD_EN.pdf` against exposed HA entities/actions/conditions; one branch per gap found |
 | 26 | ⬜ | `chore/esphome-core-prep` | Final pass before opening PR against esphome/esphome: verify component namespace, add `CODEOWNERS` entry, pass ESPHome's own test runner (`pytest tests/`), verify Python passes ESPHome's ruff config, verify C++ passes ESPHome's clang-tidy, document migration path away from `external_components:` |
