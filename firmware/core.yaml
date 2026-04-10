@@ -8,7 +8,7 @@
 #   - uart_bus  (uart component id for the scanner serial connection)
 
 external_components:
-  - source: components
+  - source: ../components
     components: [m5stack_barcode]
 
 logger:
