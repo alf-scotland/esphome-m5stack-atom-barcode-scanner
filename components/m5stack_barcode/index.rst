@@ -32,22 +32,21 @@ The ``m5stack_barcode`` component provides an interface to the M5Stack 2D/QR Bar
             format: "Scanned: %s"
             args: [ 'x.c_str()' ]
 
-    # Optional: expose barcode state as a text sensor in Home Assistant
-    text_sensor:
-      - platform: template
+      # Optional: expose barcode data as a Home Assistant text sensor
+      barcode_sensor:
         name: "Last Barcode"
-        id: last_barcode
         icon: "mdi:barcode"
 
 Component Options
 ----------------
 
-- **barcode_id** (*Optional*, :ref:`config-id`): The ID of a template text sensor that will show the scanned barcode data. Use ``on_barcode`` instead when you only need automation triggers.
 - **uart_id** (*Optional*, :ref:`config-id`): The ID of the UART bus if you need to specify a particular UART bus.
-- **version_id** (*Optional*, :ref:`config-id`): The ID of a template text sensor that will display the scanner firmware version.
 - **id** (*Optional*, :ref:`config-id`): Manually specify the ID for this component.
 - **on_barcode** (*Optional*, :ref:`Automation <automation>`): Automation to run whenever a barcode is successfully decoded. The scanned string is available as the variable ``x``.
 - **on_scan_timeout** (*Optional*, :ref:`Automation <automation>`): Automation to run when a HOST-mode scan times out without producing a result (after ``scan_duration`` has elapsed). Use this to give user feedback or retry logic. Not triggered when ``scan_duration`` is set to ``unlimited``.
+- **barcode_sensor** (*Optional*): Expose the most recently scanned barcode as a Home Assistant ``text_sensor`` entity. Updated after every successful decode.
+- **version_sensor** (*Optional*): Expose the scanner's firmware version string as a Home Assistant ``text_sensor`` entity. Populated at boot.
+- **scan_event** (*Optional*): Expose successful scans as a Home Assistant ``event`` entity of type ``scan_successful``. Unlike the text sensor, events fire on every decode — including duplicate barcodes.
 - **scanning_binary_sensor** (*Optional*): Expose the current scan state as a Home Assistant ``binary_sensor`` entity. ``on`` while scanning, ``off`` when idle.
 - **start_button** (*Optional*): Expose a Home Assistant ``button`` entity that starts a HOST-mode scan when pressed.
 - **stop_button** (*Optional*): Expose a Home Assistant ``button`` entity that stops the current HOST-mode scan when pressed.
@@ -60,6 +59,10 @@ Component Options
 - **light_mode_select** (*Optional*): Expose ``light_mode`` (main illumination) as a Home Assistant ``select`` entity.
 - **locate_light_mode_select** (*Optional*): Expose ``locate_light_mode`` (aiming pattern) as a Home Assistant ``select`` entity.
 - **scan_duration_select** (*Optional*): Expose ``scan_duration`` as a Home Assistant ``select`` entity.
+- **terminator_select** (*Optional*): Expose ``terminator`` as a Home Assistant ``select`` entity.
+- **stable_induction_time_select** (*Optional*): Expose ``stable_induction_time`` as a Home Assistant ``select`` entity.
+- **reading_interval_select** (*Optional*): Expose ``reading_interval`` as a Home Assistant ``select`` entity.
+- **same_code_interval_select** (*Optional*): Expose ``same_code_interval`` as a Home Assistant ``select`` entity.
 
 - **operation_mode** (*Optional*): Set the scanner operation mode.
 
@@ -69,10 +72,10 @@ Component Options
   - ``continuous``: Continuous scanning mode
   - ``auto_sense``: Auto-sensing mode (scan when object is detected)
 
-- **terminator** (*Optional*): Character(s) to append to barcode output.
+- **terminator** (*Optional*): Character(s) appended by the scanner to barcode output.
 
-  - ``crlf`` (Default): Carriage Return + Line Feed
-  - ``none``: No termination character
+  - ``none`` (Default): No termination character
+  - ``crlf``: Carriage Return + Line Feed
   - ``cr``: Carriage Return
   - ``tab``: Tab character
   - ``crcr``: Two Carriage Returns
@@ -102,8 +105,8 @@ Component Options
 
 - **boot_sound_mode** (*Optional*): Controls power-up sound.
 
-  - ``enabled`` (Default): Scanner beeps on power-up
-  - ``disabled``: Scanner does not beep on power-up
+  - ``disabled`` (Default): Scanner does not beep on power-up
+  - ``enabled``: Scanner beeps on power-up
 
 - **decode_sound_mode** (*Optional*): Controls sound on successful decode.
 
@@ -415,13 +418,12 @@ string is available as ``x`` inside the automation block.
 
     m5stack_barcode:
       id: barcode_scanner
+      barcode_sensor:
+        name: "Last Barcode"
       on_barcode:
         - logger.log:
             format: "Scanned: %s"
             args: [ 'x.c_str()' ]
-        - text_sensor.template.publish:
-            id: last_barcode
-            state: !lambda "return x;"
 
 .. _m5stack_barcode-on_scan_timeout_trigger:
 
@@ -453,6 +455,73 @@ Sub-components
 All sub-components are optional inline entities. They stay in bidirectional sync with the
 scanner: changing a setting in Home Assistant queues the UART command, and the entity only
 updates its displayed state after the scanner ACKs — no optimistic state is shown.
+
+.. _m5stack_barcode-barcode_sensor:
+
+``barcode_sensor``
+******************
+
+Exposes the most recently scanned barcode as a Home Assistant ``text_sensor`` entity.
+Updated after every successful decode. The state is persistent between scans — it holds
+the last barcode until overwritten by a new scan.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      barcode_sensor:
+        name: "Last Barcode"
+        icon: "mdi:barcode"
+
+.. _m5stack_barcode-version_sensor:
+
+``version_sensor``
+******************
+
+Exposes the scanner module's firmware version string as a Home Assistant ``text_sensor``
+entity. Populated automatically at boot after the ``GET_VERSION`` command completes.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      version_sensor:
+        name: "Scanner Version"
+        entity_category: "diagnostic"
+        icon: "mdi:information-outline"
+
+.. _m5stack_barcode-scan_event:
+
+``scan_event``
+**************
+
+Exposes successful scans as a Home Assistant ``event`` entity of type ``scan_successful``.
+Unlike ``barcode_sensor``, an event fires on *every* decode — including repeated scans of
+the same barcode — making it suitable for HA automations that must not miss duplicates.
+
+.. note::
+
+    ESPHome event entities do not carry arbitrary payload. To pass the barcode value to
+    Home Assistant automations, use ``on_barcode`` with ``homeassistant.event``:
+
+    .. code-block:: yaml
+
+        on_barcode:
+          - homeassistant.event:
+              event: esphome.barcode_scanned
+              data:
+                barcode: !lambda return x;
+
+    Then trigger on ``esphome_custom_event`` in HA with ``event_type: esphome.barcode_scanned``
+    and access ``trigger.event.data.barcode``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      scan_event:
+        name: "Barcode Scanned"
+        icon: "mdi:barcode-scan"
 
 .. _m5stack_barcode-scanning_binary_sensor:
 
@@ -648,6 +717,77 @@ Options: ``500ms``, ``1s``, ``3s``, ``5s``, ``10s``, ``15s``, ``20s``, ``unlimit
         name: "Scan Duration"
         icon: "mdi:timer-outline"
 
+.. _m5stack_barcode-terminator_select:
+
+``terminator_select``
+*********************
+
+Exposes the output terminator as a select entity.
+Options: ``none``, ``cr``, ``crlf``, ``tab``, ``crcr``, ``crlfcrlf``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      terminator_select:
+        name: "Terminator"
+        entity_category: "config"
+        icon: "mdi:keyboard-return"
+
+.. _m5stack_barcode-stable_induction_time_select:
+
+``stable_induction_time_select``
+*********************************
+
+Exposes the stable induction time as a select entity. This controls how long the scanner
+must detect a stable code before accepting it.
+Options: ``0ms``, ``100ms``, ``300ms``, ``500ms``, ``1s``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      stable_induction_time_select:
+        name: "Stable Induction Time"
+        entity_category: "config"
+        icon: "mdi:timer-sand"
+
+.. _m5stack_barcode-reading_interval_select:
+
+``reading_interval_select``
+***************************
+
+Exposes the reading interval as a select entity. This controls the time between
+consecutive reading attempts.
+Options: ``0ms``, ``100ms``, ``300ms``, ``500ms``, ``1s``, ``1.5s``, ``2s``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      reading_interval_select:
+        name: "Reading Interval"
+        entity_category: "config"
+        icon: "mdi:timer-outline"
+
+.. _m5stack_barcode-same_code_interval_select:
+
+``same_code_interval_select``
+*****************************
+
+Exposes the same-code interval as a select entity. This controls how long the scanner
+waits before it will report the same barcode again.
+Options: ``0ms``, ``100ms``, ``300ms``, ``500ms``, ``1s``, ``1.5s``, ``2s``.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      same_code_interval_select:
+        name: "Same Code Interval"
+        entity_category: "config"
+        icon: "mdi:timer-refresh"
+
 Conditions
 ----------
 
@@ -777,11 +917,25 @@ workarounds needed.
       id: barcode_scanner
       operation_mode: host
 
+      # Text sensors
+      barcode_sensor:
+        name: "Last Barcode"
+        icon: "mdi:barcode"
+      version_sensor:
+        name: "Scanner Version"
+        entity_category: "diagnostic"
+
+      # Event entity — fires on every decode, carries barcode value as event data
+      scan_event:
+        name: "Barcode Scanned"
+        icon: "mdi:barcode-scan"
+
       # Triggers
       on_barcode:
-        - text_sensor.template.publish:
-            id: last_barcode
-            state: !lambda "return x;"
+        - homeassistant.event:
+            event: esphome.barcode_scanned
+            data:
+              barcode: !lambda return x;
       on_scan_timeout:
         - logger.log: "Scan timed out — no barcode found"
 
@@ -805,6 +959,18 @@ workarounds needed.
       scan_duration_select:
         name: "Scan Duration"
         icon: "mdi:timer-outline"
+      terminator_select:
+        name: "Terminator"
+        entity_category: "config"
+      stable_induction_time_select:
+        name: "Stable Induction Time"
+        entity_category: "config"
+      reading_interval_select:
+        name: "Reading Interval"
+        entity_category: "config"
+      same_code_interval_select:
+        name: "Same Code Interval"
+        entity_category: "config"
 
       # Sound switches
       sound_switch:

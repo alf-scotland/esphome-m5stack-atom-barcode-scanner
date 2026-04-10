@@ -4,23 +4,19 @@ This document explains how to work with pre-release builds (beta/rc) and use OTA
 
 ## Pre-release Workflow
 
-Pre-releases allow you to test new features or fixes before they're officially released. Here's how we handle them:
+Pre-releases allow you to test new features or fixes before they're officially released.
 
 ### Creating a Pre-release
 
-1. Create a branch from `main` for your beta/rc version:
-   ```bash
-   git checkout main
-   git pull
-   git checkout -b release/YYYY.MM.0-beta.1
-   ```
-
-2. Update version in `firmware.yaml`:
+1. Update `project_version` in the `substitutions:` block of `firmware/atom_lite.yaml`:
    ```yaml
-   project_version: "YYYY.MM.0-beta.1"
+   substitutions:
+     project_version: "YYYY.MM.0-beta.1"
    ```
 
-3. When ready, tag the pre-release:
+2. Commit the version bump to `main`.
+
+3. Tag the pre-release and push:
    ```bash
    git tag vYYYY.MM.0-beta.1
    git push origin vYYYY.MM.0-beta.1
@@ -30,14 +26,14 @@ Pre-releases allow you to test new features or fixes before they're officially r
    - Build the firmware
    - Create a GitHub pre-release
    - Mark it as a pre-release on GitHub
-   - Generate an OTA-enabled firmware variant
+   - Attach `firmware.bin`, `firmware.factory.bin`, and `firmware.ota.bin` as release assets
 
 ### Pre-release Naming Conventions
 
 Follow these naming patterns:
 
-- Beta releases: `vYYYY.MM.0-beta.N` (e.g., `v2024.6.0-beta.1`)
-- Release candidates: `vYYYY.MM.0-rc.N` (e.g., `v2024.6.0-rc.1`)
+- Beta releases: `vYYYY.MM.0-beta.N` (e.g., `v2026.4.0-beta.1`)
+- Release candidates: `vYYYY.MM.0-rc.N` (e.g., `v2026.4.0-rc.1`)
 
 ## OTA Updates
 
@@ -45,49 +41,38 @@ OTA (Over-The-Air) updates allow you to update your device without physically co
 
 ### Using OTA with Pre-releases
 
-#### Method 1: Manual OTA Upload
+#### Method 1: Manual OTA Upload via ESPHome Dashboard
 
-1. Download the firmware binary from the GitHub pre-release
+1. Download `firmware.bin` from the GitHub pre-release.
 2. In the ESPHome dashboard:
-   - Navigate to your device
-   - Click "Upload Firmware"
-   - Select the downloaded binary
-   - Click "Upload"
+   - Navigate to your device.
+   - Click **Upload Firmware**.
+   - Select the downloaded binary and click **Upload**.
 
-#### Method 2: OTA-enabled Firmware (for testing branches/PRs)
+#### Method 2: Integration with Home Assistant
 
-For pre-releases, we generate a special OTA-enabled firmware that can automatically check for updates from a specific GitHub branch or tag.
-
-1. Flash your device with the `firmware-ota.bin` from the pre-release
-2. The device will automatically check for updates from the specified GitHub reference
-
-#### Method 3: Integration with Home Assistant
-
-To use pre-releases with Home Assistant:
-
-1. In Home Assistant, go to **Settings** → **Devices & Services** → **ESPHome**
-2. Find your device and click on it
-3. Click the three dots (⋮) and select "OTA Update"
-4. Choose the firmware binary you downloaded from the pre-release
-5. Click "Upload"
+1. In Home Assistant, go to **Settings** → **Devices & Services** → **ESPHome**.
+2. Find your device and click on it.
+3. Click the three dots (⋮) and select **OTA Update**.
+4. Choose the `firmware.bin` binary you downloaded from the pre-release.
+5. Click **Upload**.
 
 ### OTA Configuration (Advanced)
 
-You can customize OTA behavior in your `firmware.yaml`. Use the modern list format
-(ESPHome 2024.6+):
+You can flash a specific binary via the `http_request` OTA platform. Use the modern list
+format (ESPHome 2024.6+):
 
 ```yaml
 # Standard OTA via ESPHome dashboard
 ota:
   - platform: esphome
-    password: !secret ota_password
 
 # Optional: enable safe mode recovery (recommended)
 safe_mode:
   reboot_timeout: 3min
   num_attempts: 5
 
-# Optional: OTA from a direct URL (e.g., GitHub Release binary)
+# HTTP OTA from a direct URL (e.g., GitHub Release binary)
 ota:
   - platform: http_request
 
@@ -99,7 +84,7 @@ button:
     name: "Flash Pre-release"
     on_press:
       - ota.http_request.flash:
-          url: https://github.com/scotland/esphome-m5stack-atom-barcode-scanner/releases/download/vYYYY.MM.0-beta.1/firmware.bin
+          url: https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/vYYYY.MM.0-beta.1/firmware.ota.bin
           verify_ssl: false
 ```
 
@@ -107,22 +92,25 @@ button:
 
 When testing pre-releases:
 
-1. Always backup your working configuration
-2. Document any issues you find in GitHub issues
-3. Include logs and steps to reproduce
-4. If possible, test on a dedicated device (not your primary device)
+1. Always backup your working configuration.
+2. Document any issues you find in GitHub issues.
+3. Include logs and steps to reproduce.
+4. If possible, test on a dedicated device (not your primary device).
 
 ## Reverting to Stable Releases
 
 If a pre-release causes issues:
 
-1. Flash the latest stable release using any of the OTA methods above
-2. Or, use the ESPHome dashboard to compile and flash the main branch version
+1. Flash the latest stable release using any of the OTA methods above.
+2. Or, compile locally from `main`:
+   ```bash
+   uv run esphome compile firmware/atom_lite.yaml
+   ```
 
 ## Contributing Test Results
 
 After testing a pre-release, please provide feedback:
 
-1. For bugs, create an issue with the prefix `[Beta]` or `[RC]`
-2. For successful tests, comment on the GitHub release
-3. Include details about your testing environment
+1. For bugs, create an issue with the prefix `[Beta]` or `[RC]`.
+2. For successful tests, comment on the GitHub release.
+3. Include details about your testing environment.
