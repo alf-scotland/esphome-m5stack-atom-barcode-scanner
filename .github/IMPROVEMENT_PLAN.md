@@ -39,7 +39,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 
 | # | Status | Branch | What |
 |---|--------|--------|------|
-| 12 | ⬜ | `fix/firmware-security` | Three security issues: (a) `api:` has no `encryption:` key; (b) `ota: platform: esphome` has no `password:`; (c) `http_request: verify_ssl: false` globally disables TLS — critical to fix before OTA manifest work. Also: `safe_mode: disabled: true` should be removed for reference firmware |
+| 12 | ⏸ | `fix/firmware-security` | Three security issues: (a) `api:` has no `encryption:` key; (b) `ota: platform: esphome` has no `password:`; (c) `http_request: verify_ssl: false` globally disables TLS — critical to fix before OTA manifest work. Also: `safe_mode: disabled: true` should be removed for reference firmware — **deferred: project is private; must land before item 24 (OTA manifest)** |
 | 13 | ✅ | `refactor/firmware-yaml-split` | (a) Replace template operation mode select + `on_value` LED automation with the native `operation_mode_select` subcomponent; LED reactions move to confirmed scanner state events rather than YAML select value. (b) Split `firmware.yaml` into `core.yaml` (component config, scripts, common entities) + `atom_lite.yaml` (`!include core.yaml` + Atom Lite board/GPIO/LED specifics); LED status patterns (connecting, connected, scanning) borrowed from ESPHome voice module style — board-specific and live in `atom_lite.yaml`; update `release.yml` to build each device YAML independently. `firmware.yaml` becomes a symlink or stub for backwards compat during transition. Replaces item 23. |
 | 14 | ✅ | `fix/firmware-on-barcode-example` | Add `on_barcode` automation to firmware using `homeassistant.event` so the barcode value travels in the event payload — fires every scan including duplicate barcodes, no race with text sensor state. Add matching HA automation example to `README.md` showing the `esphome.barcode_scanned` trigger + `trigger.event.data.barcode` pattern (the text-sensor approach misses duplicate scans). |
 | 15 | ✅ | `fix/firmware-version-management` | `project_version` is a hardcoded string patched by `sed` in CI — fragile; switch to a `substitutions:` block so the version is defined once at the top of the file |
@@ -50,10 +50,10 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 
 | # | Status | Branch | What |
 |---|--------|--------|------|
-| 16 | ⬜ | `ci/add-cpp-static-analysis` | `lint.yml` job named `cpp-check` only runs `clang-format`; rename to `cpp-format` and add a real `cpp-lint` job running `cppcheck` (already configured in `.pre-commit-config.yaml`) |
-| 17 | ⬜ | `ci/normalize-uv-sync` | `lint.yml` uses `uv sync --all-extras --dev`; firmware build workflows use `uv sync --all-extras` — inconsistency should be intentional and documented; firmware builds don't need dev deps |
-| 18 | ⬜ | `ci/pin-action-shas` | All three workflows use floating tags (`actions/checkout@v4` etc.); pin to immutable commit SHAs; add Dependabot to keep them updated |
-| 19 | ⬜ | `ci/add-dependabot` | No `.github/dependabot.yml` — add entries for `github-actions`, `pip` (pyproject.toml), and pre-commit hook revs |
+| 16 | ✅ | `ci/add-cpp-static-analysis` | `lint.yml` job named `cpp-check` only runs `clang-format`; rename to `cpp-format` and add a real `cpp-lint` job running `cppcheck` (already configured in `.pre-commit-config.yaml`) |
+| 17 | ✅ | `ci/normalize-uv-sync` | `lint.yml` uses `uv sync --all-extras --dev`; firmware build workflows use `uv sync --all-extras` — inconsistency should be intentional and documented; firmware builds don't need dev deps |
+| 18 | ✅ | `ci/pin-action-shas` | All three workflows use floating tags (`actions/checkout@v4` etc.); pin to immutable commit SHAs; add Dependabot to keep them updated |
+| 19 | ✅ | `ci/add-dependabot` | No `.github/dependabot.yml` — add entries for `github-actions`, `pip` (pyproject.toml), and pre-commit hook revs |
 
 ---
 

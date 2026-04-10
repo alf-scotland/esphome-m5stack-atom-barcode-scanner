@@ -47,6 +47,11 @@ repos:
           - --suppress=unknownMacro
         exclude: ^components/m5stack_barcode/actions\.h$
 
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.10.0
+    hooks:
+      - id: pip-audit
+
   - repo: https://github.com/pocc/pre-commit-hooks
     rev: v1.3.5
     hooks:
