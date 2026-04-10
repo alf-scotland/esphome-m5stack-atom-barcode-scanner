@@ -18,7 +18,7 @@ substitutions:
   name: atom-barcode
   friendly_name: Atom Barcode Scanner
   project_name: esphome-m5stack-atom-barcode-scanner
-  project_version: "2025.3.0-beta.1"
+  project_version: "2026.4.0"
 
 packages:
   core: !include core.yaml

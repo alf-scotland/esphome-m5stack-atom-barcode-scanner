@@ -50,11 +50,16 @@ jobs:
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Update version in firmware
+      - name: Verify firmware version matches tag
         run: |
           VERSION="${{ steps.extract_version.outputs.version }}"
-          sed -i "s/project_version: \".*\"/project_version: \"$VERSION\"/" firmware/atom_lite.yaml
-          grep "project_version" firmware/atom_lite.yaml
+          YAML_VERSION=$(grep 'project_version:' firmware/atom_lite.yaml | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$YAML_VERSION" != "$VERSION" ]; then
+            echo "ERROR: tag v$VERSION does not match project_version '$YAML_VERSION' in firmware/atom_lite.yaml"
+            echo "Update project_version in firmware/atom_lite.yaml to '$VERSION' and commit before tagging."
+            exit 1
+          fi
+          echo "Version verified: $VERSION"
 
       - name: Build firmware
         run: |
