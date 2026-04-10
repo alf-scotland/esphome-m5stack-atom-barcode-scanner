@@ -53,12 +53,12 @@ jobs:
       - name: Update version in firmware
         run: |
           VERSION="${{ steps.extract_version.outputs.version }}"
-          sed -i "s/project_version: \".*\"/project_version: \"$VERSION\"/" atom_lite.yaml
-          grep "project_version" atom_lite.yaml
+          sed -i "s/project_version: \".*\"/project_version: \"$VERSION\"/" firmware/atom_lite.yaml
+          grep "project_version" firmware/atom_lite.yaml
 
       - name: Build firmware
         run: |
-          uv run esphome compile atom_lite.yaml
+          uv run esphome compile firmware/atom_lite.yaml
 
       - name: Copy firmware binaries to release directory
         run: |

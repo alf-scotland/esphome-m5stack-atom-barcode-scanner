@@ -6,8 +6,7 @@ on:
     branches:
       - main
     paths:
-      - 'atom_lite.yaml'
-      - 'core.yaml'
+      - 'firmware/**'
       - 'firmware.yaml'
       - 'components/**'
       - '.github/workflows/**'
@@ -69,11 +68,11 @@ jobs:
         run: |
           # Stamp a PR-specific version so the built binary is identifiable
           PR_VERSION="${{ steps.set_ref.outputs.ref_name }}"
-          sed -i "s/project_version: \".*\"/project_version: \"$PR_VERSION\"/" atom_lite.yaml
+          sed -i "s/project_version: \".*\"/project_version: \"$PR_VERSION\"/" firmware/atom_lite.yaml
 
       - name: Compile firmware
         run: |
-          uv run esphome compile atom_lite.yaml
+          uv run esphome compile firmware/atom_lite.yaml
 
       - name: Find and copy firmware files
         id: find_firmware

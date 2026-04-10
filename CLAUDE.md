@@ -85,17 +85,19 @@ YAML → __init__.py (validate + codegen) → C++ component instantiation
 - **Sub-components**: Select/Switch/Button/BinarySensor entities are child components, registered separately, and appear as individual HA entities
 - Use `fnv1_hash("m5stack_barcode")` from `esphome/core/helpers.h` — `get_object_id_hash()` does not exist on non-`EntityBase` classes
 
-### Planned multi-device firmware structure
+### Multi-device firmware structure
 
-The repository will eventually produce per-device firmware binaries. The intended layout:
+All firmware lives under `firmware/`. The layout:
 
 ```
-core.yaml           ← shared component config, scripts, common entities
-atom_lite.yaml      ← includes core.yaml, M5Stack Atom Lite board/GPIO specifics
-# future: atom_s3.yaml, etc.
+firmware/
+  core.yaml           ← shared scanner config: component, selects, text sensors, network
+  atom_lite.yaml      ← Atom Lite board/GPIO/LED specifics; packages core.yaml
+  # future: atom_s3.yaml, etc.
+firmware.yaml         ← root stub; packages firmware/atom_lite.yaml for OTA compat
 ```
 
-The release CI should build each device YAML independently and publish per-device binaries. `firmware.yaml` is the current placeholder for `atom_lite.yaml` during this transition.
+The release CI builds each device YAML in `firmware/` independently and publishes per-device binaries. Add a new device by creating `firmware/<device>.yaml`, packaging `core.yaml`, and adding a build step to `release.yml`.
 
 ### OTA update delivery
 

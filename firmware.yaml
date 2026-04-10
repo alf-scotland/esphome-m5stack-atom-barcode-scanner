@@ -3,4 +3,4 @@
 # and CI tooling that referenced firmware.yaml.  It will be removed once all
 # devices have been migrated to update from atom_lite.yaml.
 packages:
-  device: !include atom_lite.yaml
+  device: !include firmware/atom_lite.yaml
