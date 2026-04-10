@@ -81,7 +81,7 @@ jobs:
           mkdir -p firmware-files
 
           # Copy all firmware files to the firmware-files directory
-          find .esphome -type f -name "*.bin" -exec cp {} firmware-files/ \;
+          find . -path '*/.esphome/*' -type f -name "*.bin" -exec cp {} firmware-files/ \;
 
           # List the firmware files and log them
           echo "Available firmware files:"
