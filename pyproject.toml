@@ -5,7 +5,7 @@ description = "ESPHome external component for the M5Stack Atom QR Code Scanner"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "esphome==2026.3.1",
+    "esphome==2026.3.3",
     "fatfs-ng>=0.1.15",
     "littlefs-python>=0.17.1",
 ]
