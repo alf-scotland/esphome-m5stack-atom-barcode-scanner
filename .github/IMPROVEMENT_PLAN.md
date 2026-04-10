@@ -31,6 +31,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 | 9 | ✅ | `refactor/command-handler-constants` | `command_handlers.cpp:24` — `size_t(16)` is a magic number; extract to a named constant alongside `MAX_LOG_LENGTH` |
 | 10 | ✅ | `refactor/command-handler-separation` | `StateCommand` both parses the UART response and mutates scanner state (calls `scanner->set_*_state()`); separate parsing from state mutation — handlers return parsed values via callback, scanner owns all state transitions |
 | 11 | ✅ | `fix/schema-defaults` | Most optional config keys in `__init__.py` have no `default=`; add defaults matching scanner factory defaults (verify against PDFs) |
+| 27 | ⬜ | `fix/terminator-none-barcode-truncation` | `has_terminator_in_buffer_()` returns `true` on the first received byte when `terminator: none`, causing HOST mode to fire `process_barcode_()` on partial data — barcode is sliced into single-byte publishes and the text sensor ends up holding only the last few bytes. Fix: track `last_rx_time_` (updated in `read_buffer_()`) and treat the buffer as complete only after it is non-empty AND no new bytes have arrived for a short idle window (~20 ms, well above the ~1 ms inter-byte gap at 9600 baud). **Workaround**: configure a real terminator (e.g. `terminator: crlf`) in the firmware YAML. |
 
 ---
 
