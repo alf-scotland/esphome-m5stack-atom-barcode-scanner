@@ -62,6 +62,36 @@ Connect your M5Stack Atom QR Code Scanner to your ESP device:
 - VCC -> 3.3V
 - GND -> GND
 
+## Home Assistant Automations
+
+The reference firmware fires a `homeassistant.event` (`esphome.barcode_scanned`) on every successful scan with the barcode value in the event payload. This fires reliably for duplicate scans — a text sensor state-change trigger would be skipped if the same barcode is scanned twice in a row.
+
+Add `on_barcode:` to your `m5stack_barcode:` config block:
+
+```yaml
+m5stack_barcode:
+  on_barcode:
+    - homeassistant.event:
+        event: esphome.barcode_scanned
+        data:
+          barcode: !lambda return x;
+```
+
+Then trigger on that event in Home Assistant and access the barcode via `trigger.event.data.barcode`:
+
+```yaml
+alias: Handle Barcode Scan
+trigger:
+  - platform: event
+    event_type: esphome.barcode_scanned
+action:
+  - service: notify.mobile_app_my_phone
+    data:
+      message: "Scanned: {{ trigger.event.data.barcode }}"
+```
+
+The `scan_event` sub-component (entity class `event`) also appears as a device trigger in HA's automation UI for convenience, but it does not carry the barcode value — use the `homeassistant.event` pattern above when you need the scanned code in the action.
+
 ## Development
 
 This component uses ESPHome's standard development tools.

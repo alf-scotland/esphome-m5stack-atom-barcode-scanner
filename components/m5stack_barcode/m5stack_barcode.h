@@ -141,23 +141,9 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   float get_setup_priority() const override { return setup_priority::DATA; }
 
   // Sensor Configuration
-  /**
-   * @brief Set the text sensor for barcode output.
-   * @param text_sensor Pointer to the text sensor component
-   */
-  void set_text_sensor(text_sensor::TextSensor *text_sensor) { this->text_sensor_ = text_sensor; }
-
-  /**
-   * @brief Set the text sensor for firmware version.
-   * @param version_sensor Pointer to the text sensor component
-   */
-  void set_version_sensor(text_sensor::TextSensor *version_sensor) { this->version_sensor_ = version_sensor; }
-
-  /**
-   * @brief Set the event component for barcode scan events.
-   * @param event Pointer to the event component
-   */
-  void set_barcode_event(event::Event *event) { this->barcode_event_ = event; }
+  void set_barcode_sensor(text_sensor::TextSensor *sensor) { this->barcode_sensor_ = sensor; }
+  void set_version_sensor(text_sensor::TextSensor *sensor) { this->version_sensor_ = sensor; }
+  void set_scan_event(event::Event *ev) { this->scan_event_ = ev; }
 
   /**
    * @brief Register a callback invoked whenever a barcode is successfully decoded.
@@ -558,9 +544,9 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   CallbackManager<void()> scan_timeout_callback_;        ///< on_scan_timeout automation triggers
 
   // Component State
-  text_sensor::TextSensor *text_sensor_{nullptr};                     ///< Sensor for barcode output
-  text_sensor::TextSensor *version_sensor_{nullptr};                  ///< Sensor for firmware version
-  event::Event *barcode_event_{nullptr};                              ///< Event for barcode scans
+  text_sensor::TextSensor *barcode_sensor_{nullptr};                  ///< Sub-component: last scanned barcode
+  text_sensor::TextSensor *version_sensor_{nullptr};                  ///< Sub-component: scanner firmware version
+  event::Event *scan_event_{nullptr};                                 ///< Sub-component: fired on every successful scan
   OperationModeSelect *operation_mode_select_{nullptr};               ///< Optional HA select for operation mode
   BuzzerVolumeSelect *buzzer_volume_select_{nullptr};                 ///< Optional HA select for buzzer volume
   LightModeSelect *light_mode_select_{nullptr};                       ///< Optional HA select for light mode

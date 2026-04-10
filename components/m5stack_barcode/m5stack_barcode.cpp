@@ -612,19 +612,14 @@ void BarcodeScanner::process_barcode_() {
       return;
     }
 
-    // Publish the barcode to optional text sensor
-    if (this->text_sensor_ != nullptr) {
-      this->text_sensor_->publish_state(barcode);
-    }
+    if (this->barcode_sensor_ != nullptr)
+      this->barcode_sensor_->publish_state(barcode);
 
-    // Fire on_barcode automation trigger
+    // Fire on_barcode automation trigger (runs homeassistant.event etc.)
     this->barcode_callback_(barcode);
 
-    // Trigger the barcode scanned event
-    if (this->barcode_event_ != nullptr) {
-      this->barcode_event_->trigger("scan_successful");
-      ESP_LOGD(TAG_SCANNER, "Scanner event triggered: scan_successful");
-    }
+    if (this->scan_event_ != nullptr)
+      this->scan_event_->trigger("scan_successful");
   }
 
   // Clear the buffer for the next barcode
