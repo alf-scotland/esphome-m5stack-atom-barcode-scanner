@@ -1,0 +1,323 @@
+# M5Stack Atom Lite — barcode scanner firmware.
+#
+# Includes core.yaml for the shared scanner config and adds everything specific
+# to the Atom Lite hardware: ESP32 board, UART GPIO assignment, the onboard
+# SK6812 LED, the physical button, the scanner DLED line, and all LED scripts.
+#
+# LED state machine:
+#   WiFi disconnected   → orange pulse (led_wifi_connecting)
+#   WiFi up, API down   → white pulse  (led_api_connecting)
+#   API connected       → green flash, then idle (led_api_connected)
+#   Manual scan active  → solid blue
+#   Continuous/AutoSense active → solid purple
+#   Scan success        → green flash 500ms, then idle/continuous
+#   DLED triggered      → yellow flash 200ms (command ack / hardware activity)
+#   Scan timeout        → orange flash 500ms
+
+substitutions:
+  name: atom-barcode
+  friendly_name: Atom Barcode Scanner
+  project_name: esphome-m5stack-atom-barcode-scanner
+  project_version: "2025.3.0-beta.1"
+
+packages:
+  core: !include core.yaml
+
+dashboard_import:
+  package_import_url: github://alf-scotland/esphome-m5stack-atom-barcode-scanner/atom_lite.yaml@main
+  import_full_config: true
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
+  project:
+    name: scotland.${project_name}
+    version: ${project_version}
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: led_wifi_connecting
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: arduino
+
+uart:
+  id: uart_bus
+  baud_rate: 9600
+  tx_pin: 19
+  rx_pin: 22
+
+# ── Hardware ──────────────────────────────────────────────────────────────────
+
+output:
+  - platform: gpio
+    pin: GPIO23
+    id: scanner_trig_pin
+    inverted: true  # LOW activates scanner
+
+light:
+  - platform: esp32_rmt_led_strip
+    name: "${friendly_name} Status LED"
+    id: atom_status_led
+    pin: GPIO27
+    default_transition_length: 0s
+    chipset: SK6812
+    num_leds: 1
+    rgb_order: grb
+    disabled_by_default: true
+    effects:
+      - pulse:
+      - flicker:
+
+switch:
+  - platform: output
+    name: "${friendly_name} Hardware Trigger"
+    id: scanner_trigger_internal
+    output: scanner_trig_pin
+    icon: "mdi:barcode-scan"
+    entity_category: "diagnostic"
+    restore_mode: ALWAYS_OFF
+    internal: true
+
+# ── Connectivity LED ──────────────────────────────────────────────────────────
+
+wifi:
+  on_connect:
+    - script.execute: led_api_connecting
+  on_disconnect:
+    - script.execute: led_wifi_connecting
+
+api:
+  on_client_connected:
+    - script.execute: led_api_connected
+  on_client_disconnected:
+    - script.execute: led_api_connecting
+
+# ── LED scripts ───────────────────────────────────────────────────────────────
+
+script:
+  # Idle state: turn off or show continuous-mode indicator if applicable.
+  # Called after any transient LED event (scan success, timeout, ack flash).
+  - id: led_off
+    then:
+      - if:
+          condition:
+            m5stack_barcode.is_continuous_mode:
+              id: barcode_scanner
+          then:
+            - script.execute: led_continuous_scan_active
+          else:
+            - light.turn_off:
+                id: atom_status_led
+
+  # Connectivity states
+  - id: led_wifi_connecting
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 50%
+          red: 100%
+          green: 40%
+          blue: 0%
+          effect: pulse
+
+  - id: led_api_connecting
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 30%
+          red: 100%
+          green: 100%
+          blue: 100%
+          effect: pulse
+
+  - id: led_api_connected
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 0%
+          green: 100%
+          blue: 0%
+          flash_length: 1000ms
+      - delay: 1000ms
+      - script.execute: led_off
+
+  # Scan states
+  - id: led_manual_scan_start
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 0%
+          green: 0%
+          blue: 100%
+
+  - id: led_continuous_scan_active
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 70%
+          red: 80%
+          green: 0%
+          blue: 80%
+
+  - id: led_scan_success
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 0%
+          green: 100%
+          blue: 0%
+          flash_length: 500ms
+      - delay: 500ms
+      - script.execute: led_off
+
+  - id: led_command_ack
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 70%
+          green: 70%
+          blue: 0%
+          flash_length: 200ms
+      - delay: 200ms
+      - script.execute: led_off
+
+  - id: led_scan_timeout
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 100%
+          red: 100%
+          green: 50%
+          blue: 0%
+          flash_length: 500ms
+      - delay: 500ms
+      - script.execute: led_off
+
+  # Hardware trigger: activates the scanner trig pin and waits for scan_duration
+  # before timing out if the scanner hasn't responded.
+  - id: hardware_trigger_with_timeout
+    then:
+      - script.execute: led_manual_scan_start
+      - switch.turn_on: scanner_trigger_internal
+      - delay: !lambda 'return id(barcode_scanner).get_scan_duration_ms();'
+      - if:
+          condition:
+            switch.is_on: scanner_trigger_internal
+          then:
+            - switch.turn_off: scanner_trigger_internal
+            - script.execute: led_scan_timeout
+
+# ── Physical inputs ───────────────────────────────────────────────────────────
+
+binary_sensor:
+  # DLED: scanner hardware output — HIGH while the laser/LED is active.
+  # Used to detect scan activity in non-HOST modes and to drive the ack LED flash.
+  - platform: gpio
+    pin:
+      number: GPIO33
+      mode: INPUT
+      inverted: true  # DLED is active-LOW
+    name: "${friendly_name} Detection LED"
+    id: scanner_dled_pin
+    entity_category: "diagnostic"
+    icon: "mdi:led-on"
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - script.execute: led_command_ack
+        - if:
+            condition:
+              m5stack_barcode.is_continuous_mode:
+                id: barcode_scanner
+            then:
+              - m5stack_barcode.process_current_buffer:
+                  id: barcode_scanner
+            else:
+              - switch.turn_off: scanner_trigger_internal
+
+  # Atom Lite built-in button — triggers a manual scan when idle.
+  - platform: gpio
+    pin:
+      number: GPIO39
+      mode: INPUT
+      inverted: true
+    name: "${friendly_name} Button"
+    id: atom_button
+    entity_category: "diagnostic"
+    icon: "mdi:gesture-tap-button"
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_press:
+      then:
+        - if:
+            condition:
+              m5stack_barcode.is_idle:
+                id: barcode_scanner
+            then:
+              - button.press: start_scan_button
+
+# ── HA buttons ────────────────────────────────────────────────────────────────
+
+button:
+  - platform: template
+    name: "Start Scan"
+    id: start_scan_button
+    icon: "mdi:play-circle-outline"
+    on_press:
+      - if:
+          condition:
+            m5stack_barcode.is_idle:
+              id: barcode_scanner
+          then:
+            - script.execute: led_manual_scan_start
+            - m5stack_barcode.start:
+                id: barcode_scanner
+
+  - platform: template
+    name: "Stop Scan"
+    icon: "mdi:stop-circle-outline"
+    on_press:
+      - m5stack_barcode.stop:
+          id: barcode_scanner
+      - script.execute: led_off
+
+  - platform: template
+    name: "Hardware Trigger"
+    id: hardware_trigger_button
+    icon: "mdi:barcode-scan"
+    entity_category: "diagnostic"
+    on_press:
+      - if:
+          condition:
+            m5stack_barcode.is_idle:
+              id: barcode_scanner
+          then:
+            - script.execute: hardware_trigger_with_timeout
+
+# ── Operation mode select (device-specific: drives LED on mode change) ────────
+
+m5stack_barcode:
+  operation_mode_select:
+    name: "Operation Mode"
+    entity_category: "config"
+    icon: "mdi:tune"
+    on_value:
+      - if:
+          condition:
+            lambda: 'return x == "continuous" || x == "auto_sense";'
+          then:
+            - script.execute: led_continuous_scan_active
+          else:
+            - light.turn_off:
+                id: atom_status_led

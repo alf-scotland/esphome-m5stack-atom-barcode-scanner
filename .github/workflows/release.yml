@@ -53,17 +53,17 @@ jobs:
       - name: Update version in firmware
         run: |
           VERSION="${{ steps.extract_version.outputs.version }}"
-          sed -i "s/project_version: \".*\"/project_version: \"$VERSION\"/" firmware.yaml
-          grep "project_version" firmware.yaml
+          sed -i "s/project_version: \".*\"/project_version: \"$VERSION\"/" firmware/atom_lite.yaml
+          grep "project_version" firmware/atom_lite.yaml
 
       - name: Build firmware
         run: |
-          uv run esphome compile firmware.yaml
+          uv run esphome compile firmware/atom_lite.yaml
 
       - name: Copy firmware binaries to release directory
         run: |
           mkdir -p release-files
-          find .esphome -path "*/.pioenvs/*/firmware*.bin" -type f -exec cp -v {} release-files/ \;
+          find . -path '*/.esphome/*' -path '*/.pioenvs/*/firmware*.bin' -type f -exec cp -v {} release-files/ \;
           if [ -z "$(ls -A release-files/)" ]; then
             echo "ERROR: No firmware binaries found after build"
             exit 1

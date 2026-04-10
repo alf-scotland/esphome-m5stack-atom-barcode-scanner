@@ -1,0 +1,132 @@
+# Shared scanner configuration — included by all device firmwares via packages.
+#
+# Everything here is device-agnostic: network stack, scanner component config,
+# HA entities, and text sensors.  Hardware-specific items (GPIO pins, LED strip,
+# physical buttons) live in the per-device file (e.g. atom_lite.yaml).
+#
+# Depends on the including file providing:
+#   - uart_bus  (uart component id for the scanner serial connection)
+
+external_components:
+  - source: ../components
+    components: [m5stack_barcode]
+
+logger:
+  level: DEBUG
+
+api:
+
+ota:
+  - platform: esphome
+  - platform: http_request
+
+http_request:
+  verify_ssl: false
+
+safe_mode:
+  disabled: true
+
+wifi:
+  ap:
+
+captive_portal:
+
+text_sensor:
+  - platform: template
+    name: "Last Barcode"
+    id: last_barcode
+    icon: "mdi:barcode"
+
+  - platform: template
+    name: "Scanner Version"
+    id: scanner_version
+    entity_category: "diagnostic"
+    icon: "mdi:information-outline"
+
+event:
+  - platform: template
+    name: "Scanner Events"
+    id: scanner_events
+    icon: "mdi:barcode-scan"
+    device_class: "button"
+    event_types:
+      - "scan_successful"
+    on_event:
+      then:
+        - logger.log: "Scanner event triggered"
+
+m5stack_barcode:
+  id: barcode_scanner
+  barcode_id: last_barcode
+  version_id: scanner_version
+  operation_mode: host
+  terminator: none
+  buzzer_volume: medium
+  uart_id: uart_bus
+  barcode_event: scanner_events
+
+  light_mode_select:
+    name: "Light Mode"
+    entity_category: "config"
+    icon: "mdi:lightbulb"
+
+  locate_light_mode_select:
+    name: "Locate Light Mode"
+    entity_category: "config"
+    icon: "mdi:crosshairs"
+
+  scan_duration_select:
+    name: "Scan Duration"
+    entity_category: "config"
+    icon: "mdi:timer"
+
+  buzzer_volume_select:
+    name: "Volume"
+    entity_category: "config"
+    icon: "mdi:volume-medium"
+
+  sound_switch:
+    name: "Sound"
+    entity_category: "config"
+    icon: "mdi:volume-high"
+
+  boot_sound_switch:
+    name: "Boot Sound"
+    entity_category: "config"
+    icon: "mdi:power"
+
+  decode_sound_switch:
+    name: "Decode Sound"
+    entity_category: "config"
+    icon: "mdi:volume-source"
+
+  decoding_success_light_switch:
+    name: "Decoding Success Light"
+    entity_category: "config"
+    icon: "mdi:led-on"
+
+  terminator_select:
+    name: "Terminator"
+    entity_category: "config"
+    icon: "mdi:keyboard-return"
+
+  stable_induction_time_select:
+    name: "Stable Induction Time"
+    entity_category: "config"
+    icon: "mdi:timer-sand"
+
+  reading_interval_select:
+    name: "Reading Interval"
+    entity_category: "config"
+    icon: "mdi:timer-outline"
+
+  same_code_interval_select:
+    name: "Same Code Interval"
+    entity_category: "config"
+    icon: "mdi:timer-refresh"
+
+button:
+  - platform: restart
+    name: "${friendly_name} Restart"
+    entity_category: "diagnostic"
+    icon: "mdi:restart"
