@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Keep GitHub Actions pinned SHAs up to date.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  # Keep Python dependencies in pyproject.toml up to date.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"
