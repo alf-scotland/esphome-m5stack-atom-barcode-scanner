@@ -36,11 +36,11 @@ BarcodeScanner = m5stack_barcode_ns.class_(
 )
 
 # Configuration constants
-CONF_BARCODE_ID = "barcode_id"
-CONF_VERSION_ID = "version_id"
+CONF_BARCODE_SENSOR = "barcode_sensor"
+CONF_VERSION_SENSOR = "version_sensor"
+CONF_SCAN_EVENT = "scan_event"
 CONF_ON_BARCODE = "on_barcode"
 CONF_ON_SCAN_TIMEOUT = "on_scan_timeout"
-CONF_BARCODE_EVENT = "barcode_event"
 
 # Sub-component config keys
 CONF_OPERATION_MODE_SELECT = "operation_mode_select"
@@ -357,9 +357,13 @@ IsIdleCondition = m5stack_barcode_ns.class_(
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(BarcodeScanner),
-        cv.Optional(CONF_BARCODE_ID): cv.use_id(text_sensor.TextSensor),
-        cv.Optional(CONF_VERSION_ID): cv.use_id(text_sensor.TextSensor),
-        cv.Optional(CONF_BARCODE_EVENT): cv.use_id(event.Event),
+        cv.Optional(CONF_BARCODE_SENSOR): text_sensor.text_sensor_schema(
+            text_sensor.TextSensor,
+        ),
+        cv.Optional(CONF_VERSION_SENSOR): text_sensor.text_sensor_schema(
+            text_sensor.TextSensor,
+        ),
+        cv.Optional(CONF_SCAN_EVENT): event.event_schema(event.Event),
         cv.Optional(CONF_ON_BARCODE): automation.validate_automation(
             {
                 cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger),
@@ -474,17 +478,6 @@ CONFIG_SCHEMA = cv.Schema(
 
 
 # Code generation
-async def handle_sensor_config(var: Any, config: dict[str, Any]) -> None:
-    """Handle sensor configuration."""
-    if CONF_BARCODE_ID in config:
-        barcode_var = await cg.get_variable(config[CONF_BARCODE_ID])
-        cg.add(var.set_text_sensor(barcode_var))
-
-    if CONF_VERSION_ID in config:
-        version_var = await cg.get_variable(config[CONF_VERSION_ID])
-        cg.add(var.set_version_sensor(version_var))
-
-
 async def handle_operation_config(var: Any, config: dict[str, Any]) -> None:
     """Handle operation mode and terminator configuration."""
     if CONF_OPERATION_MODE in config:
@@ -652,11 +645,7 @@ async def handle_button_subcomponents(var: Any, config: dict[str, Any]) -> None:
 
 
 async def handle_automation_triggers(var: Any, config: dict[str, Any]) -> None:
-    """Wire up event entity and automation triggers."""
-    if CONF_BARCODE_EVENT in config:
-        event_var = await cg.get_variable(config[CONF_BARCODE_EVENT])
-        cg.add(var.set_barcode_event(event_var))
-
+    """Wire up automation triggers."""
     for conf in config.get(CONF_ON_BARCODE, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
         await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
@@ -672,7 +661,24 @@ async def to_code(config: dict[str, Any]) -> None:
     await cg.register_component(var, config)
     await uart.register_uart_device(var, config)
 
-    await handle_sensor_config(var, config)
+    if CONF_BARCODE_SENSOR in config:
+        ts_conf = config[CONF_BARCODE_SENSOR]
+        ts_var = cg.new_Pvariable(ts_conf[CONF_ID])
+        await text_sensor.register_text_sensor(ts_var, ts_conf)
+        cg.add(var.set_barcode_sensor(ts_var))
+
+    if CONF_VERSION_SENSOR in config:
+        ts_conf = config[CONF_VERSION_SENSOR]
+        ts_var = cg.new_Pvariable(ts_conf[CONF_ID])
+        await text_sensor.register_text_sensor(ts_var, ts_conf)
+        cg.add(var.set_version_sensor(ts_var))
+
+    if CONF_SCAN_EVENT in config:
+        ev_conf = config[CONF_SCAN_EVENT]
+        ev_var = cg.new_Pvariable(ev_conf[CONF_ID])
+        await event.register_event(ev_var, ev_conf, event_types=["scan_successful"])
+        cg.add(var.set_scan_event(ev_var))
+
     await handle_operation_config(var, config)
     await handle_light_config(var, config)
     await handle_sound_config(var, config)

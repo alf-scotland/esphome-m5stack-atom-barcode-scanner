@@ -31,39 +31,31 @@ wifi:
 
 captive_portal:
 
-text_sensor:
-  - platform: template
-    name: "Last Barcode"
-    id: last_barcode
-    icon: "mdi:barcode"
-
-  - platform: template
-    name: "Scanner Version"
-    id: scanner_version
-    entity_category: "diagnostic"
-    icon: "mdi:information-outline"
-
-event:
-  - platform: template
-    name: "Scanner Events"
-    id: scanner_events
-    icon: "mdi:barcode-scan"
-    device_class: "button"
-    event_types:
-      - "scan_successful"
-    on_event:
-      then:
-        - logger.log: "Scanner event triggered"
-
 m5stack_barcode:
   id: barcode_scanner
-  barcode_id: last_barcode
-  version_id: scanner_version
   operation_mode: host
   terminator: none
   buzzer_volume: medium
   uart_id: uart_bus
-  barcode_event: scanner_events
+
+  barcode_sensor:
+    name: "Last Barcode"
+    icon: "mdi:barcode"
+
+  version_sensor:
+    name: "Scanner Version"
+    entity_category: "diagnostic"
+    icon: "mdi:information-outline"
+
+  scan_event:
+    name: "Barcode Scanned"
+    icon: "mdi:barcode-scan"
+
+  on_barcode:
+    - homeassistant.event:
+        event: esphome.barcode_scanned
+        data:
+          barcode: !lambda return x;
 
   light_mode_select:
     name: "Light Mode"
