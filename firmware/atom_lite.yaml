@@ -5,14 +5,18 @@
 # SK6812 LED, the physical button, the scanner DLED line, and all LED scripts.
 #
 # LED state machine:
-#   WiFi disconnected   → orange pulse (led_wifi_connecting)
-#   WiFi up, API down   → white pulse  (led_api_connecting)
-#   API connected       → green flash, then idle (led_api_connected)
-#   Manual scan active  → solid blue
-#   Continuous/AutoSense active → solid purple
-#   Scan success        → green flash 500ms, then idle/continuous
-#   DLED triggered      → yellow flash 200ms (command ack / hardware activity)
-#   Scan timeout        → orange flash 500ms
+#   WiFi disconnected              → orange pulse (led_wifi_connecting)
+#   WiFi up, API down              → white pulse  (led_api_connecting)
+#   API connected, idle            → off          (via led_off)
+#   Manual scan active (HOST mode) → solid blue
+#   Continuous/AutoSense active    → solid purple
+#   Scan success                   → green flash 500ms, then led_off
+#   DLED triggered                 → yellow flash 200ms, then led_off
+#   Scan timeout                   → orange flash 500ms, then led_off
+#
+# led_off is the canonical "return to correct idle state" script.
+# It checks scan state and connectivity rather than always turning the LED
+# off, ensuring transient flashes always restore the right underlying state.
 
 substitutions:
   name: atom-barcode
@@ -94,13 +98,24 @@ api:
   on_client_connected:
     - script.execute: led_api_connected
   on_client_disconnected:
-    - script.execute: led_api_connecting
+    # Only show "connecting" if no API client remains. This prevents a white
+    # pulse when disconnecting the ESPHome CLI/dashboard during development
+    # while Home Assistant is still connected.
+    - if:
+        condition:
+          not:
+            api.connected:
+        then:
+          - script.execute: led_api_connecting
 
 # ── LED scripts ───────────────────────────────────────────────────────────────
 
 script:
-  # Idle state: turn off or show continuous-mode indicator if applicable.
-  # Called after any transient LED event (scan success, timeout, ack flash).
+  # Return to the correct underlying state after any transient LED event.
+  # Checks (in order): continuous mode → manual scan still active → API connected
+  # → WiFi connected → WiFi disconnected. This ensures that a brief flash
+  # (success, timeout, ack) always restores whatever state was "underneath" it,
+  # rather than blindly turning the LED off regardless of connectivity or scan state.
   - id: led_off
     then:
       - if:
@@ -110,8 +125,28 @@ script:
           then:
             - script.execute: led_continuous_scan_active
           else:
-            - light.turn_off:
-                id: atom_status_led
+            - if:
+                condition:
+                  m5stack_barcode.is_manual_scanning:
+                    id: barcode_scanner
+                then:
+                  # Scan still in progress (e.g. command-ack flash mid-scan) — restore blue.
+                  - script.execute: led_manual_scan_start
+                else:
+                  - if:
+                      condition:
+                        api.connected:
+                      then:
+                        - light.turn_off:
+                            id: atom_status_led
+                      else:
+                        - if:
+                            condition:
+                              wifi.connected:
+                            then:
+                              - script.execute: led_api_connecting
+                            else:
+                              - script.execute: led_wifi_connecting
 
   # Connectivity states
   - id: led_wifi_connecting
@@ -142,7 +177,7 @@ script:
           red: 0%
           green: 100%
           blue: 0%
-          flash_length: 1000ms
+          effect: none
       - delay: 1000ms
       - script.execute: led_off
 
@@ -155,6 +190,7 @@ script:
           red: 0%
           green: 0%
           blue: 100%
+          effect: none
 
   - id: led_continuous_scan_active
     then:
@@ -164,6 +200,7 @@ script:
           red: 80%
           green: 0%
           blue: 80%
+          effect: none
 
   - id: led_scan_success
     then:
@@ -173,7 +210,7 @@ script:
           red: 0%
           green: 100%
           blue: 0%
-          flash_length: 500ms
+          effect: none
       - delay: 500ms
       - script.execute: led_off
 
@@ -185,7 +222,7 @@ script:
           red: 70%
           green: 70%
           blue: 0%
-          flash_length: 200ms
+          effect: none
       - delay: 200ms
       - script.execute: led_off
 
@@ -197,7 +234,7 @@ script:
           red: 100%
           green: 50%
           blue: 0%
-          flash_length: 500ms
+          effect: none
       - delay: 500ms
       - script.execute: led_off
 
@@ -306,18 +343,33 @@ button:
             - script.execute: hardware_trigger_with_timeout
 
 # ── Operation mode select (device-specific: drives LED on mode change) ────────
+# ── Scan event LED hooks (device-specific) ────────────────────────────────────
 
 m5stack_barcode:
+  # Wire scan outcome events to the LED scripts defined in this file.
+  # core.yaml registers the homeassistant.event action for on_barcode; these
+  # entries are merged by the package system, so both fire on each event.
+  on_barcode:
+    - script.execute: led_scan_success
+  on_scan_timeout:
+    - script.execute: led_scan_timeout
+
   operation_mode_select:
     name: "Operation Mode"
     entity_category: "config"
     icon: "mdi:tune"
     on_value:
+      # Guard: publish_initial_states_() fires on_value at boot before the API
+      # is connected, which would clobber the wifi/api connectivity pulse LEDs.
+      # Only act on mode changes that happen after the API is up.
       - if:
           condition:
-            lambda: 'return x == "continuous" || x == "auto_sense";'
+            api.connected:
           then:
-            - script.execute: led_continuous_scan_active
-          else:
-            - light.turn_off:
-                id: atom_status_led
+            - if:
+                condition:
+                  lambda: 'return x == "continuous" || x == "auto_sense";'
+                then:
+                  - script.execute: led_continuous_scan_active
+                else:
+                  - script.execute: led_off
