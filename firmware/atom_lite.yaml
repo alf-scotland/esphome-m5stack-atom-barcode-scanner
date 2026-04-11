@@ -169,6 +169,7 @@ script:
           red: 0%
           green: 100%
           blue: 0%
+          effect: none
       - delay: 1000ms
       - script.execute: led_off
 
@@ -181,6 +182,7 @@ script:
           red: 0%
           green: 0%
           blue: 100%
+          effect: none
 
   - id: led_continuous_scan_active
     then:
@@ -190,6 +192,7 @@ script:
           red: 80%
           green: 0%
           blue: 80%
+          effect: none
 
   - id: led_scan_success
     then:
@@ -199,6 +202,7 @@ script:
           red: 0%
           green: 100%
           blue: 0%
+          effect: none
       - delay: 500ms
       - script.execute: led_off
 
@@ -210,6 +214,7 @@ script:
           red: 70%
           green: 70%
           blue: 0%
+          effect: none
       - delay: 200ms
       - script.execute: led_off
 
@@ -221,6 +226,7 @@ script:
           red: 100%
           green: 50%
           blue: 0%
+          effect: none
       - delay: 500ms
       - script.execute: led_off
 
