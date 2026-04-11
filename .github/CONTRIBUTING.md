@@ -12,84 +12,116 @@ This project adheres to the [ESPHome Code of Conduct](https://github.com/esphome
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/scotland/esphome-m5stack-atom-barcode-scanner.git
+   git clone https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner.git
    cd esphome-m5stack-atom-barcode-scanner
    ```
 
-2. Create and activate a virtual environment with uv:
+2. Install all dependencies (including dev tools):
    ```bash
-   uv venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   uv sync --all-extras --dev
    ```
 
-3. Install development dependencies:
+3. Install pre-commit hooks:
    ```bash
-   uv pip install -r requirements-dev.txt
-   ```
-
-4. Install pre-commit hooks:
-   ```bash
-   pre-commit install
+   uv run pre-commit install
    ```
 
 ### Branch Strategy
 
 - `main`: The main development branch, should always be in a stable state.
-- `feature/*`: Feature branches for new features or major changes.
-- `bugfix/*`: Bugfix branches for bug fixes.
-- `release/*`: Release preparation branches.
+- `feat/*`: Feature branches for new features or major changes.
+- `fix/*`: Bugfix branches for bug fixes.
+- `hotfix/*`: Urgent fixes that need to go directly to `main`.
+- `refactor/*`: Refactoring without behaviour change.
+- `ci/*`: CI/CD changes.
+- `docs/*`: Documentation-only changes.
+- `chore/*`: Maintenance tasks (dependency bumps, version changes, etc).
 
 ### Pull Request Process
 
 1. Create a new branch from `main`:
    ```bash
-   git checkout -b feature/your-feature-name
+   git checkout -b feat/your-feature-name
    ```
 
-2. Make your changes, commit them with descriptive commit messages.
+2. Make your changes, commit them with [conventional commit](https://www.conventionalcommits.org/) messages.
+   Scope the component name where relevant: `feat(barcode): add scan timeout config`
 
-3. Run tests and linting:
+3. Run linting and formatting:
    ```bash
-   pre-commit run --all-files
+   uv run pre-commit run --all-files
    ```
 
-4. Push your branch and create a pull request against `main`.
+4. Verify the firmware compiles:
+   ```bash
+   uv run esphome compile firmware/atom_lite.yaml
+   ```
 
-5. The PR will be reviewed by maintainers and automated checks will run.
+5. Push your branch and create a pull request against `main`.
+
+6. The PR will be reviewed by maintainers and automated checks will run.
+   A firmware artifact will be built and linked in a PR comment — use it to test on hardware.
+
+### Running C++ Static Analysis
+
+`cppcheck` and `clang-tidy` are available locally via pre-commit. `cppcheck` runs
+automatically on every commit; `clang-tidy` is a manual stage:
+
+```bash
+# Run cppcheck (runs automatically on commit too)
+uv run pre-commit run cppcheck --all-files
+
+# Run clang-tidy (manual stage — requires clang-tidy installed)
+uv run pre-commit run clang-tidy --hook-stage manual
+```
 
 ### Versioning Scheme
 
-We follow a CalVer-like versioning scheme similar to ESPHome, with primary releases being YYYY.MM.PATCH.
+We follow CalVer (`YYYY.MM.PATCH`), matching ESPHome's scheme.
 
-Example: `2024.3.0`, `2024.3.1`, etc.
+Example: `2026.3.0`, `2026.3.1`, etc.
 
-For pre-releases, we use the following format: `YYYY.MM.PATCH-beta.N`
+For pre-releases: `YYYY.MM.PATCH-beta.N` or `YYYY.MM.PATCH-rc.N`
 
-Example: `2024.3.0-beta.1`
+Example: `2026.3.0-beta.1`
 
 ## Release Process
 
-1. Create a new release branch: `release/YYYY.MM.0`
-2. Update version in `firmware.yaml`
-3. Once ready, tag the release: `git tag vYYYY.MM.0`
-4. Push the tag: `git push origin vYYYY.MM.0`
-5. The CI will automatically build and publish the release.
+1. Update `project_version` in the `substitutions:` block of `firmware/atom_lite.yaml`:
+   ```yaml
+   substitutions:
+     project_version: "YYYY.MM.PATCH"
+   ```
+
+2. Commit the version bump to `main`.
+
+3. Tag the release and push the tag:
+   ```bash
+   git tag vYYYY.MM.PATCH
+   git push origin vYYYY.MM.PATCH
+   ```
+
+4. The CI will build the firmware and publish a GitHub Release with binary assets.
+   The tag must match `project_version` exactly — CI validates this before building.
+
+See `.github/BRANCHING_AND_RELEASES.md` for full details.
 
 ## Code Style
 
-- Python: We follow the [ESPHome Python style guide](https://github.com/esphome/esphome/blob/dev/CONTRIBUTING.md#python-style)
-- C++: We use clang-format with the included `.clang-format` file
-- YAML: We follow yamllint rules defined in `.yamllint.yaml`
+- Python: We follow the [ESPHome Python style guide](https://github.com/esphome/esphome/blob/dev/CONTRIBUTING.md#python-style); enforced by `ruff`
+- C++: C++17, column limit 120; enforced by `clang-format` v17 (`.clang-format`)
+- YAML: enforced by `yamllint` (`.yamllint.yaml`)
 
 ## Testing
 
 - Test your changes with actual hardware whenever possible
-- Ensure your code works with the latest stable ESPHome release
+- Ensure your code works with the pinned ESPHome release (`pyproject.toml`)
 
 ## Documentation
 
-- Update documentation for any new features or changes
-- Include examples for new functionality
+- Update `components/m5stack_barcode/index.rst` for any new config keys, actions, triggers, or entities
+- Validate every documented default against `__init__.py` and the manufacturer PDFs in `components/m5stack_barcode/docs/`
+- Include YAML examples for new functionality
 
 ## Thank You
 

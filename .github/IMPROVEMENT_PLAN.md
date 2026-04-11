@@ -61,9 +61,9 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 
 | # | Status | Branch | What |
 |---|--------|--------|------|
-| 20 | ⬜ | `docs/fix-contributing-guide` | `CONTRIBUTING.md` references non-existent `requirements-dev.txt` (should be `uv sync`); doesn't mention the manual `clang-tidy` pre-commit stage; doesn't include `uv run esphome compile firmware.yaml` as a verification step |
-| 21 | ⬜ | `docs/fix-ota-guides` | `OTA_UPDATES_GUIDE.md` and `PRERELEASE_AND_OTA.md` reference `firmware-ota.bin` (doesn't exist; actual output is `firmware.ota.bin`); `OTA_UPDATES_GUIDE.md` describes "Git Repository OTA" not implemented anywhere — remove or implement; `PRERELEASE_AND_OTA.md` has a YAML sample with duplicate `ota:` blocks |
-| 22 | ⬜ | `docs/rewrite-component-docs` | `index.rst` is LLM-generated and unreliable; full rewrite required — document every config key, action, trigger, condition, and entity; validate every claim against the PDFs and the current `__init__.py` schema |
+| 20 | ✅ | `docs/tier5-all` | `CONTRIBUTING.md` references non-existent `requirements-dev.txt` (should be `uv sync`); doesn't mention the manual `clang-tidy` pre-commit stage; doesn't include `uv run esphome compile firmware.yaml` as a verification step |
+| 21 | ✅ | `docs/tier5-all` | `OTA_UPDATES_GUIDE.md` and `PRERELEASE_AND_OTA.md` reference `firmware-ota.bin` (doesn't exist; actual output is `firmware.ota.bin`); `OTA_UPDATES_GUIDE.md` describes "Git Repository OTA" not implemented anywhere — remove or implement; `PRERELEASE_AND_OTA.md` has a YAML sample with duplicate `ota:` blocks |
+| 22 | ✅ | `docs/tier5-all` | `index.rst` is LLM-generated and unreliable; full rewrite required — document every config key, action, trigger, condition, and entity; validate every claim against the PDFs and the current `__init__.py` schema |
 
 ---
 
