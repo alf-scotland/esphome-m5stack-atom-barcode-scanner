@@ -98,7 +98,15 @@ api:
   on_client_connected:
     - script.execute: led_api_connected
   on_client_disconnected:
-    - script.execute: led_api_connecting
+    # Only show "connecting" if no API client remains. This prevents a white
+    # pulse when disconnecting the ESPHome CLI/dashboard during development
+    # while Home Assistant is still connected.
+    - if:
+        condition:
+          not:
+            api.connected:
+        then:
+          - script.execute: led_api_connecting
 
 # ── LED scripts ───────────────────────────────────────────────────────────────
 
