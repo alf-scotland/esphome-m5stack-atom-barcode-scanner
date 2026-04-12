@@ -15,16 +15,15 @@ logger:
   level: DEBUG
 
 api:
+  encryption:
+    key: !secret api_encryption_key
 
 ota:
   - platform: esphome
+    password: !secret ota_password
   - platform: http_request
 
 http_request:
-  verify_ssl: false
-
-safe_mode:
-  disabled: true
 
 wifi:
   ap:

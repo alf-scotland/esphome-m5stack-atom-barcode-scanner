@@ -71,6 +71,15 @@ jobs:
           PR_VERSION="${{ steps.set_ref.outputs.ref_name }}"
           sed -i "s/project_version: \".*\"/project_version: \"$PR_VERSION\"/" firmware/atom_lite.yaml
 
+      - name: Create secrets for CI build
+        run: |
+          # Dummy values — valid format, not used on real hardware.
+          # The base64 key is 32 bytes encoded (required by ESPHome noise_psk).
+          cat > firmware/secrets.yaml << 'EOF'
+          api_encryption_key: "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
+          ota_password: "ci_ota_password_not_for_real_use"
+          EOF
+
       - name: Compile firmware
         run: |
           uv run esphome compile firmware/atom_lite.yaml
