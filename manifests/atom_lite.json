@@ -1,0 +1,11 @@
+{
+  "name": "atom-barcode",
+  "version": "0.0.0",
+  "summary": "M5Stack Atom Lite Barcode Scanner Firmware",
+  "changelog": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases",
+  "ota": {
+    "summary": "No release available yet",
+    "url": "",
+    "md5": ""
+  }
+}

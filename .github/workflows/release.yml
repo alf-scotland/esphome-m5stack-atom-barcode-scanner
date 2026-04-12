@@ -94,3 +94,42 @@ jobs:
           files: release-files/*.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate OTA manifest
+        # Skip manifest update for pre-releases — only stable versions are offered as OTA.
+        if: steps.extract_version.outputs.is_prerelease == 'false'
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          OTA_BIN="release-files/firmware.ota.bin"
+          MD5=$(md5sum "$OTA_BIN" | cut -d' ' -f1)
+          OTA_URL="https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v${VERSION}/firmware.ota.bin"
+
+          mkdir -p manifests
+          cat > manifests/atom_lite.json << EOF
+          {
+            "name": "atom-barcode",
+            "version": "$VERSION",
+            "summary": "M5Stack Atom Lite Barcode Scanner Firmware",
+            "changelog": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v$VERSION",
+            "ota": {
+              "summary": "Firmware update to $VERSION",
+              "url": "$OTA_URL",
+              "md5": "$MD5"
+            }
+          }
+          EOF
+
+          echo "Generated manifests/atom_lite.json:"
+          cat manifests/atom_lite.json
+
+      - name: Commit manifest to main
+        if: steps.extract_version.outputs.is_prerelease == 'false'
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git add manifests/atom_lite.json
+          git commit -m "chore: update OTA manifest for v${VERSION} [skip ci]"
+          git push origin main
