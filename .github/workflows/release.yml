@@ -62,6 +62,13 @@ jobs:
           fi
           echo "Version verified: $VERSION"
 
+      - name: Create secrets for release build
+        run: |
+          cat > firmware/secrets.yaml << EOF
+          api_encryption_key: "${{ secrets.API_ENCRYPTION_KEY }}"
+          ota_password: "${{ secrets.OTA_PASSWORD }}"
+          EOF
+
       - name: Build firmware
         run: |
           uv run esphome compile firmware/atom_lite.yaml
