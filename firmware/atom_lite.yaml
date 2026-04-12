@@ -27,6 +27,11 @@ substitutions:
 packages:
   core: !include core.yaml
 
+update:
+  - platform: http_request
+    name: "Firmware Update"
+    source: https://raw.githubusercontent.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/main/manifests/atom_lite.json
+
 dashboard_import:
   package_import_url: github://alf-scotland/esphome-m5stack-atom-barcode-scanner/atom_lite.yaml@main
   import_full_config: true
