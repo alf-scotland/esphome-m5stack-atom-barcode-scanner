@@ -34,6 +34,10 @@ static const size_t MAX_VERSION_LENGTH =
 // response (128-byte barcode + 4-byte CRLFCRLF terminator) with comfortable margin.
 // If this is exceeded the data is corrupt or from an unexpected source; discard and recover.
 static const size_t MAX_RX_BUFFER_SIZE = 256;
+// Idle gap used to detect end-of-barcode when terminator: none is configured.
+// At 9600 baud the inter-byte gap is ~1 ms; 20 ms is well above that while still
+// being short enough that the barcode is processed promptly after the last byte.
+static const uint32_t RX_IDLE_WINDOW_MS = 20;
 
 // Methods moved from header file
 bool BarcodeScanner::is_continuous_mode() const {
@@ -359,9 +363,14 @@ void BarcodeScanner::dump_config() {
 void BarcodeScanner::clear_buffer_() { this->rx_buffer_.clear(); }
 
 void BarcodeScanner::read_buffer_() {
+  bool got_bytes = false;
   while (this->available()) {
     uint8_t byte = this->read();
     this->rx_buffer_.push_back(byte);
+    got_bytes = true;
+  }
+  if (got_bytes) {
+    this->last_rx_time_ = millis();
   }
   if (this->rx_buffer_.size() > MAX_RX_BUFFER_SIZE) {
     ESP_LOGW(TAG_SCANNER, "RX buffer overflow (%u bytes); discarding — check for UART noise or scanner malfunction",
@@ -463,7 +472,8 @@ bool BarcodeScanner::has_terminator_in_buffer_() const {
   const size_t len = this->rx_buffer_.size();
   switch (this->terminator_) {
     case Terminator::NONE:
-      return len > 0;
+      // No terminator byte — treat end-of-barcode as a quiet gap after the last byte.
+      return len > 0 && (millis() - this->last_rx_time_) >= RX_IDLE_WINDOW_MS;
     case Terminator::CR:
       return len >= 1 && this->rx_buffer_[len - 1] == '\r';
     case Terminator::CRLF:
@@ -476,7 +486,7 @@ bool BarcodeScanner::has_terminator_in_buffer_() const {
       return len >= 4 && this->rx_buffer_[len - 4] == '\r' && this->rx_buffer_[len - 3] == '\n' &&
              this->rx_buffer_[len - 2] == '\r' && this->rx_buffer_[len - 1] == '\n';
     default:
-      return len > 0;
+      return len > 0 && (millis() - this->last_rx_time_) >= RX_IDLE_WINDOW_MS;
   }
 }
 

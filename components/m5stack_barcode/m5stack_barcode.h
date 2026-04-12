@@ -569,6 +569,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
   bool initial_states_published_{false};                ///< Guard for one-shot publish_initial_states_() in loop()
   uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
+  uint32_t last_rx_time_{0};                            ///< millis() of the last byte received into rx_buffer_
   uint32_t scan_started_at_{0};                         ///< millis() when start_scan() was called; 0 = idle
   CommandState command_state_{CommandState::IDLE};      ///< Current command processing state
   ResponseType expected_response_{ResponseType::NONE};  ///< Expected response type
