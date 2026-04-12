@@ -74,7 +74,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 | # | Status | Branch | What |
 |---|--------|--------|------|
 | 23 | ⏸ | `feat/multi-device-yaml-split` | Pulled forward into item 13 — YAML split and per-device CI builds are in scope there |
-| 24 | 🔄 | `feat/ota-manifest-and-update-component` | Generate a `manifest.json` per device in `release.yml` (name, version, binary URL → GitHub Release asset); publish to `gh-pages` or `main:manifests/`; add `update:` platform to firmware pointing at the manifest URL; fix `verify_ssl: false` first (item 12) |
+| 24 | ✅ | `feat/ota-manifest-and-update-component` | Generate a `manifest.json` per device in `release.yml` (name, version, binary URL → GitHub Release asset); publish to `gh-pages` or `main:manifests/`; add `update:` platform to firmware pointing at the manifest URL; fix `verify_ssl: false` first (item 12) |
 | 25 | ⬜ | `feat/protocol-coverage-<feature>` | Audit every command in `ATOM_QRCODE_CMD_EN.pdf` against exposed HA entities/actions/conditions; one branch per gap found |
 | 26 | ⬜ | `chore/esphome-core-prep` | Final pass before opening PR against esphome/esphome: verify component namespace, add `CODEOWNERS` entry, pass ESPHome's own test runner (`pytest tests/`), verify Python passes ESPHome's ruff config, verify C++ passes ESPHome's clang-tidy, document migration path away from `external_components:` |
 
