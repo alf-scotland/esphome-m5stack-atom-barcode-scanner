@@ -228,6 +228,30 @@ class Commands {
   };
 
   /**
+   * Command acknowledgment sound control commands.
+   * These control whether the scanner beeps when it processes a configuration command.
+   */
+  struct CmdAckSound {
+    // PDF item 14: 0x01 = "Enable" (default) = beep on config ACK; 0x00 = "Prohibit" = silent
+    static constexpr uint8_t CMD_ACK_SOUND_ENABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0E, 0x01, 0xFE, 0x25};
+    static constexpr uint8_t CMD_ACK_SOUND_DISABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0E, 0x00, 0xFE, 0x26};
+
+    static constexpr size_t SIZE = 10;
+  };
+
+  /**
+   * Configuration code scanning permission commands.
+   * These control whether the scanner can be reconfigured by scanning a special config barcode.
+   */
+  struct ConfigCodeScan {
+    // PDF item 21: 0x01 = "Enable" (default) = scanner accepts config barcodes; 0x00 = "Prohibit"
+    static constexpr uint8_t CONFIG_CODE_SCAN_ENABLED[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0xEC, 0x01, 0xFE, 0x3A};
+    static constexpr uint8_t CONFIG_CODE_SCAN_DISABLED[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0xEC, 0x00, 0xFE, 0x3B};
+
+    static constexpr size_t SIZE = 9;
+  };
+
+  /**
    * Response codes from the scanner.
    * These are used to acknowledge commands or indicate status.
    */

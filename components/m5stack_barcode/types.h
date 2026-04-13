@@ -123,6 +123,18 @@ enum class SameCodeInterval {
   MS_2000   // 2s
 };
 
+// Command acknowledgment sound modes (PDF item 14)
+enum class CmdAckSoundMode {
+  CMD_ACK_SOUND_DISABLED,  // No beep when a config command is ACK'd
+  CMD_ACK_SOUND_ENABLED    // Beep when a config command is ACK'd (factory default)
+};
+
+// Configuration code scanning permission modes (PDF item 21)
+enum class ConfigCodeScanMode {
+  CONFIG_CODE_SCAN_DISABLED,  // Scanner ignores config barcodes
+  CONFIG_CODE_SCAN_ENABLED    // Scanner accepts config barcodes (factory default)
+};
+
 // Scanning state to track different states of the scanner
 enum class ScanState {
   IDLE,                // Not scanning
@@ -144,6 +156,8 @@ auto scan_duration_to_string(ScanDuration duration) -> const char *;
 auto stable_induction_time_to_string(StableInductionTime time) -> const char *;
 auto reading_interval_to_string(ReadingInterval interval) -> const char *;
 auto same_code_interval_to_string(SameCodeInterval interval) -> const char *;
+auto cmd_ack_sound_mode_to_string(CmdAckSoundMode mode) -> const char *;
+auto config_code_scan_mode_to_string(ConfigCodeScanMode mode) -> const char *;
 auto scan_state_to_string(ScanState state) -> const char *;
 
 // Duration conversion helper

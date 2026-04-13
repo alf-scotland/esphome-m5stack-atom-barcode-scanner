@@ -25,7 +25,7 @@ namespace m5stack_barcode {
 
 /// Version tag for the stored preference struct. Increment when the struct layout changes
 /// to automatically invalidate stale preferences and force a full re-sync.
-static const uint8_t SETTINGS_VERSION = 1;
+static const uint8_t SETTINGS_VERSION = 2;
 
 /// Packed representation of all scanner settings stored in ESPHome preferences (NVS flash).
 /// On first boot (or after a factory reset / version bump) all fields are sent to the scanner.
@@ -45,11 +45,13 @@ struct ScannerPreferences {
   uint8_t stable_induction_time;
   uint8_t reading_interval;
   uint8_t same_code_interval;
+  uint8_t cmd_ack_sound_mode;
+  uint8_t config_code_scan_mode;
 } __attribute__((packed));
 
 // Catch struct layout changes (added/removed fields, unexpected padding) at compile time.
 // Increment SETTINGS_VERSION whenever the struct changes so stale NVS data is discarded.
-static_assert(sizeof(ScannerPreferences) == 14, "ScannerPreferences size changed — bump SETTINGS_VERSION");
+static_assert(sizeof(ScannerPreferences) == 16, "ScannerPreferences size changed — bump SETTINGS_VERSION");
 
 // Forward declarations
 class OperationModeSelect;
@@ -65,6 +67,8 @@ class SoundSwitch;
 class BootSoundSwitch;
 class DecodeSoundSwitch;
 class DecodingSuccessLightSwitch;
+class CmdAckSoundSwitch;
+class ConfigCodeScanSwitch;
 
 // Logging tag for this component
 extern const char *const TAG_SCANNER;
@@ -179,6 +183,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_stable_induction_time_initial(StableInductionTime time) { this->stable_induction_time_ = time; }
   void set_reading_interval_initial(ReadingInterval interval) { this->reading_interval_ = interval; }
   void set_same_code_interval_initial(SameCodeInterval interval) { this->same_code_interval_ = interval; }
+  void set_cmd_ack_sound_mode_initial(CmdAckSoundMode mode) { this->cmd_ack_sound_mode_ = mode; }
+  void set_config_code_scan_mode_initial(ConfigCodeScanMode mode) { this->config_code_scan_mode_ = mode; }
 
   /// Attach the optional operation-mode select sub-component.
   void set_operation_mode_select(OperationModeSelect *select) { this->operation_mode_select_ = select; }
@@ -189,6 +195,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_boot_sound_switch(BootSoundSwitch *sw) { this->boot_sound_switch_ = sw; }
   void set_decode_sound_switch(DecodeSoundSwitch *sw) { this->decode_sound_switch_ = sw; }
   void set_decoding_success_light_switch(DecodingSuccessLightSwitch *sw) { this->decoding_success_light_switch_ = sw; }
+  void set_cmd_ack_sound_switch(CmdAckSoundSwitch *sw) { this->cmd_ack_sound_switch_ = sw; }
+  void set_config_code_scan_switch(ConfigCodeScanSwitch *sw) { this->config_code_scan_switch_ = sw; }
   void set_buzzer_volume_select(BuzzerVolumeSelect *sel) { this->buzzer_volume_select_ = sel; }
   void set_light_mode_select(LightModeSelect *sel) { this->light_mode_select_ = sel; }
   void set_locate_light_mode_select(LocateLightModeSelect *sel) { this->locate_light_mode_select_ = sel; }
@@ -304,6 +312,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @return bool True if command was queued successfully
    */
   void set_same_code_interval(SameCodeInterval interval);
+  void set_cmd_ack_sound_mode(CmdAckSoundMode mode);
+  void set_config_code_scan_mode(ConfigCodeScanMode mode);
 
   /**
    * @brief Process the current buffer as a barcode.
@@ -437,6 +447,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_stable_induction_time_state(StableInductionTime time);
   void set_reading_interval_state(ReadingInterval interval);
   void set_same_code_interval_state(SameCodeInterval interval);
+  void set_cmd_ack_sound_mode_state(CmdAckSoundMode mode);
+  void set_config_code_scan_mode_state(ConfigCodeScanMode mode);
   void set_operation_mode_state(OperationMode mode);
 
   // Command Processing Methods
@@ -560,6 +572,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   BootSoundSwitch *boot_sound_switch_{nullptr};                       ///< Optional HA switch for boot sound mode
   DecodeSoundSwitch *decode_sound_switch_{nullptr};                   ///< Optional HA switch for decode sound mode
   DecodingSuccessLightSwitch *decoding_success_light_switch_{nullptr};  ///< Optional HA switch for success light
+  CmdAckSoundSwitch *cmd_ack_sound_switch_{nullptr};                    ///< Optional HA switch for cmd ACK sound
+  ConfigCodeScanSwitch *config_code_scan_switch_{nullptr};              ///< Optional HA switch for config code scanning
   binary_sensor::BinarySensor *scanning_binary_sensor_{nullptr};        ///< Optional HA binary sensor for scan state
 
   std::vector<uint8_t> rx_buffer_;                       ///< Buffer for received data
@@ -583,13 +597,16 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   SoundMode sound_mode_{SoundMode::SOUND_DISABLED};                                   ///< Current sound mode
   BuzzerVolume buzzer_volume_{BuzzerVolume::BUZZER_VOLUME_LOW};                       ///< Current buzzer volume
   DecodingSuccessLightMode decoding_success_light_mode_{
-      DecodingSuccessLightMode::DECODING_LIGHT_ENABLED};                      ///< Current decoding success light mode
-  BootSoundMode boot_sound_mode_{BootSoundMode::BOOT_SOUND_DISABLED};         ///< Current boot sound mode
-  DecodeSoundMode decode_sound_mode_{DecodeSoundMode::DECODE_SOUND_ENABLED};  ///< Current decode sound mode
-  ScanDuration scan_duration_{ScanDuration::MS_3000};                         ///< Current scan duration
-  StableInductionTime stable_induction_time_{StableInductionTime::MS_500};    ///< Current stable induction time
-  ReadingInterval reading_interval_{ReadingInterval::MS_500};                 ///< Current reading interval
-  SameCodeInterval same_code_interval_{SameCodeInterval::MS_500};             ///< Current same code interval
+      DecodingSuccessLightMode::DECODING_LIGHT_ENABLED};                        ///< Current decoding success light mode
+  BootSoundMode boot_sound_mode_{BootSoundMode::BOOT_SOUND_DISABLED};           ///< Current boot sound mode
+  DecodeSoundMode decode_sound_mode_{DecodeSoundMode::DECODE_SOUND_ENABLED};    ///< Current decode sound mode
+  ScanDuration scan_duration_{ScanDuration::MS_3000};                           ///< Current scan duration
+  StableInductionTime stable_induction_time_{StableInductionTime::MS_500};      ///< Current stable induction time
+  ReadingInterval reading_interval_{ReadingInterval::MS_500};                   ///< Current reading interval
+  SameCodeInterval same_code_interval_{SameCodeInterval::MS_500};               ///< Current same code interval
+  CmdAckSoundMode cmd_ack_sound_mode_{CmdAckSoundMode::CMD_ACK_SOUND_ENABLED};  ///< Current cmd ACK sound mode
+  ConfigCodeScanMode config_code_scan_mode_{
+      ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED};  ///< Current config code scan mode
 };
 
 /// Trigger fired whenever a barcode is successfully decoded.
@@ -899,6 +916,30 @@ class DecodeSoundSwitch : public switch_::Switch, public Component {
 
 /// Switch sub-component for decoding_success_light_mode — controls the success flash.
 class DecodingSuccessLightSwitch : public switch_::Switch, public Component {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void write_state(bool state) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Switch sub-component for cmd_ack_sound_mode — controls whether the scanner beeps on config ACK.
+class CmdAckSoundSwitch : public switch_::Switch, public Component {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void write_state(bool state) override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Switch sub-component for config_code_scan_mode — controls whether config barcodes are accepted.
+class ConfigCodeScanSwitch : public switch_::Switch, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 

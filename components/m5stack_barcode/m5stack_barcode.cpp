@@ -105,7 +105,9 @@ static bool prefs_in_range(const ScannerPreferences &p) {
          p.scan_duration <= static_cast<uint8_t>(ScanDuration::UNLIMITED) &&
          p.stable_induction_time <= static_cast<uint8_t>(StableInductionTime::MS_1000) &&
          p.reading_interval <= static_cast<uint8_t>(ReadingInterval::MS_2000) &&
-         p.same_code_interval <= static_cast<uint8_t>(SameCodeInterval::MS_2000);
+         p.same_code_interval <= static_cast<uint8_t>(SameCodeInterval::MS_2000) &&
+         p.cmd_ack_sound_mode <= static_cast<uint8_t>(CmdAckSoundMode::CMD_ACK_SOUND_ENABLED) &&
+         p.config_code_scan_mode <= static_cast<uint8_t>(ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED);
 }
 
 void BarcodeScanner::configure_defaults_() {
@@ -140,6 +142,8 @@ void BarcodeScanner::configure_defaults_() {
                    this->stable_induction_time_)
   QUEUE_IF_CHANGED(reading_interval, CommandFactory::create_reading_interval_command, this->reading_interval_)
   QUEUE_IF_CHANGED(same_code_interval, CommandFactory::create_same_code_interval_command, this->same_code_interval_)
+  QUEUE_IF_CHANGED(cmd_ack_sound_mode, CommandFactory::create_cmd_ack_sound_command, this->cmd_ack_sound_mode_)
+  QUEUE_IF_CHANGED(config_code_scan_mode, CommandFactory::create_config_code_scan_command, this->config_code_scan_mode_)
 
 #undef QUEUE_IF_CHANGED
 }
@@ -172,6 +176,11 @@ void BarcodeScanner::publish_initial_states_() {
   if (this->decoding_success_light_switch_ != nullptr)
     this->decoding_success_light_switch_->publish_state(this->decoding_success_light_mode_ ==
                                                         DecodingSuccessLightMode::DECODING_LIGHT_ENABLED);
+  if (this->cmd_ack_sound_switch_ != nullptr)
+    this->cmd_ack_sound_switch_->publish_state(this->cmd_ack_sound_mode_ == CmdAckSoundMode::CMD_ACK_SOUND_ENABLED);
+  if (this->config_code_scan_switch_ != nullptr)
+    this->config_code_scan_switch_->publish_state(this->config_code_scan_mode_ ==
+                                                  ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED);
 }
 
 void BarcodeScanner::save_settings_() {
@@ -190,6 +199,8 @@ void BarcodeScanner::save_settings_() {
   prefs.stable_induction_time = static_cast<uint8_t>(this->stable_induction_time_);
   prefs.reading_interval = static_cast<uint8_t>(this->reading_interval_);
   prefs.same_code_interval = static_cast<uint8_t>(this->same_code_interval_);
+  prefs.cmd_ack_sound_mode = static_cast<uint8_t>(this->cmd_ack_sound_mode_);
+  prefs.config_code_scan_mode = static_cast<uint8_t>(this->config_code_scan_mode_);
   if (!this->pref_.save(&prefs)) {
     ESP_LOGW(TAG_SCANNER, "Failed to save scanner preferences to NVS");
   }
@@ -353,6 +364,8 @@ void BarcodeScanner::dump_config() {
                 stable_induction_time_to_string(this->stable_induction_time_));
   ESP_LOGCONFIG(TAG_SCANNER, "  Reading Interval: %s", reading_interval_to_string(this->reading_interval_));
   ESP_LOGCONFIG(TAG_SCANNER, "  Same Code Interval: %s", same_code_interval_to_string(this->same_code_interval_));
+  ESP_LOGCONFIG(TAG_SCANNER, "  Cmd ACK Sound: %s", cmd_ack_sound_mode_to_string(this->cmd_ack_sound_mode_));
+  ESP_LOGCONFIG(TAG_SCANNER, "  Config Code Scan: %s", config_code_scan_mode_to_string(this->config_code_scan_mode_));
 
   if (this->version_sensor_ != nullptr && this->version_sensor_->has_state()) {
     ESP_LOGCONFIG(TAG_SCANNER, "  Firmware Version: %s", this->version_sensor_->get_state().c_str());
@@ -906,6 +919,24 @@ void BarcodeScanner::set_decode_sound_mode(DecodeSoundMode mode) {
   this->queue_command(std::move(command));
 }
 
+void BarcodeScanner::set_cmd_ack_sound_mode(CmdAckSoundMode mode) {
+  if (mode == this->cmd_ack_sound_mode_) {
+    ESP_LOGD(TAG_SCANNER, "Cmd ACK sound mode already set to %s", cmd_ack_sound_mode_to_string(mode));
+    return;
+  }
+  auto command = CommandFactory::create_cmd_ack_sound_command(mode);
+  this->queue_command(std::move(command));
+}
+
+void BarcodeScanner::set_config_code_scan_mode(ConfigCodeScanMode mode) {
+  if (mode == this->config_code_scan_mode_) {
+    ESP_LOGD(TAG_SCANNER, "Config code scan mode already set to %s", config_code_scan_mode_to_string(mode));
+    return;
+  }
+  auto command = CommandFactory::create_config_code_scan_command(mode);
+  this->queue_command(std::move(command));
+}
+
 void BarcodeScanner::set_scan_duration(ScanDuration duration) {
   if (duration == this->scan_duration_) {
     ESP_LOGD(TAG_SCANNER, "Scan duration already set to %s", scan_duration_to_string(duration));
@@ -1030,6 +1061,22 @@ void BarcodeScanner::set_decode_sound_mode_state(DecodeSoundMode mode) {
   this->save_settings_();
   if (this->decode_sound_switch_ != nullptr)
     this->decode_sound_switch_->publish_state(mode == DecodeSoundMode::DECODE_SOUND_ENABLED);
+}
+
+void BarcodeScanner::set_cmd_ack_sound_mode_state(CmdAckSoundMode mode) {
+  ESP_LOGD(TAG_SCANNER, "Setting cmd ACK sound mode to %s", cmd_ack_sound_mode_to_string(mode));
+  this->cmd_ack_sound_mode_ = mode;
+  this->save_settings_();
+  if (this->cmd_ack_sound_switch_ != nullptr)
+    this->cmd_ack_sound_switch_->publish_state(mode == CmdAckSoundMode::CMD_ACK_SOUND_ENABLED);
+}
+
+void BarcodeScanner::set_config_code_scan_mode_state(ConfigCodeScanMode mode) {
+  ESP_LOGD(TAG_SCANNER, "Setting config code scan mode to %s", config_code_scan_mode_to_string(mode));
+  this->config_code_scan_mode_ = mode;
+  this->save_settings_();
+  if (this->config_code_scan_switch_ != nullptr)
+    this->config_code_scan_switch_->publish_state(mode == ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED);
 }
 
 void BarcodeScanner::set_scan_duration_state(ScanDuration duration) {
@@ -1226,6 +1273,24 @@ void DecodingSuccessLightSwitch::write_state(bool state) {
   }
   scanner_->set_decoding_success_light_mode(state ? DecodingSuccessLightMode::DECODING_LIGHT_ENABLED
                                                   : DecodingSuccessLightMode::DECODING_LIGHT_DISABLED);
+}
+
+void CmdAckSoundSwitch::write_state(bool state) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "CmdAckSoundSwitch: no scanner attached");
+    return;
+  }
+  scanner_->set_cmd_ack_sound_mode(state ? CmdAckSoundMode::CMD_ACK_SOUND_ENABLED
+                                         : CmdAckSoundMode::CMD_ACK_SOUND_DISABLED);
+}
+
+void ConfigCodeScanSwitch::write_state(bool state) {
+  if (scanner_ == nullptr) {
+    ESP_LOGW(TAG_SCANNER, "ConfigCodeScanSwitch: no scanner attached");
+    return;
+  }
+  scanner_->set_config_code_scan_mode(state ? ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED
+                                            : ConfigCodeScanMode::CONFIG_CODE_SCAN_DISABLED);
 }
 
 void StartButton::press_action() {

@@ -363,5 +363,39 @@ std::unique_ptr<Command> CommandFactory::create_same_code_interval_command(SameC
                                    [interval](BarcodeScanner *s) { s->set_same_code_interval_state(interval); });
 }
 
+std::unique_ptr<Command> CommandFactory::create_cmd_ack_sound_command(CmdAckSoundMode mode) {
+  const uint8_t *data = nullptr;
+  switch (mode) {
+    case CmdAckSoundMode::CMD_ACK_SOUND_ENABLED:
+      data = Commands::CmdAckSound::CMD_ACK_SOUND_ENABLED;
+      break;
+    case CmdAckSoundMode::CMD_ACK_SOUND_DISABLED:
+      data = Commands::CmdAckSound::CMD_ACK_SOUND_DISABLED;
+      break;
+    default:
+      ESP_LOGW(TAG_CMD, "Invalid cmd ack sound mode: %d", static_cast<uint8_t>(mode));
+      return nullptr;
+  }
+  return std::make_unique<Command>(data, Commands::CmdAckSound::SIZE, cmd_ack_sound_mode_to_string(mode),
+                                   [mode](BarcodeScanner *s) { s->set_cmd_ack_sound_mode_state(mode); });
+}
+
+std::unique_ptr<Command> CommandFactory::create_config_code_scan_command(ConfigCodeScanMode mode) {
+  const uint8_t *data = nullptr;
+  switch (mode) {
+    case ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED:
+      data = Commands::ConfigCodeScan::CONFIG_CODE_SCAN_ENABLED;
+      break;
+    case ConfigCodeScanMode::CONFIG_CODE_SCAN_DISABLED:
+      data = Commands::ConfigCodeScan::CONFIG_CODE_SCAN_DISABLED;
+      break;
+    default:
+      ESP_LOGW(TAG_CMD, "Invalid config code scan mode: %d", static_cast<uint8_t>(mode));
+      return nullptr;
+  }
+  return std::make_unique<Command>(data, Commands::ConfigCodeScan::SIZE, config_code_scan_mode_to_string(mode),
+                                   [mode](BarcodeScanner *s) { s->set_config_code_scan_mode_state(mode); });
+}
+
 }  // namespace m5stack_barcode
 }  // namespace esphome
