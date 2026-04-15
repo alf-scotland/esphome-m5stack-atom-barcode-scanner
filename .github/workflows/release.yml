@@ -85,6 +85,7 @@ jobs:
           ls -lh release-files/
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe  # v2
         with:
           name: Release v${{ steps.extract_version.outputs.version }}
@@ -98,30 +99,37 @@ jobs:
       - name: Generate OTA manifest
         # Skip manifest update for pre-releases — only stable versions are offered as OTA.
         if: steps.extract_version.outputs.is_prerelease == 'false'
+        env:
+          VERSION: ${{ steps.extract_version.outputs.version }}
+          RELEASE_URL: ${{ steps.create_release.outputs.url }}
+          RELEASE_SUMMARY: ${{ steps.create_release.outputs.body }}
         run: |
-          VERSION="${{ steps.extract_version.outputs.version }}"
           OTA_BIN="release-files/firmware.ota.bin"
           MD5=$(md5sum "$OTA_BIN" | cut -d' ' -f1)
           OTA_URL="https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v${VERSION}/firmware.ota.bin"
 
           mkdir -p manifests
-          cat > manifests/atom_lite.json << EOF
-          {
-            "name": "atom-barcode",
-            "version": "$VERSION",
-            "builds": [
-              {
-                "chipFamily": "ESP32",
-                "ota": {
-                  "path": "$OTA_URL",
-                  "md5": "$MD5",
-                  "summary": "M5Stack Atom Lite Barcode Scanner Firmware",
-                  "release_url": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v$VERSION"
-                }
-              }
-            ]
+          # Use Python for safe JSON serialisation — release body contains newlines and quotes.
+          python3 - "$VERSION" "$OTA_URL" "$MD5" <<'PYEOF'
+          import json, sys, os
+          version, ota_url, md5 = sys.argv[1], sys.argv[2], sys.argv[3]
+          manifest = {
+              "name": "atom-barcode",
+              "version": version,
+              "builds": [{
+                  "chipFamily": "ESP32",
+                  "ota": {
+                      "path": ota_url,
+                      "md5": md5,
+                      "summary": os.environ.get("RELEASE_SUMMARY", ""),
+                      "release_url": os.environ.get("RELEASE_URL", ""),
+                  },
+              }],
           }
-          EOF
+          with open("manifests/atom_lite.json", "w") as f:
+              json.dump(manifest, f, indent=2)
+              f.write("\n")
+          PYEOF
 
           echo "Generated manifests/atom_lite.json:"
           cat manifests/atom_lite.json
