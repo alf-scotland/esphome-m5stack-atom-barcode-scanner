@@ -109,13 +109,17 @@ jobs:
           {
             "name": "atom-barcode",
             "version": "$VERSION",
-            "summary": "M5Stack Atom Lite Barcode Scanner Firmware",
-            "changelog": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v$VERSION",
-            "ota": {
-              "summary": "Firmware update to $VERSION",
-              "url": "$OTA_URL",
-              "md5": "$MD5"
-            }
+            "builds": [
+              {
+                "chipFamily": "ESP32",
+                "ota": {
+                  "path": "$OTA_URL",
+                  "md5": "$MD5",
+                  "summary": "M5Stack Atom Lite Barcode Scanner Firmware",
+                  "release_url": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v$VERSION"
+                }
+              }
+            ]
           }
           EOF
 
