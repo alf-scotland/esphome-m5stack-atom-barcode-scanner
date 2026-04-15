@@ -7,7 +7,6 @@
       "ota": {
         "path": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v2026.4.1/firmware.ota.bin",
         "md5": "aec2d5ad80973dcd44c8f9334fc88ef4",
-<<<<<<< HEAD
         "summary": "## What's Changed\n* feat(barcode): add cmd ACK sound and config code scan switches by @alf-scotland in https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/pull/42\n\n\n**Full Changelog**: https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/compare/v2026.4.0...v2026.4.1",
         "release_url": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v2026.4.1"
       }
