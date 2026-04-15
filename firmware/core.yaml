@@ -96,6 +96,16 @@ m5stack_barcode:
     entity_category: "config"
     icon: "mdi:led-on"
 
+  cmd_ack_sound_switch:
+    name: "Command ACK Sound"
+    entity_category: "config"
+    icon: "mdi:bell-check"
+
+  config_code_scan_switch:
+    name: "Config Code Scanning"
+    entity_category: "config"
+    icon: "mdi:barcode-off"
+
   terminator_select:
     name: "Terminator"
     entity_category: "config"

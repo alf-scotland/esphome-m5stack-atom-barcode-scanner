@@ -56,6 +56,8 @@ CONF_SOUND_SWITCH = "sound_switch"
 CONF_BOOT_SOUND_SWITCH = "boot_sound_switch"
 CONF_DECODE_SOUND_SWITCH = "decode_sound_switch"
 CONF_DECODING_SUCCESS_LIGHT_SWITCH = "decoding_success_light_switch"
+CONF_CMD_ACK_SOUND_SWITCH = "cmd_ack_sound_switch"
+CONF_CONFIG_CODE_SCAN_SWITCH = "config_code_scan_switch"
 CONF_START_BUTTON = "start_button"
 CONF_STOP_BUTTON = "stop_button"
 CONF_SCANNING_BINARY_SENSOR = "scanning_binary_sensor"
@@ -75,6 +77,8 @@ CONF_BUZZER_VOLUME = "buzzer_volume"
 CONF_DECODING_SUCCESS_LIGHT_MODE = "decoding_success_light_mode"
 CONF_BOOT_SOUND_MODE = "boot_sound_mode"
 CONF_DECODE_SOUND_MODE = "decode_sound_mode"
+CONF_CMD_ACK_SOUND_MODE = "cmd_ack_sound_mode"
+CONF_CONFIG_CODE_SCAN_MODE = "config_code_scan_mode"
 
 # Scanner timing settings
 CONF_SCAN_DURATION = "scan_duration"
@@ -149,6 +153,18 @@ DecodeSoundMode = m5stack_barcode_ns.enum("DecodeSoundMode", is_class=True)
 DECODE_SOUND_MODES = {
     "enabled": DecodeSoundMode.DECODE_SOUND_ENABLED,
     "disabled": DecodeSoundMode.DECODE_SOUND_DISABLED,
+}
+
+CmdAckSoundMode = m5stack_barcode_ns.enum("CmdAckSoundMode", is_class=True)
+CMD_ACK_SOUND_MODES = {
+    "enabled": CmdAckSoundMode.CMD_ACK_SOUND_ENABLED,
+    "disabled": CmdAckSoundMode.CMD_ACK_SOUND_DISABLED,
+}
+
+ConfigCodeScanMode = m5stack_barcode_ns.enum("ConfigCodeScanMode", is_class=True)
+CONFIG_CODE_SCAN_MODES = {
+    "enabled": ConfigCodeScanMode.CONFIG_CODE_SCAN_ENABLED,
+    "disabled": ConfigCodeScanMode.CONFIG_CODE_SCAN_DISABLED,
 }
 
 ScanDuration = m5stack_barcode_ns.enum("ScanDuration", is_class=True)
@@ -324,6 +340,16 @@ DecodingSuccessLightSwitch = m5stack_barcode_ns.class_(
     switch.Switch,
     cg.Component,
 )
+CmdAckSoundSwitch = m5stack_barcode_ns.class_(
+    "CmdAckSoundSwitch",
+    switch.Switch,
+    cg.Component,
+)
+ConfigCodeScanSwitch = m5stack_barcode_ns.class_(
+    "ConfigCodeScanSwitch",
+    switch.Switch,
+    cg.Component,
+)
 
 # Sub-components — button
 StartButton = m5stack_barcode_ns.class_(
@@ -413,6 +439,12 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_DECODING_SUCCESS_LIGHT_SWITCH): switch.switch_schema(
             DecodingSuccessLightSwitch,
         ).extend(cv.COMPONENT_SCHEMA),
+        cv.Optional(CONF_CMD_ACK_SOUND_SWITCH): switch.switch_schema(
+            CmdAckSoundSwitch,
+        ).extend(cv.COMPONENT_SCHEMA),
+        cv.Optional(CONF_CONFIG_CODE_SCAN_SWITCH): switch.switch_schema(
+            ConfigCodeScanSwitch,
+        ).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_START_BUTTON): button.button_schema(
             StartButton,
         ).extend(cv.COMPONENT_SCHEMA),
@@ -455,6 +487,14 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_DECODE_SOUND_MODE, default="enabled"): cv.enum(
             DECODE_SOUND_MODES,
+            lower=True,
+        ),
+        cv.Optional(CONF_CMD_ACK_SOUND_MODE, default="enabled"): cv.enum(
+            CMD_ACK_SOUND_MODES,
+            lower=True,
+        ),
+        cv.Optional(CONF_CONFIG_CODE_SCAN_MODE, default="enabled"): cv.enum(
+            CONFIG_CODE_SCAN_MODES,
             lower=True,
         ),
         cv.Optional(CONF_SCAN_DURATION, default="3s"): cv.enum(
@@ -515,6 +555,14 @@ async def handle_sound_config(var: Any, config: dict[str, Any]) -> None:
 
     if CONF_DECODE_SOUND_MODE in config:
         cg.add(var.set_decode_sound_mode_initial(config[CONF_DECODE_SOUND_MODE]))
+
+    if CONF_CMD_ACK_SOUND_MODE in config:
+        cg.add(var.set_cmd_ack_sound_mode_initial(config[CONF_CMD_ACK_SOUND_MODE]))
+
+    if CONF_CONFIG_CODE_SCAN_MODE in config:
+        cg.add(
+            var.set_config_code_scan_mode_initial(config[CONF_CONFIG_CODE_SCAN_MODE]),
+        )
 
 
 async def handle_timing_config(var: Any, config: dict[str, Any]) -> None:
@@ -622,6 +670,8 @@ async def handle_switch_subcomponents(var: Any, config: dict[str, Any]) -> None:
         (CONF_BOOT_SOUND_SWITCH, var.set_boot_sound_switch),
         (CONF_DECODE_SOUND_SWITCH, var.set_decode_sound_switch),
         (CONF_DECODING_SUCCESS_LIGHT_SWITCH, var.set_decoding_success_light_switch),
+        (CONF_CMD_ACK_SOUND_SWITCH, var.set_cmd_ack_sound_switch),
+        (CONF_CONFIG_CODE_SCAN_SWITCH, var.set_config_code_scan_switch),
     ]
     for conf_key, setter in switch_map:
         if conf_key in config:

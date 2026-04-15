@@ -90,6 +90,14 @@ constexpr uint8_t Commands::SameCodeInterval::MS_1000[];
 constexpr uint8_t Commands::SameCodeInterval::MS_1500[];
 constexpr uint8_t Commands::SameCodeInterval::MS_2000[];
 
+// Command acknowledgment sound commands
+constexpr uint8_t Commands::CmdAckSound::CMD_ACK_SOUND_ENABLED[];
+constexpr uint8_t Commands::CmdAckSound::CMD_ACK_SOUND_DISABLED[];
+
+// Configuration code scan permission commands
+constexpr uint8_t Commands::ConfigCodeScan::CONFIG_CODE_SCAN_ENABLED[];
+constexpr uint8_t Commands::ConfigCodeScan::CONFIG_CODE_SCAN_DISABLED[];
+
 // Response codes
 constexpr uint8_t Commands::Responses::ACK[];
 constexpr uint8_t Commands::Responses::NON_HOST_ACK[];

@@ -205,6 +205,28 @@ auto same_code_interval_to_string(SameCodeInterval interval) -> const char * {
   }
 }
 
+auto cmd_ack_sound_mode_to_string(CmdAckSoundMode mode) -> const char * {
+  switch (mode) {
+    case CmdAckSoundMode::CMD_ACK_SOUND_ENABLED:
+      return "Enabled";
+    case CmdAckSoundMode::CMD_ACK_SOUND_DISABLED:
+      return "Disabled";
+    default:
+      return "Unknown Command ACK Sound Mode";
+  }
+}
+
+auto config_code_scan_mode_to_string(ConfigCodeScanMode mode) -> const char * {
+  switch (mode) {
+    case ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED:
+      return "Enabled";
+    case ConfigCodeScanMode::CONFIG_CODE_SCAN_DISABLED:
+      return "Disabled";
+    default:
+      return "Unknown Config Code Scan Mode";
+  }
+}
+
 auto scan_state_to_string(ScanState state) -> const char * {
   switch (state) {
     case ScanState::IDLE:
