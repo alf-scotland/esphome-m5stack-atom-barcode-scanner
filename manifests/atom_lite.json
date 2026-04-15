@@ -1,14 +1,14 @@
 {
   "name": "atom-barcode",
-  "version": "2026.4.0",
+  "version": "2026.4.1",
   "builds": [
     {
       "chipFamily": "ESP32",
       "ota": {
-        "path": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v2026.4.0/firmware.ota.bin",
-        "md5": "0ebc119566e5f84a14be107c5607f0cd",
-        "summary": "M5Stack Atom Lite Barcode Scanner Firmware",
-        "release_url": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v2026.4.0"
+        "path": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v2026.4.1/firmware.ota.bin",
+        "md5": "aec2d5ad80973dcd44c8f9334fc88ef4",
+        "summary": "",
+        "release_url": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v2026.4.1"
       }
     }
   ]
