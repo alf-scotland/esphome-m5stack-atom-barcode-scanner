@@ -101,18 +101,22 @@ jobs:
         if: steps.extract_version.outputs.is_prerelease == 'false'
         env:
           VERSION: ${{ steps.extract_version.outputs.version }}
-          RELEASE_URL: ${{ steps.create_release.outputs.url }}
-          RELEASE_SUMMARY: ${{ steps.create_release.outputs.body }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           OTA_BIN="release-files/firmware.ota.bin"
           MD5=$(md5sum "$OTA_BIN" | cut -d' ' -f1)
           OTA_URL="https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v${VERSION}/firmware.ota.bin"
+          RELEASE_URL="https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v${VERSION}"
+
+          # Fetch the auto-generated release notes from GitHub — generate_release_notes:true
+          # populates them server-side but doesn't expose them as a softprops action output.
+          RELEASE_SUMMARY=$(gh release view "v${VERSION}" --json body --jq '.body')
 
           mkdir -p manifests
           # Use Python for safe JSON serialisation — release body contains newlines and quotes.
-          python3 - "$VERSION" "$OTA_URL" "$MD5" <<'PYEOF'
+          python3 - "$VERSION" "$OTA_URL" "$MD5" "$RELEASE_URL" <<'PYEOF'
           import json, sys, os
-          version, ota_url, md5 = sys.argv[1], sys.argv[2], sys.argv[3]
+          version, ota_url, md5, release_url = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
           manifest = {
               "name": "atom-barcode",
               "version": version,
@@ -122,7 +126,7 @@ jobs:
                       "path": ota_url,
                       "md5": md5,
                       "summary": os.environ.get("RELEASE_SUMMARY", ""),
-                      "release_url": os.environ.get("RELEASE_URL", ""),
+                      "release_url": release_url,
                   },
               }],
           }
