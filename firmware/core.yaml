@@ -24,6 +24,10 @@ ota:
   - platform: http_request
 
 http_request:
+  # Default 512 B is too small for GitHub CDN redirect headers (signed URLs).
+  # 4096 B comfortably handles the redirect chain and speeds up OTA chunk reads.
+  buffer_size_rx: 4096
+  buffer_size_tx: 512
 
 wifi:
   ap:
