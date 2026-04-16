@@ -1293,6 +1293,22 @@ void ConfigCodeScanSwitch::write_state(bool state) {
                                             : ConfigCodeScanMode::CONFIG_CODE_SCAN_DISABLED);
 }
 
+void BarcodeScanner::factory_reset() {
+  ESP_LOGW(TAG_SCANNER, "Factory reset requested — scanner will revert to hardware defaults and ESP will reboot");
+  this->queue_command(CommandFactory::create_factory_reset_command());
+}
+
+void BarcodeScanner::do_factory_reset_() {
+  // Invalidate NVS by saving a zeroed struct (version=0).  On next boot
+  // configure_defaults_() will see a version mismatch and re-send every setting.
+  ScannerPreferences empty{};
+  if (!this->pref_.save(&empty)) {
+    ESP_LOGW(TAG_SCANNER, "Failed to invalidate NVS preferences; settings may not fully re-sync after reboot");
+  }
+  ESP_LOGW(TAG_SCANNER, "Scanner factory reset acknowledged — rebooting to re-apply YAML settings");
+  App.safe_reboot();
+}
+
 void StartButton::press_action() {
   if (scanner_ != nullptr)
     scanner_->start_scan();
@@ -1301,6 +1317,11 @@ void StartButton::press_action() {
 void StopButton::press_action() {
   if (scanner_ != nullptr)
     scanner_->stop_scan();
+}
+
+void FactoryResetButton::press_action() {
+  if (scanner_ != nullptr)
+    scanner_->factory_reset();
 }
 
 }  // namespace m5stack_barcode

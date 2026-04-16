@@ -252,6 +252,23 @@ class Commands {
   };
 
   /**
+   * Factory reset command.
+   * PDF item 1: "Set default parameters" — restores all scanner settings to factory defaults.
+   * After ACK the ESP clears its NVS preferences and reboots so that all YAML-configured
+   * settings are re-applied from scratch on the next boot.
+   *
+   * Scanner factory defaults differ from ESPHome component defaults in three places:
+   *   - sound_mode:      factory = enabled (sounds on);  component default = disabled
+   *   - buzzer_volume:   factory = high;                 component default = low
+   *   - boot_sound_mode: factory = enabled;              component default = disabled
+   * After the reboot the component re-applies its YAML defaults, restoring the intended state.
+   */
+  struct FactoryReset {
+    static constexpr uint8_t FACTORY_RESET[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0xFF, 0x00, 0xFD, 0x35};
+    static constexpr size_t SIZE = 10;
+  };
+
+  /**
    * Response codes from the scanner.
    * These are used to acknowledge commands or indicate status.
    */

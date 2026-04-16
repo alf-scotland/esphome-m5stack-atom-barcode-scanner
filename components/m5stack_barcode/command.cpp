@@ -397,5 +397,10 @@ std::unique_ptr<Command> CommandFactory::create_config_code_scan_command(ConfigC
                                    [mode](BarcodeScanner *s) { s->set_config_code_scan_mode_state(mode); });
 }
 
+std::unique_ptr<Command> CommandFactory::create_factory_reset_command() {
+  return std::make_unique<Command>(Commands::FactoryReset::FACTORY_RESET, Commands::FactoryReset::SIZE, "Factory reset",
+                                   [](BarcodeScanner *s) { s->do_factory_reset_(); });
+}
+
 }  // namespace m5stack_barcode
 }  // namespace esphome

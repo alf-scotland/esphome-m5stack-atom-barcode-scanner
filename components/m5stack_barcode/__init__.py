@@ -60,6 +60,7 @@ CONF_CMD_ACK_SOUND_SWITCH = "cmd_ack_sound_switch"
 CONF_CONFIG_CODE_SCAN_SWITCH = "config_code_scan_switch"
 CONF_START_BUTTON = "start_button"
 CONF_STOP_BUTTON = "stop_button"
+CONF_FACTORY_RESET_BUTTON = "factory_reset_button"
 CONF_SCANNING_BINARY_SENSOR = "scanning_binary_sensor"
 
 # Event types
@@ -362,6 +363,11 @@ StopButton = m5stack_barcode_ns.class_(
     button.Button,
     cg.Component,
 )
+FactoryResetButton = m5stack_barcode_ns.class_(
+    "FactoryResetButton",
+    button.Button,
+    cg.Component,
+)
 
 # Conditions
 IsContinuousModeCondition = m5stack_barcode_ns.class_(
@@ -450,6 +456,9 @@ CONFIG_SCHEMA = cv.Schema(
         ).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_STOP_BUTTON): button.button_schema(
             StopButton,
+        ).extend(cv.COMPONENT_SCHEMA),
+        cv.Optional(CONF_FACTORY_RESET_BUTTON): button.button_schema(
+            FactoryResetButton,
         ).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_SCANNING_BINARY_SENSOR): (
             binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor).extend(
@@ -685,7 +694,7 @@ async def handle_switch_subcomponents(var: Any, config: dict[str, Any]) -> None:
 
 async def handle_button_subcomponents(var: Any, config: dict[str, Any]) -> None:
     """Wire up button sub-components."""
-    for conf_key in (CONF_START_BUTTON, CONF_STOP_BUTTON):
+    for conf_key in (CONF_START_BUTTON, CONF_STOP_BUTTON, CONF_FACTORY_RESET_BUTTON):
         if conf_key in config:
             btn_conf = config[conf_key]
             btn_var = cg.new_Pvariable(btn_conf[CONF_ID])

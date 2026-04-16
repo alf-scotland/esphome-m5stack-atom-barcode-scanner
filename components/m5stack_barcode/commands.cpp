@@ -98,6 +98,9 @@ constexpr uint8_t Commands::CmdAckSound::CMD_ACK_SOUND_DISABLED[];
 constexpr uint8_t Commands::ConfigCodeScan::CONFIG_CODE_SCAN_ENABLED[];
 constexpr uint8_t Commands::ConfigCodeScan::CONFIG_CODE_SCAN_DISABLED[];
 
+// Factory reset command
+constexpr uint8_t Commands::FactoryReset::FACTORY_RESET[];
+
 // Response codes
 constexpr uint8_t Commands::Responses::ACK[];
 constexpr uint8_t Commands::Responses::NON_HOST_ACK[];
