@@ -17,7 +17,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 | 2 | ✅ | `fix/rx-buffer-overflow` | `read_buffer_()` appends bytes with no size cap; `MAX_BARCODE_LENGTH` defined but never enforced in the read path |
 | 3 | ✅ | `fix/command-queue-state` | `queue_command()` doesn't check whether an ACK is currently pending; timed-out commands are silently dropped with no retry or logging of which command failed |
 | 4 | ✅ | `fix/nvs-preferences-robustness` | Loaded NVS enum fields not range-validated before casting; `pref_.save()` return value unchecked; no `static_assert` on struct size to catch padding changes |
-| 5 | ⏸ | `fix/nvs-instance-isolation` | `fnv1_hash("m5stack_barcode")` is a constant — two component instances share the same NVS slot; must incorporate a per-instance identifier — **deferred: single-instance-per-device is the only realistic deployment** |
+| 5 | ⏸ | `fix/nvs-instance-isolation` | `fnv1_hash("m5stack_barcode")` is a constant — two component instances share the same NVS slot; must incorporate a per-instance identifier — **permanently deferred: the M5Stack Atom hardware physically only supports one scanner connection; multi-instance deployment is not realistic** |
 
 ---
 
@@ -79,7 +79,7 @@ These are correctness issues. Nothing else should start until all of Tier 1 is m
 | 30 | ✅ | `feat/protocol-factory-reset` | PDF item 1: "Set default parameters" — add a `factory_reset` button entity that sends `08 C6 04 08 00 F2 FF 00 FD 35`, clears NVS (so the next boot re-syncs all settings from YAML), then reboots the ESP32. Reboot is required because the scanner is now in factory state and ESPHome must re-apply all configured settings before HA entities reflect reality. **Risk: highest of the three — if reboot fails or is interrupted mid-reset the scanner and HA will be out of sync.** |
 | 31 | ✅ | `feat/protocol-cmd-ack-sound-config-code-scan` | PDF item 14: "Setting code parameter prompt tone" — the beep the scanner emits when it successfully processes a configuration command. Currently always on (factory default). Add `cmd_ack_sound_switch` entity (enable/prohibit). Requires adding 2 bytes to `commands.h`, a new field in `ScannerPreferences` (bump `SETTINGS_VERSION` to 2, update `static_assert`), and following the same switch pattern as `decode_sound_switch`. |
 | 32 | ✅ | `feat/protocol-cmd-ack-sound-config-code-scan` | PDF item 21: "Allow scanning of configuration codes" — controls whether the scanner can be reconfigured by scanning a specially-encoded barcode QR. Default is enabled, which means accidentally scanning a config QR code could silently change scanner settings without HA knowing. Add `config_code_scan_switch` entity. Same NVS impact as item 31 — both fields can be added in one `SETTINGS_VERSION` bump if done together. |
-| 26 | ⬜ | `chore/esphome-core-prep` | Final pass before opening PR against esphome/esphome: verify component namespace, add `CODEOWNERS` entry, pass ESPHome's own test runner (`pytest tests/`), verify Python passes ESPHome's ruff config, verify C++ passes ESPHome's clang-tidy, document migration path away from `external_components:` |
+| 26 | 🔄 | `chore/esphome-core-prep` | Final pass before opening PR against esphome/esphome: verify component namespace, add `CODEOWNERS` entry, pass ESPHome's own test runner (`pytest tests/`), verify Python passes ESPHome's ruff config, verify C++ passes ESPHome's clang-tidy, document migration path away from `external_components:` |
 
 ---
 

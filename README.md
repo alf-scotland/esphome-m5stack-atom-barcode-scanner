@@ -7,32 +7,30 @@ This repository provides an external component for ESPHome that enables support 
 This repository contains:
 
 - **Component** (`components/m5stack_barcode/`): The ESPHome external component
-- **Firmware** (`firmware.yaml`): A complete firmware example for the M5Stack Atom Barcode Scanner
+- **Firmware** (`firmware/atom_lite.yaml`): A complete firmware example for the M5Stack Atom Lite + QR Scanner kit
 - **Documentation** (`components/m5stack_barcode/index.rst`): Detailed component usage documentation
 
 ## Installation
 
-To use this component in your ESPHome configuration, add the following to your YAML file:
+Add the following to your ESPHome YAML configuration:
 
 ```yaml
 external_components:
-  - source: github://scotland/esphome-m5stack-atom-barcode-scanner@main
+  - source: github://alf-scotland/esphome-m5stack-atom-barcode-scanner@main
     components: [ m5stack_barcode ]
 ```
 
+> **When this component is merged into ESPHome core**, remove the `external_components:` block entirely — the component will be available built-in. No other YAML changes are required.
+
 ## Quick Start Configuration
 
-Here's a minimal working configuration:
-
 ```yaml
-# Configure UART for communication with the scanner
 uart:
   id: uart_bus
   baud_rate: 9600
   tx_pin: GPIO19
   rx_pin: GPIO22
 
-# Configure the barcode scanner component
 m5stack_barcode:
   id: barcode_scanner
   uart_id: uart_bus
@@ -41,26 +39,19 @@ m5stack_barcode:
     - logger.log:
         format: "Scanned: %s"
         args: [ 'x.c_str()' ]
-
-# Optional: expose barcode as a text sensor in Home Assistant
-text_sensor:
-  - platform: template
-    name: "Last Barcode"
-    id: last_barcode
-    icon: "mdi:barcode"
 ```
 
-For complete documentation on all available options, actions, and conditions, see the [component documentation](components/m5stack_barcode/index.rst).
+For all available options, actions, and conditions see [`components/m5stack_barcode/index.rst`](components/m5stack_barcode/index.rst).
 
 ## Hardware Connection
 
 Connect your M5Stack Atom QR Code Scanner to your ESP device:
-- UART TX (Scanner) -> RX GPIO22 (ESP)
-- UART RX (Scanner) -> TX GPIO19 (ESP)
-- TRIG Pin -> GPIO23 (ESP)
-- DLED Pin -> GPIO33 (ESP)
-- VCC -> 3.3V
-- GND -> GND
+- UART TX (Scanner) → RX GPIO22 (ESP)
+- UART RX (Scanner) → TX GPIO19 (ESP)
+- TRIG Pin → GPIO23 (ESP)
+- DLED Pin → GPIO33 (ESP)
+- VCC → 3.3V
+- GND → GND
 
 ## Home Assistant Automations
 
@@ -94,80 +85,49 @@ The `scan_event` sub-component (entity class `event`) also appears as a device t
 
 ## Development
 
-This component uses ESPHome's standard development tools.
-
 ### Prerequisites
 
-- Python 3.13 or higher
-- ESPHome 2025.5.0 or higher
-- uv (for dependency management)
-- pre-commit (for development)
+- Python 3.11 or higher
+- [uv](https://docs.astral.sh/uv/) for dependency management
 
-### Setting Up Development Environment
+### Setup
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/scotland/esphome-m5stack-atom-barcode-scanner.git
+git clone https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner.git
 cd esphome-m5stack-atom-barcode-scanner
+uv sync --all-extras --dev
+uv run pre-commit install
 ```
 
-2. Install uv:
+### Common Commands
+
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Compile firmware
+uv run esphome compile firmware/atom_lite.yaml
+
+# Lint everything
+uv run pre-commit run --all-files
+
+# Run config validation tests
+uv run pytest tests/
+
+# Python linting only
+uv run ruff check .
+uv run ruff format .
+
+# C++ static analysis (requires clang-tidy installed)
+uv run pre-commit run clang-tidy --hook-stage manual
 ```
 
-3. Create and activate a virtual environment and install dependencies:
-```bash
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -r requirements-dev.txt
-```
+### Code Style
 
-4. Install pre-commit hooks:
-```bash
-pre-commit install
-```
-
-### Code Style and Linting
-
-This project uses ruff for all Python code quality checks:
-
-- Code formatting
-- Import sorting
-- Code linting
-- Type checking
-
-Run all linting checks:
-```bash
-ruff check .
-ruff format .
-```
-
-### Testing
-
-To run the test suite:
-```bash
-pytest tests/
-```
+- **C++**: C++17, column limit 120 (`.clang-format`), clang-format v17
+- **Python**: line length 88, ruff with all rules (see `pyproject.toml`)
+- **YAML**: validated by yamllint (`.yamllint.yaml`)
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run the linting checks (`pre-commit run --all-files`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-### Contribution Guidelines
-
-- Follow the existing code style
-- Add tests for new functionality
-- Update documentation as needed
-- Ensure all tests pass and linting checks succeed
-- Keep commits focused and atomic
-- Write clear commit messages
+See [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) for the full contribution guide including branch strategy, PR process, and release steps.
 
 ## Documentation
 
@@ -175,9 +135,9 @@ Full component documentation — all configuration options, actions, triggers, a
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-- [ESPHome](https://esphome.io/) for the amazing framework
+- [ESPHome](https://esphome.io/) for the framework
 - [M5Stack](https://docs.m5stack.com/) for the Atom QR Code Scanner hardware

@@ -13,6 +13,27 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pre-commit>=4.5.1",
+    "pytest>=8.0.0",
     "ruff>=0.15.11",
     "yamllint>=1.38.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # Docstring style conflicts — pick D211/D213 variants
+    "D203",   # one-blank-line-before-class (conflicts with D211)
+    "D213",   # multi-line-summary-second-line (conflicts with D212)
+    # Annotation flexibility
+    "ANN401", # Dynamically typed expressions (Any) are discouraged
+    # ESPHome __init__.py uses Any extensively in codegen helpers
+]
+
+[tool.ruff.lint.per-file-ignores]
+"components/m5stack_barcode/__init__.py" = [
+    "ANN401", # Any is required for ESPHome codegen API (cg.get_variable, etc.)
 ]
