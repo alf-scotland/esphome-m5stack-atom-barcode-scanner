@@ -69,6 +69,7 @@ class DecodeSoundSwitch;
 class DecodingSuccessLightSwitch;
 class CmdAckSoundSwitch;
 class ConfigCodeScanSwitch;
+class FactoryResetButton;
 
 // Logging tag for this component
 extern const char *const TAG_SCANNER;
@@ -316,6 +317,20 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_config_code_scan_mode(ConfigCodeScanMode mode);
 
   /**
+   * @brief Reset the scanner to factory defaults and reboot the ESP.
+   *
+   * Sends the factory-reset command (PDF item 1) to the scanner.  On ACK the
+   * component invalidates its NVS preferences (version set to 0) so the next
+   * boot treats all settings as changed and re-sends every YAML-configured
+   * value to the scanner.  The ESP then reboots via App.safe_reboot().
+   *
+   * Note: scanner factory defaults differ from the component defaults for three
+   * settings (sound_mode, buzzer_volume, boot_sound_mode).  These are corrected
+   * automatically on the next boot when the component re-applies YAML values.
+   */
+  void factory_reset();
+
+  /**
    * @brief Process the current buffer as a barcode.
    * This is useful for continuous mode where we want to process intermediate results.
    */
@@ -456,6 +471,16 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    * @brief Process the command queue and send commands to the scanner.
    */
   void process_command_queue_();
+
+  /**
+   * @brief Invalidate NVS preferences and trigger a safe reboot.
+   *
+   * Called by CommandFactory::create_factory_reset_command()'s on_success lambda
+   * after the scanner ACKs the factory-reset command.  Saves a zeroed
+   * ScannerPreferences struct (version=0) so configure_defaults_() on the next
+   * boot re-sends all settings unconditionally, then calls App.safe_reboot().
+   */
+  void do_factory_reset_();
 
   /**
    * @brief Add a command to the processing queue.
@@ -964,6 +989,20 @@ class StartButton : public button::Button, public Component {
 
 /// Button sub-component that stops the current HOST-mode scan when pressed in Home Assistant.
 class StopButton : public button::Button, public Component {
+ public:
+  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
+
+ protected:
+  void press_action() override;
+
+ private:
+  BarcodeScanner *scanner_{nullptr};
+};
+
+/// Button sub-component that resets the scanner to factory defaults and reboots the ESP.
+/// After ACK the component invalidates its NVS preferences and calls App.safe_reboot() so
+/// all YAML-configured settings are re-applied on the next boot.
+class FactoryResetButton : public button::Button, public Component {
  public:
   void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
 

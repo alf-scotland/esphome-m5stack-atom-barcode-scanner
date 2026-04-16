@@ -50,6 +50,12 @@ m5stack_barcode:
     entity_category: "diagnostic"
     icon: "mdi:information-outline"
 
+  factory_reset_button:
+    name: "Factory Reset Scanner"
+    entity_category: "diagnostic"
+    icon: "mdi:restore"
+    disabled_by_default: true
+
   scan_event:
     name: "Barcode Scanned"
     icon: "mdi:barcode-scan"

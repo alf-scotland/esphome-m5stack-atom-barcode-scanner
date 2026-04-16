@@ -75,6 +75,7 @@ class CommandFactory {
   static std::unique_ptr<Command> create_same_code_interval_command(SameCodeInterval interval);
   static std::unique_ptr<Command> create_cmd_ack_sound_command(CmdAckSoundMode mode);
   static std::unique_ptr<Command> create_config_code_scan_command(ConfigCodeScanMode mode);
+  static std::unique_ptr<Command> create_factory_reset_command();
 };
 
 }  // namespace m5stack_barcode

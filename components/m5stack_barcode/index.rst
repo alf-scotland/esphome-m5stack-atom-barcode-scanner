@@ -50,6 +50,7 @@ Component Options
 - **scanning_binary_sensor** (*Optional*): Expose the current scan state as a Home Assistant ``binary_sensor`` entity. ``on`` while scanning, ``off`` when idle.
 - **start_button** (*Optional*): Expose a Home Assistant ``button`` entity that starts a HOST-mode scan when pressed.
 - **stop_button** (*Optional*): Expose a Home Assistant ``button`` entity that stops the current HOST-mode scan when pressed.
+- **factory_reset_button** (*Optional*): Expose a Home Assistant ``button`` entity that resets the scanner to hardware factory defaults and reboots the ESP. See :ref:`m5stack_barcode-factory_reset_button`.
 - **sound_switch** (*Optional*): Expose ``sound_mode`` as a Home Assistant ``switch`` entity. ``on`` = sound enabled, ``off`` = disabled.
 - **boot_sound_switch** (*Optional*): Expose ``boot_sound_mode`` as a Home Assistant ``switch`` entity.
 - **decode_sound_switch** (*Optional*): Expose ``decode_sound_mode`` as a Home Assistant ``switch`` entity.
@@ -98,10 +99,19 @@ Component Options
   - ``enabled`` (Default): Success light flashes on successful decode
   - ``disabled``: Success light does not flash on successful decode
 
-- **sound_mode** (*Optional*): General sound control.
+- **sound_mode** (*Optional*): General sound control (global mute).
 
-  - ``disabled`` (Default): No sound
-  - ``enabled``: Sound enabled
+  - ``disabled`` (Default): Scanner buzzer is silenced
+  - ``enabled``: Scanner buzzer is active
+
+  .. note::
+
+      The scanner's hardware factory default is ``enabled`` (sounds on).  The component
+      default is ``disabled`` to avoid audible noise in a Home Assistant installation.
+      The other two deliberate divergences from factory defaults are ``boot_sound_mode``
+      (factory: enabled; component: disabled) and ``buzzer_volume`` (factory: high;
+      component: low).  All three are restored to the component-configured values
+      automatically after a :ref:`factory reset <m5stack_barcode-factory_reset_button>`.
 
 - **boot_sound_mode** (*Optional*): Controls power-up sound.
 
@@ -572,6 +582,54 @@ A button entity that calls ``m5stack_barcode.stop`` when pressed.
         name: "Stop Scan"
         icon: "mdi:stop-circle-outline"
 
+.. _m5stack_barcode-factory_reset_button:
+
+``factory_reset_button``
+************************
+
+A button entity that resets the scanner to its hardware factory defaults, then reboots the
+ESP so the component can re-apply all YAML-configured settings from scratch.
+
+**What happens when pressed:**
+
+1. The factory-reset command (PDF item 1) is queued and sent to the scanner over UART.
+2. On ACK the component invalidates its NVS preferences (sets the stored version to 0).
+3. ``App.safe_reboot()`` is called — the ESP reboots.
+4. On boot, ``configure_defaults_()`` detects no valid preferences and sends every
+   YAML-configured setting to the scanner unconditionally.
+
+**Factory vs component defaults:** The scanner hardware resets to the manufacturer defaults
+for all settings.  Three of those defaults differ from the component defaults:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 25
+
+   * - Setting
+     - Hardware factory default
+     - Component default
+   * - ``sound_mode``
+     - ``enabled`` (sounds on)
+     - ``disabled``
+   * - ``buzzer_volume``
+     - ``high``
+     - ``low``
+   * - ``boot_sound_mode``
+     - ``enabled``
+     - ``disabled``
+
+These are corrected automatically when the component re-applies YAML settings after the
+reboot.  No user intervention is required.
+
+.. code-block:: yaml
+
+    m5stack_barcode:
+      id: barcode_scanner
+      factory_reset_button:
+        name: "Factory Reset Scanner"
+        icon: "mdi:restore"
+        entity_category: "config"
+
 .. _m5stack_barcode-sound_switch:
 
 ``sound_switch``
@@ -951,6 +1009,10 @@ workarounds needed.
       stop_button:
         name: "Stop Scan"
         icon: "mdi:stop-circle-outline"
+      factory_reset_button:
+        name: "Factory Reset Scanner"
+        icon: "mdi:restore"
+        entity_category: "config"
 
       # Mode and duration selects
       operation_mode_select:
