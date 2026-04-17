@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Keep GitHub Actions pinned SHAs up to date.
+  # Keep GitHub Actions pinned SHAs up to date (covers all workflows including pre-commit-autoupdate.yml).
   - package-ecosystem: github-actions
     directory: /
     schedule:
