@@ -114,86 +114,86 @@ Checks: >-
   -readability-redundant-string-init,
   -readability-uppercase-literal-suffix,
   -readability-use-anyofallof,
-WarningsAsErrors: "*"
-FormatStyle: google
+WarningsAsErrors: '*'
+FormatStyle:     google
 CheckOptions:
-  - key: google-readability-function-size.StatementThreshold
-    value: "800"
-  - key: google-runtime-int.TypeSuffix
-    value: "_t"
-  - key: llvm-namespace-comment.ShortNamespaceLines
-    value: "10"
-  - key: llvm-namespace-comment.SpacesBeforeComments
-    value: "2"
-  - key: modernize-loop-convert.MaxCopySize
-    value: "16"
-  - key: modernize-loop-convert.MinConfidence
-    value: reasonable
-  - key: modernize-loop-convert.NamingStyle
-    value: CamelCase
-  - key: modernize-pass-by-value.IncludeStyle
-    value: llvm
-  - key: modernize-replace-auto-ptr.IncludeStyle
-    value: llvm
-  - key: modernize-use-nullptr.NullMacros
-    value: "NULL"
-  - key: modernize-make-unique.MakeSmartPtrFunction
-    value: "make_unique"
-  - key: modernize-make-unique.MakeSmartPtrFunctionHeader
-    value: "esphome/core/helpers.h"
-  - key: readability-braces-around-statements.ShortStatementLines
-    value: 2
-  - key: readability-identifier-naming.LocalVariableCase
-    value: "lower_case"
-  - key: readability-identifier-naming.ClassCase
-    value: "CamelCase"
-  - key: readability-identifier-naming.StructCase
-    value: "CamelCase"
-  - key: readability-identifier-naming.EnumCase
-    value: "CamelCase"
-  - key: readability-identifier-naming.EnumConstantCase
-    value: "UPPER_CASE"
-  - key: readability-identifier-naming.StaticConstantCase
-    value: "UPPER_CASE"
-  - key: readability-identifier-naming.StaticVariableCase
-    value: "lower_case"
-  - key: readability-identifier-naming.GlobalConstantCase
-    value: "UPPER_CASE"
-  - key: readability-identifier-naming.ParameterCase
-    value: "lower_case"
-  - key: readability-identifier-naming.PrivateMemberCase
-    value: "lower_case"
-  - key: readability-identifier-naming.PrivateMemberSuffix
-    value: "_"
-  - key: readability-identifier-naming.PrivateMethodCase
-    value: "lower_case"
-  - key: readability-identifier-naming.PrivateMethodSuffix
-    value: "_"
-  - key: readability-identifier-naming.ClassMemberCase
-    value: "lower_case"
-  - key: readability-identifier-naming.ClassMemberCase
-    value: "lower_case"
-  - key: readability-identifier-naming.ProtectedMemberCase
-    value: "lower_case"
-  - key: readability-identifier-naming.ProtectedMemberSuffix
-    value: "_"
-  - key: readability-identifier-naming.FunctionCase
-    value: "lower_case"
-  - key: readability-identifier-naming.ClassMethodCase
-    value: "lower_case"
-  - key: readability-identifier-naming.ProtectedMethodCase
-    value: "lower_case"
-  - key: readability-identifier-naming.ProtectedMethodSuffix
-    value: "_"
-  - key: readability-identifier-naming.VirtualMethodCase
-    value: "lower_case"
-  - key: readability-identifier-naming.VirtualMethodSuffix
-    value: ""
-  - key: readability-qualified-auto.AddConstToQualified
-    value: 0
-  - key: readability-identifier-length.MinimumVariableNameLength
-    value: 0
-  - key: readability-identifier-length.MinimumParameterNameLength
-    value: 0
-  - key: readability-identifier-length.MinimumLoopCounterNameLength
-    value: 0
+  - key:             google-readability-function-size.StatementThreshold
+    value:           '800'
+  - key:             google-runtime-int.TypeSuffix
+    value:           '_t'
+  - key:             llvm-namespace-comment.ShortNamespaceLines
+    value:           '10'
+  - key:             llvm-namespace-comment.SpacesBeforeComments
+    value:           '2'
+  - key:             modernize-loop-convert.MaxCopySize
+    value:           '16'
+  - key:             modernize-loop-convert.MinConfidence
+    value:           reasonable
+  - key:             modernize-loop-convert.NamingStyle
+    value:           CamelCase
+  - key:             modernize-pass-by-value.IncludeStyle
+    value:           llvm
+  - key:             modernize-replace-auto-ptr.IncludeStyle
+    value:           llvm
+  - key:             modernize-use-nullptr.NullMacros
+    value:           'NULL'
+  - key:             modernize-make-unique.MakeSmartPtrFunction
+    value:           'make_unique'
+  - key:             modernize-make-unique.MakeSmartPtrFunctionHeader
+    value:           'esphome/core/helpers.h'
+  - key:             readability-braces-around-statements.ShortStatementLines
+    value:           2
+  - key:             readability-identifier-naming.LocalVariableCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.ClassCase
+    value:           'CamelCase'
+  - key:             readability-identifier-naming.StructCase
+    value:           'CamelCase'
+  - key:             readability-identifier-naming.EnumCase
+    value:           'CamelCase'
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           'UPPER_CASE'
+  - key:             readability-identifier-naming.StaticConstantCase
+    value:           'UPPER_CASE'
+  - key:             readability-identifier-naming.StaticVariableCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.GlobalConstantCase
+    value:           'UPPER_CASE'
+  - key:             readability-identifier-naming.ParameterCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.PrivateMemberCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.PrivateMemberSuffix
+    value:           '_'
+  - key:             readability-identifier-naming.PrivateMethodCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.PrivateMethodSuffix
+    value:           '_'
+  - key:             readability-identifier-naming.ClassMemberCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.ClassMemberCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.ProtectedMemberCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.ProtectedMemberSuffix
+    value:           '_'
+  - key:             readability-identifier-naming.FunctionCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.ClassMethodCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.ProtectedMethodCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.ProtectedMethodSuffix
+    value:           '_'
+  - key:             readability-identifier-naming.VirtualMethodCase
+    value:           'lower_case'
+  - key:             readability-identifier-naming.VirtualMethodSuffix
+    value:           ''
+  - key:             readability-qualified-auto.AddConstToQualified
+    value:           0
+  - key:             readability-identifier-length.MinimumVariableNameLength
+    value:           0
+  - key:             readability-identifier-length.MinimumParameterNameLength
+    value:           0
+  - key:             readability-identifier-length.MinimumLoopCounterNameLength
+    value:           0

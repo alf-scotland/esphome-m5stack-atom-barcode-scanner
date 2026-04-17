@@ -28,12 +28,13 @@ ignore = [
     # Docstring style conflicts — pick D211/D213 variants
     "D203",   # one-blank-line-before-class (conflicts with D211)
     "D213",   # multi-line-summary-second-line (conflicts with D212)
-    # Annotation flexibility
-    "ANN401", # Dynamically typed expressions (Any) are discouraged
-    # ESPHome __init__.py uses Any extensively in codegen helpers
+    # Annotation flexibility — Any is used extensively in ESPHome codegen helpers
+    "ANN401",
+    # subprocess with a fixed list is not untrusted input (test runner only)
+    "S603",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "components/m5stack_barcode/__init__.py" = [
-    "ANN401", # Any is required for ESPHome codegen API (cg.get_variable, etc.)
+    "ANN401",
 ]

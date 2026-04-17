@@ -34,7 +34,7 @@ class YamlTestItem(pytest.Item):
 
     def runtest(self) -> None:
         """Validate the YAML with `esphome config` and fail if it errors."""
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(
             [sys.executable, "-m", "esphome", "config", str(self.fspath)],
             capture_output=True,
             text=True,
