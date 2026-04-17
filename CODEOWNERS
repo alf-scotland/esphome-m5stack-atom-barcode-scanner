@@ -1,1 +1,7 @@
+# GitHub CODEOWNERS for this repository.
+# The component sub-path mirrors the ESPHome core convention:
+#   esphome/components/m5stack_barcode/* @alf-scotland
+# so that the same entry can be copied verbatim into the ESPHome core
+# CODEOWNERS file when the core PR is submitted.
+components/m5stack_barcode/* @alf-scotland
 * @alf-scotland

@@ -1,0 +1,131 @@
+esphome:
+  name: test-all-entities
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source: ../components
+    components: [m5stack_barcode]
+
+logger:
+
+uart:
+  id: uart_bus
+  baud_rate: 9600
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+
+m5stack_barcode:
+  id: scanner
+  uart_id: uart_bus
+  operation_mode: host
+  terminator: crlf
+  light_mode: on_when_reading
+  locate_light_mode: always_off
+  sound_mode: enabled
+  buzzer_volume: medium
+  decoding_success_light_mode: enabled
+  boot_sound_mode: disabled
+  decode_sound_mode: enabled
+  cmd_ack_sound_mode: enabled
+  config_code_scan_mode: disabled
+  scan_duration: 3s
+  stable_induction_time: 500ms
+  reading_interval: 500ms
+  same_code_interval: 1s
+
+  barcode_sensor:
+    name: "Last Barcode"
+    icon: "mdi:barcode"
+
+  version_sensor:
+    name: "Scanner Version"
+    entity_category: diagnostic
+
+  scan_event:
+    name: "Barcode Scanned"
+
+  scanning_binary_sensor:
+    name: "Scanning"
+
+  operation_mode_select:
+    name: "Operation Mode"
+    entity_category: config
+
+  buzzer_volume_select:
+    name: "Volume"
+    entity_category: config
+
+  light_mode_select:
+    name: "Light Mode"
+    entity_category: config
+
+  locate_light_mode_select:
+    name: "Locate Light Mode"
+    entity_category: config
+
+  scan_duration_select:
+    name: "Scan Duration"
+    entity_category: config
+
+  terminator_select:
+    name: "Terminator"
+    entity_category: config
+
+  stable_induction_time_select:
+    name: "Stable Induction Time"
+    entity_category: config
+
+  reading_interval_select:
+    name: "Reading Interval"
+    entity_category: config
+
+  same_code_interval_select:
+    name: "Same Code Interval"
+    entity_category: config
+
+  sound_switch:
+    name: "Sound"
+    entity_category: config
+
+  boot_sound_switch:
+    name: "Boot Sound"
+    entity_category: config
+
+  decode_sound_switch:
+    name: "Decode Sound"
+    entity_category: config
+
+  decoding_success_light_switch:
+    name: "Decoding Success Light"
+    entity_category: config
+
+  cmd_ack_sound_switch:
+    name: "Command ACK Sound"
+    entity_category: config
+
+  config_code_scan_switch:
+    name: "Config Code Scanning"
+    entity_category: config
+
+  start_button:
+    name: "Start Scan"
+
+  stop_button:
+    name: "Stop Scan"
+
+  factory_reset_button:
+    name: "Factory Reset"
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  on_barcode:
+    - logger.log:
+        format: "Scanned: %s"
+        args: ["x.c_str()"]
+
+  on_scan_timeout:
+    - logger.log: "Scan timed out"

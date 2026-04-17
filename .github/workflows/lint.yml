@@ -47,6 +47,31 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
 
+  component-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version-file: 'pyproject.toml'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+          version: "0.6.10"
+
+      - name: Install dependencies
+        # --dev installs pytest alongside esphome for config validation tests.
+        run: uv sync --all-extras --dev
+
+      - name: Run component config validation tests
+        run: uv run pytest tests/ -v
+
   cpp-format:
     runs-on: ubuntu-latest
     steps:

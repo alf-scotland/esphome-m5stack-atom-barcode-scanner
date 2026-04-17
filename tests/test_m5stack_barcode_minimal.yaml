@@ -1,0 +1,20 @@
+esphome:
+  name: test-minimal
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source: ../components
+    components: [m5stack_barcode]
+
+uart:
+  id: uart_bus
+  baud_rate: 9600
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+
+m5stack_barcode:
+  uart_id: uart_bus
