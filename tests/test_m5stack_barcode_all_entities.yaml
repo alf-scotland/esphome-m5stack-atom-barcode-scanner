@@ -10,6 +10,8 @@ external_components:
   - source: ../components
     components: [m5stack_barcode]
 
+logger:
+
 uart:
   id: uart_bus
   baud_rate: 9600
