@@ -9,7 +9,8 @@ updates:
       prefix: "ci"
 
   # Keep Python dependencies in pyproject.toml up to date.
-  - package-ecosystem: pip
+  # Using the uv ecosystem so Dependabot understands uv-managed projects.
+  - package-ecosystem: uv
     directory: /
     schedule:
       interval: weekly
