@@ -54,6 +54,7 @@ uv run pre-commit install
 - **Conventional commits** — `feat:`, `fix:`, `refactor:`, `docs:`, `ci:`, `chore:`. Scope the component: `feat(barcode): add scan timeout config`.
 - Every PR must pass lint CI before merge. The PR firmware build also compiles the firmware and posts artifact download links — use these to test on hardware before merging.
 - Versioning follows CalVer (`YYYY.MM.PATCH`), matching ESPHome's scheme. See `.github/BRANCHING_AND_RELEASES.md` for the full release process.
+- **Version bumps are never bundled into feature or fix PRs.** The version bump in `firmware/atom_lite.yaml` is a separate `chore: bump version to YYYY.MM.PATCH` commit on its own branch (or directly on main after the fix merges), followed by tagging.
 - OTA updates are delivered automatically via GitHub Releases — bump `project_version` in `firmware/atom_lite.yaml`, commit, tag `vYYYY.MM.PATCH`, and CI builds + publishes the firmware and updates `manifests/atom_lite.json`.
 
 ## Architecture
