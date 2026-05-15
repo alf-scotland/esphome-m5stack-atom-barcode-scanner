@@ -14,7 +14,7 @@ dependencies = [
 dev = [
     "pre-commit>=4.6.0",
     "pytest>=8.0.0",
-    "ruff>=0.15.12",
+    "ruff>=0.15.13",
     "yamllint>=1.38.0",
 ]
 
