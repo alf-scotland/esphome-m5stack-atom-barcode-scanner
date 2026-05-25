@@ -8,6 +8,7 @@ dependencies = [
     "esphome==2026.5.0",
     "fatfs-ng>=0.1.15",
     "littlefs-python>=0.17.1",
+    "pip>=26.1",
 ]
 
 [dependency-groups]
