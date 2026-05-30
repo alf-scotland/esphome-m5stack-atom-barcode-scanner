@@ -1,14 +1,14 @@
 {
   "name": "atom-barcode",
-  "version": "2026.5.0",
+  "version": "2026.5.1",
   "builds": [
     {
       "chipFamily": "ESP32",
       "ota": {
-        "path": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v2026.5.0/firmware.ota.bin",
-        "md5": "cf17284a9b9fa3683dc590bb28fc186c",
-        "summary": "",
-        "release_url": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v2026.5.0"
+        "path": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/download/v2026.5.1/firmware.ota.bin",
+        "md5": "716a377cd0b9cee895998087b3b4005f",
+        "summary": "## What's Changed\n* chore: bump esphome from 2026.5.0 to 2026.5.1 by @dependabot[bot] in https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/pull/68\n* chore: bump ruff from 0.15.14 to 0.15.15 by @dependabot[bot] in https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/pull/69\n* fix(ci): export RELEASE_SUMMARY so release notes appear in HA by @alf-scotland in https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/pull/70\n\n\n**Full Changelog**: https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/compare/v2026.5.0...v2026.5.1",
+        "release_url": "https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases/tag/v2026.5.1"
       }
     }
   ]
