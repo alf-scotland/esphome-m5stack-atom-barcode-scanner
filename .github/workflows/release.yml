@@ -110,7 +110,8 @@ jobs:
 
           # Fetch the auto-generated release notes from GitHub — generate_release_notes:true
           # populates them server-side but doesn't expose them as a softprops action output.
-          RELEASE_SUMMARY=$(gh release view "v${VERSION}" --json body --jq '.body')
+          # export so the Python heredoc subprocess inherits it via os.environ.
+          export RELEASE_SUMMARY=$(gh release view "v${VERSION}" --json body --jq '.body')
 
           mkdir -p manifests
           # Use Python for safe JSON serialisation — release body contains newlines and quotes.
