@@ -12,7 +12,7 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.14
+    rev: v0.15.22
     hooks:
       - id: ruff
         args: [--fix]
@@ -27,7 +27,7 @@ repos:
 
   # C++ formatting
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v22.1.5
+    rev: v22.1.8
     hooks:
       - id: clang-format
         types_or: [c++, c, cuda]
@@ -49,7 +49,7 @@ repos:
         exclude: ^components/m5stack_barcode/actions\.h$
 
   - repo: https://github.com/pypa/pip-audit
-    rev: v2.10.0
+    rev: v2.10.1
     hooks:
       - id: pip-audit
         args: [--path, .venv]
