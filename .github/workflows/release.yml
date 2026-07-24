@@ -76,7 +76,7 @@ jobs:
       - name: Copy firmware binaries to release directory
         run: |
           mkdir -p release-files
-          find . -path '*/.esphome/*' -path '*/.pioenvs/*/firmware*.bin' -type f -exec cp -v {} release-files/ \;
+          find . -path '*/.esphome/*' -type f \( -name "firmware.ota.bin" -o -name "firmware.factory.bin" \) -exec cp -v {} release-files/ \;
           if [ -z "$(ls -A release-files/)" ]; then
             echo "ERROR: No firmware binaries found after build"
             exit 1
