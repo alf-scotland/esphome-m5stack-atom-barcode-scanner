@@ -1,0 +1,59 @@
+esphome:
+  name: test-v2-uart-all-entities
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source: ../components
+    components: [m5stack_barcode]
+
+logger:
+
+uart:
+  id: uart_bus
+  baud_rate: 115200
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+
+m5stack_barcode:
+  id: scanner
+  model: v2_uart
+  uart_id: uart_bus
+  operation_mode: host
+  scan_duration: 3s
+
+  barcode_sensor:
+    name: "Last Barcode"
+    icon: "mdi:barcode"
+
+  scan_event:
+    name: "Barcode Scanned"
+
+  scanning_binary_sensor:
+    name: "Scanning"
+
+  operation_mode_select:
+    name: "Trigger Mode"
+    entity_category: config
+
+  start_button:
+    name: "Start Scan"
+
+  stop_button:
+    name: "Stop Scan"
+
+  factory_reset_button:
+    name: "Factory Reset"
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  on_barcode:
+    - logger.log:
+        format: "Scanned: %s"
+        args: ["x.c_str()"]
+
+  on_scan_timeout:
+    - logger.log: "Scan timed out"

@@ -1,0 +1,84 @@
+# Shared scanner configuration for M5Stack Atomic QRCode2 Base (V2 UART).
+# Included by per-device firmware files via packages.
+#
+# Everything here is device-agnostic: network stack, scanner component config,
+# and HA entities.  Hardware-specific items (GPIO pins, LED strip, physical
+# buttons) live in the per-device file.
+#
+# Depends on the including file providing:
+#   - uart_bus  (uart component id; must be configured at 115200 baud)
+
+external_components:
+  - source: ../components
+    components: [m5stack_barcode]
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+  - platform: http_request
+
+http_request:
+  buffer_size_rx: 512
+  buffer_size_tx: 1024
+
+wifi:
+  ap:
+
+captive_portal:
+
+m5stack_barcode:
+  id: barcode_scanner
+  model: v2_uart
+  uart_id: uart_bus
+  operation_mode: host
+  scan_duration: 5s
+
+  barcode_sensor:
+    name: "Last Barcode"
+    icon: "mdi:barcode"
+
+  scan_event:
+    name: "Barcode Scanned"
+    icon: "mdi:barcode-scan"
+
+  scanning_binary_sensor:
+    name: "Scanning"
+    icon: "mdi:line-scan"
+
+  operation_mode_select:
+    name: "Trigger Mode"
+    entity_category: "config"
+    icon: "mdi:camera-control"
+
+  start_button:
+    name: "Start Scan"
+    icon: "mdi:barcode-scan"
+
+  stop_button:
+    name: "Stop Scan"
+    icon: "mdi:stop"
+
+  factory_reset_button:
+    name: "Factory Reset Scanner"
+    entity_category: "diagnostic"
+    icon: "mdi:restore"
+    disabled_by_default: true
+
+  on_barcode:
+    - homeassistant.event:
+        event: esphome.barcode_scanned
+        data:
+          barcode: !lambda return x;
+
+button:
+  - platform: restart
+    name: "${friendly_name} Restart"
+    entity_category: "diagnostic"
+    icon: "mdi:restart"

@@ -20,6 +20,8 @@ from esphome.const import CONF_ID, CONF_TRIGGER_ID
 DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["binary_sensor", "button", "event", "select", "switch", "text_sensor"]
 
+CONF_MODEL = "model"
+
 
 # Helper function to get the scanner from config
 async def get_scanner(config: dict[str, Any]) -> Any:
@@ -29,10 +31,24 @@ async def get_scanner(config: dict[str, Any]) -> Any:
 
 # Component namespace
 m5stack_barcode_ns = cg.esphome_ns.namespace("m5stack_barcode")
-BarcodeScanner = m5stack_barcode_ns.class_(
-    "BarcodeScanner",
+
+# Base class shared by all scanner models
+BarcodeScannerBase = m5stack_barcode_ns.class_(
+    "BarcodeScannerBase",
     cg.Component,
     uart.UARTDevice,
+)
+
+# V1 scanner (UART 9600 baud, checksum-framed protocol)
+BarcodeScanner = m5stack_barcode_ns.class_(
+    "BarcodeScanner",
+    BarcodeScannerBase,
+)
+
+# V2 scanner (UART 115200 baud, packet protocol)
+BarcodeScannerV2UART = m5stack_barcode_ns.class_(
+    "BarcodeScannerV2UART",
+    BarcodeScannerBase,
 )
 
 # Configuration constants
@@ -385,145 +401,173 @@ IsIdleCondition = m5stack_barcode_ns.class_(
     automation.Condition,
 )
 
+
+def _validate_model(config: dict[str, Any]) -> dict[str, Any]:
+    """Patch the ID type to match the selected model."""
+    model = config.get(CONF_MODEL, "v1")
+    if model == "v2_uart":
+        from esphome.core import ID as CoreID  # noqa: N811, PLC0415
+
+        old_id = config[CONF_ID]
+        config = dict(config)
+        config[CONF_ID] = CoreID(
+            old_id.id,
+            is_declaration=True,
+            type=BarcodeScannerV2UART,
+        )
+    return config
+
+
 # Configuration schema
-CONFIG_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(): cv.declare_id(BarcodeScanner),
-        cv.Optional(CONF_BARCODE_SENSOR): text_sensor.text_sensor_schema(
-            text_sensor.TextSensor,
-        ),
-        cv.Optional(CONF_VERSION_SENSOR): text_sensor.text_sensor_schema(
-            text_sensor.TextSensor,
-        ),
-        cv.Optional(CONF_SCAN_EVENT): event.event_schema(event.Event),
-        cv.Optional(CONF_ON_BARCODE): automation.validate_automation(
-            {
-                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger),
-            },
-        ),
-        cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation(
-            {
-                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ScanTimeoutTrigger),
-            },
-        ),
-        cv.Optional(CONF_OPERATION_MODE_SELECT): select.select_schema(
-            OperationModeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_BUZZER_VOLUME_SELECT): select.select_schema(
-            BuzzerVolumeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_LIGHT_MODE_SELECT): select.select_schema(
-            LightModeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_LOCATE_LIGHT_MODE_SELECT): select.select_schema(
-            LocateLightModeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SCAN_DURATION_SELECT): select.select_schema(
-            ScanDurationSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_TERMINATOR_SELECT): select.select_schema(
-            TerminatorSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_STABLE_INDUCTION_TIME_SELECT): select.select_schema(
-            StableInductionTimeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_READING_INTERVAL_SELECT): select.select_schema(
-            ReadingIntervalSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SAME_CODE_INTERVAL_SELECT): select.select_schema(
-            SameCodeIntervalSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SOUND_SWITCH): switch.switch_schema(
-            SoundSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_BOOT_SOUND_SWITCH): switch.switch_schema(
-            BootSoundSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_DECODE_SOUND_SWITCH): switch.switch_schema(
-            DecodeSoundSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_DECODING_SUCCESS_LIGHT_SWITCH): switch.switch_schema(
-            DecodingSuccessLightSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_CMD_ACK_SOUND_SWITCH): switch.switch_schema(
-            CmdAckSoundSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_CONFIG_CODE_SCAN_SWITCH): switch.switch_schema(
-            ConfigCodeScanSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_START_BUTTON): button.button_schema(
-            StartButton,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_STOP_BUTTON): button.button_schema(
-            StopButton,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_FACTORY_RESET_BUTTON): button.button_schema(
-            FactoryResetButton,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SCANNING_BINARY_SENSOR): (
-            binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor).extend(
-                cv.COMPONENT_SCHEMA,
-            )
-        ),
-        cv.Optional(CONF_OPERATION_MODE, default="host"): cv.enum(
-            OPERATION_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_TERMINATOR, default="none"): cv.enum(TERMINATORS, lower=True),
-        cv.Optional(CONF_LIGHT_MODE, default="on_when_reading"): cv.enum(
-            LIGHT_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_LOCATE_LIGHT_MODE, default="on_when_reading"): cv.enum(
-            LOCATE_LIGHT_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_SOUND_MODE, default="disabled"): cv.enum(
-            SOUND_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_BUZZER_VOLUME, default="low"): cv.enum(
-            BUZZER_VOLUMES,
-            lower=True,
-        ),
-        cv.Optional(CONF_DECODING_SUCCESS_LIGHT_MODE, default="enabled"): cv.enum(
-            DECODING_SUCCESS_LIGHT_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_BOOT_SOUND_MODE, default="disabled"): cv.enum(
-            BOOT_SOUND_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_DECODE_SOUND_MODE, default="enabled"): cv.enum(
-            DECODE_SOUND_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_CMD_ACK_SOUND_MODE, default="enabled"): cv.enum(
-            CMD_ACK_SOUND_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_CONFIG_CODE_SCAN_MODE, default="enabled"): cv.enum(
-            CONFIG_CODE_SCAN_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_SCAN_DURATION, default="3s"): cv.enum(
-            SCAN_DURATIONS,
-            lower=True,
-        ),
-        cv.Optional(CONF_STABLE_INDUCTION_TIME, default="500ms"): cv.enum(
-            STABLE_INDUCTION_TIMES,
-            lower=True,
-        ),
-        cv.Optional(CONF_READING_INTERVAL, default="500ms"): cv.enum(
-            READING_INTERVALS,
-            lower=True,
-        ),
-        cv.Optional(CONF_SAME_CODE_INTERVAL, default="500ms"): cv.enum(
-            SAME_CODE_INTERVALS,
-            lower=True,
-        ),
-    },
-).extend(uart.UART_DEVICE_SCHEMA)
+CONFIG_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(BarcodeScanner),
+            cv.Optional(CONF_MODEL, default="v1"): cv.one_of(
+                "v1",
+                "v2_uart",
+                lower=True,
+            ),
+            cv.Optional(CONF_BARCODE_SENSOR): text_sensor.text_sensor_schema(
+                text_sensor.TextSensor,
+            ),
+            cv.Optional(CONF_VERSION_SENSOR): text_sensor.text_sensor_schema(
+                text_sensor.TextSensor,
+            ),
+            cv.Optional(CONF_SCAN_EVENT): event.event_schema(event.Event),
+            cv.Optional(CONF_ON_BARCODE): automation.validate_automation(
+                {
+                    cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger),
+                },
+            ),
+            cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation(
+                {
+                    cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ScanTimeoutTrigger),
+                },
+            ),
+            cv.Optional(CONF_OPERATION_MODE_SELECT): select.select_schema(
+                OperationModeSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_BUZZER_VOLUME_SELECT): select.select_schema(
+                BuzzerVolumeSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_LIGHT_MODE_SELECT): select.select_schema(
+                LightModeSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_LOCATE_LIGHT_MODE_SELECT): select.select_schema(
+                LocateLightModeSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_SCAN_DURATION_SELECT): select.select_schema(
+                ScanDurationSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_TERMINATOR_SELECT): select.select_schema(
+                TerminatorSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_STABLE_INDUCTION_TIME_SELECT): select.select_schema(
+                StableInductionTimeSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_READING_INTERVAL_SELECT): select.select_schema(
+                ReadingIntervalSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_SAME_CODE_INTERVAL_SELECT): select.select_schema(
+                SameCodeIntervalSelect,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_SOUND_SWITCH): switch.switch_schema(
+                SoundSwitch,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_BOOT_SOUND_SWITCH): switch.switch_schema(
+                BootSoundSwitch,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_DECODE_SOUND_SWITCH): switch.switch_schema(
+                DecodeSoundSwitch,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_DECODING_SUCCESS_LIGHT_SWITCH): switch.switch_schema(
+                DecodingSuccessLightSwitch,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_CMD_ACK_SOUND_SWITCH): switch.switch_schema(
+                CmdAckSoundSwitch,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_CONFIG_CODE_SCAN_SWITCH): switch.switch_schema(
+                ConfigCodeScanSwitch,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_START_BUTTON): button.button_schema(
+                StartButton,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_STOP_BUTTON): button.button_schema(
+                StopButton,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_FACTORY_RESET_BUTTON): button.button_schema(
+                FactoryResetButton,
+            ).extend(cv.COMPONENT_SCHEMA),
+            cv.Optional(CONF_SCANNING_BINARY_SENSOR): (
+                binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor).extend(
+                    cv.COMPONENT_SCHEMA,
+                )
+            ),
+            cv.Optional(CONF_OPERATION_MODE, default="host"): cv.enum(
+                OPERATION_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_TERMINATOR, default="none"): cv.enum(
+                TERMINATORS,
+                lower=True,
+            ),
+            cv.Optional(CONF_LIGHT_MODE, default="on_when_reading"): cv.enum(
+                LIGHT_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_LOCATE_LIGHT_MODE, default="on_when_reading"): cv.enum(
+                LOCATE_LIGHT_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_SOUND_MODE, default="disabled"): cv.enum(
+                SOUND_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_BUZZER_VOLUME, default="low"): cv.enum(
+                BUZZER_VOLUMES,
+                lower=True,
+            ),
+            cv.Optional(CONF_DECODING_SUCCESS_LIGHT_MODE, default="enabled"): cv.enum(
+                DECODING_SUCCESS_LIGHT_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_BOOT_SOUND_MODE, default="disabled"): cv.enum(
+                BOOT_SOUND_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_DECODE_SOUND_MODE, default="enabled"): cv.enum(
+                DECODE_SOUND_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_CMD_ACK_SOUND_MODE, default="enabled"): cv.enum(
+                CMD_ACK_SOUND_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_CONFIG_CODE_SCAN_MODE, default="enabled"): cv.enum(
+                CONFIG_CODE_SCAN_MODES,
+                lower=True,
+            ),
+            cv.Optional(CONF_SCAN_DURATION, default="3s"): cv.enum(
+                SCAN_DURATIONS,
+                lower=True,
+            ),
+            cv.Optional(CONF_STABLE_INDUCTION_TIME, default="500ms"): cv.enum(
+                STABLE_INDUCTION_TIMES,
+                lower=True,
+            ),
+            cv.Optional(CONF_READING_INTERVAL, default="500ms"): cv.enum(
+                READING_INTERVALS,
+                lower=True,
+            ),
+            cv.Optional(CONF_SAME_CODE_INTERVAL, default="500ms"): cv.enum(
+                SAME_CODE_INTERVALS,
+                lower=True,
+            ),
+        },
+    ).extend(uart.UART_DEVICE_SCHEMA),
+    _validate_model,
+)
 
 
 # Code generation
@@ -726,7 +770,7 @@ async def to_code(config: dict[str, Any]) -> None:
         await text_sensor.register_text_sensor(ts_var, ts_conf)
         cg.add(var.set_barcode_sensor(ts_var))
 
-    if CONF_VERSION_SENSOR in config:
+    if CONF_VERSION_SENSOR in config and config.get(CONF_MODEL, "v1") == "v1":
         ts_conf = config[CONF_VERSION_SENSOR]
         ts_var = cg.new_Pvariable(ts_conf[CONF_ID])
         await text_sensor.register_text_sensor(ts_var, ts_conf)
@@ -759,7 +803,7 @@ async def to_code(config: dict[str, Any]) -> None:
 @automation.register_action(
     "m5stack_barcode.start",
     StartAction,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScannerBase)}),
     synchronous=False,
 )
 async def barcode_start_to_code(
@@ -775,7 +819,7 @@ async def barcode_start_to_code(
 @automation.register_action(
     "m5stack_barcode.stop",
     StopAction,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScannerBase)}),
     synchronous=False,
 )
 async def barcode_stop_to_code(
@@ -793,7 +837,7 @@ async def barcode_stop_to_code(
     SetModeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_OPERATION_MODE): cv.templatable(
                 cv.enum(OPERATION_MODES, lower=True),
             ),
@@ -819,7 +863,7 @@ async def barcode_set_mode_to_code(
     SetTerminatorAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_TERMINATOR): cv.templatable(
                 cv.enum(TERMINATORS, lower=True),
             ),
@@ -845,7 +889,7 @@ async def barcode_set_terminator_to_code(
     SetLightModeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_LIGHT_MODE): cv.templatable(
                 cv.enum(LIGHT_MODES, lower=True),
             ),
@@ -871,7 +915,7 @@ async def barcode_set_light_mode_to_code(
     SetLocateLightModeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_LOCATE_LIGHT_MODE): cv.templatable(
                 cv.enum(LOCATE_LIGHT_MODES, lower=True),
             ),
@@ -901,7 +945,7 @@ async def barcode_set_locate_light_mode_to_code(
     SetSoundModeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_SOUND_MODE): cv.templatable(
                 cv.enum(SOUND_MODES, lower=True),
             ),
@@ -927,7 +971,7 @@ async def barcode_set_sound_mode_to_code(
     SetBuzzerVolumeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_BUZZER_VOLUME): cv.templatable(
                 cv.enum(BUZZER_VOLUMES, lower=True),
             ),
@@ -953,7 +997,7 @@ async def barcode_set_buzzer_volume_to_code(
     SetDecodingSuccessLightModeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_DECODING_SUCCESS_LIGHT_MODE): cv.templatable(
                 cv.enum(DECODING_SUCCESS_LIGHT_MODES, lower=True),
             ),
@@ -983,7 +1027,7 @@ async def barcode_set_decoding_success_light_mode_to_code(
     SetBootSoundModeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_BOOT_SOUND_MODE): cv.templatable(
                 cv.enum(BOOT_SOUND_MODES, lower=True),
             ),
@@ -1009,7 +1053,7 @@ async def barcode_set_boot_sound_mode_to_code(
     SetDecodeSoundModeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_DECODE_SOUND_MODE): cv.templatable(
                 cv.enum(DECODE_SOUND_MODES, lower=True),
             ),
@@ -1039,7 +1083,7 @@ async def barcode_set_decode_sound_mode_to_code(
     SetScanDurationAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_SCAN_DURATION): cv.templatable(
                 cv.enum(SCAN_DURATIONS, lower=True),
             ),
@@ -1065,7 +1109,7 @@ async def barcode_set_scan_duration_to_code(
     SetStableInductionTimeAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_STABLE_INDUCTION_TIME): cv.templatable(
                 cv.enum(STABLE_INDUCTION_TIMES, lower=True),
             ),
@@ -1095,7 +1139,7 @@ async def barcode_set_stable_induction_time_to_code(
     SetReadingIntervalAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_READING_INTERVAL): cv.templatable(
                 cv.enum(READING_INTERVALS, lower=True),
             ),
@@ -1121,7 +1165,7 @@ async def barcode_set_reading_interval_to_code(
     SetSameCodeIntervalAction,
     cv.Schema(
         {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
+            cv.GenerateID(): cv.use_id(BarcodeScannerBase),
             cv.Required(CONF_SAME_CODE_INTERVAL): cv.templatable(
                 cv.enum(SAME_CODE_INTERVALS, lower=True),
             ),
@@ -1149,7 +1193,7 @@ async def barcode_set_same_code_interval_to_code(
 @automation.register_action(
     "m5stack_barcode.process_current_buffer",
     ProcessCurrentBufferAction,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScannerBase)}),
     synchronous=False,
 )
 async def barcode_process_current_buffer_to_code(
@@ -1165,7 +1209,7 @@ async def barcode_process_current_buffer_to_code(
 @automation.register_condition(
     "m5stack_barcode.is_continuous_mode",
     IsContinuousModeCondition,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScannerBase)}),
 )
 async def barcode_is_continuous_mode_to_code(
     config: dict[str, Any],
@@ -1180,7 +1224,7 @@ async def barcode_is_continuous_mode_to_code(
 @automation.register_condition(
     "m5stack_barcode.is_manual_scanning",
     IsManualScanningCondition,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScannerBase)}),
 )
 async def barcode_is_manual_scanning_to_code(
     config: dict[str, Any],
@@ -1195,7 +1239,7 @@ async def barcode_is_manual_scanning_to_code(
 @automation.register_condition(
     "m5stack_barcode.is_idle",
     IsIdleCondition,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
+    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScannerBase)}),
 )
 async def barcode_is_idle_to_code(
     config: dict[str, Any],

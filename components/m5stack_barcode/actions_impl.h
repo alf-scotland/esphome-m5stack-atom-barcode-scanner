@@ -1,19 +1,16 @@
 // Template method bodies for the action and condition classes declared in actions.h.
 //
-// This file is included at the bottom of m5stack_barcode.h, after BarcodeScanner is
-// fully defined.  It must NOT be included anywhere else — the forward declaration of
-// BarcodeScanner in actions.h is intentionally incomplete, and the method bodies below
-// require the complete type.
+// This file is included at the bottom of barcode_scanner_base.h, after
+// BarcodeScannerBase is fully defined.  It must NOT be included anywhere else.
 //
-// Why a separate file instead of defining bodies inline in actions.h?
-// actions.h is included at the top of m5stack_barcode.h (before BarcodeScanner is
-// defined), so the bodies cannot live there.  Splitting them here breaks the circularity
-// without requiring a second full-component include.
+// When #included from barcode_scanner_base.h the #pragma once guard prevents
+// re-processing, so the #include below is a harmless no-op that satisfies any
+// tooling that analyses this file in isolation.
 
 #pragma once
 
 #include "actions.h"
-#include "m5stack_barcode.h"
+#include "barcode_scanner_base.h"
 
 namespace esphome {
 namespace m5stack_barcode {
