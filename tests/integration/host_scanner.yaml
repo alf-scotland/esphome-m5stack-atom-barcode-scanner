@@ -1,0 +1,69 @@
+# Host-platform firmware for the integration tests: the scanner UART is a pty served
+# by fake_scanner.py.  One build serves every scenario — the operation mode and
+# terminator come from environment variables read at boot.
+esphome:
+  name: m5stack-barcode-sim
+  on_boot:
+    priority: -100
+    then:
+      - m5stack_barcode.set_mode:
+          id: scanner
+          operation_mode: !lambda 'const char *v = getenv("SIM_MODE"); return std::string(v ? v : "host");'
+      - m5stack_barcode.set_terminator:
+          id: scanner
+          terminator: !lambda 'const char *v = getenv("SIM_TERMINATOR"); return std::string(v ? v : "crlf");'
+      - m5stack_barcode.set_scan_duration:
+          id: scanner
+          scan_duration: 1s
+      - wait_until:
+          condition:
+            lambda: 'return id(version).has_state();'
+          timeout: 5s
+      - logger.log: "READY"
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_START") != nullptr;'
+          then:
+            - m5stack_barcode.start: scanner
+
+host:
+
+external_components:
+  - source: ../../components
+    components: [m5stack_barcode]
+
+logger:
+
+uart:
+  id: uart_bus
+  baud_rate: 9600
+  port: /tmp/m5stack-barcode-sim  # PORT in test_scanner_host.py
+
+m5stack_barcode:
+  id: scanner
+  uart_id: uart_bus
+  version_sensor:
+    id: version
+    name: Version
+    on_value:
+      - logger.log:
+          format: "VERSION[%s]"
+          args: ["x.c_str()"]
+  scanning_binary_sensor:
+    name: Scanning
+    on_state:
+      - logger.log:
+          format: "SCANNING[%d]"
+          args: ["x"]
+  operation_mode_select:
+    name: Mode
+    on_value:
+      - logger.log:
+          format: "MODE[%s]"
+          args: ["x.c_str()"]
+  on_barcode:
+    - logger.log:
+        format: "BARCODE[%s]"
+        args: ["x.c_str()"]
+  on_scan_timeout:
+    - logger.log: "SCAN_TIMEOUT"
