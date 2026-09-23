@@ -6,7 +6,8 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
         args: [--allow-multiple-documents]
-        exclude: (firmware\.yaml|firmware/.*\.yaml)
+        # ESPHome YAML uses custom tags (!include, !secret, !lambda); yamllint covers it.
+        exclude: ^(firmware\.yaml|firmware/.*\.yaml|tests/.*\.yaml)$
       - id: check-added-large-files
       - id: debug-statements
       - id: check-merge-conflict
@@ -14,7 +15,7 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.22
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
@@ -46,7 +47,7 @@ repos:
           - --suppress=unusedStructMember
           - --suppress=constVariableReference
           - --suppress=unknownMacro
-        exclude: ^components/m5stack_barcode/actions\.h$
+          - --error-exitcode=1
 
   - repo: https://github.com/pypa/pip-audit
     rev: v2.10.1
