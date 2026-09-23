@@ -7,7 +7,7 @@ This repository provides an external component for ESPHome that enables support 
 This repository contains:
 
 - **Component** (`components/m5stack_barcode/`): The ESPHome external component
-- **Firmware** (`firmware/atom_lite.yaml`): A complete firmware example for the M5Stack Atom Lite + QR Scanner kit
+- **Firmware** (`firmware/atom_lite.yaml`): A complete firmware example for the M5Stack Atom Lite + QR Scanner kit, released with OTA updates via GitHub Releases. `firmware.yaml` is the entry point for ESPHome dashboard adoption and remote `packages:` use.
 - **Documentation** (`components/m5stack_barcode/index.rst`): Detailed component usage documentation
 
 ## Installation
@@ -40,6 +40,10 @@ m5stack_barcode:
         format: "Scanned: %s"
         args: [ 'x.c_str()' ]
 ```
+
+The UART must run at 9600 baud with both TX and RX configured (validated at config time).
+Barcodes are delivered through `on_barcode` in every operation mode — `host` mode scans on
+`m5stack_barcode.start`, the other modes scan on the hardware trigger or on their own.
 
 For all available options, actions, and conditions see [`components/m5stack_barcode/index.rst`](components/m5stack_barcode/index.rst).
 
@@ -87,7 +91,7 @@ The `scan_event` sub-component (entity class `event`) also appears as a device t
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.13 or higher
 - [uv](https://docs.astral.sh/uv/) for dependency management
 
 ### Setup
@@ -95,7 +99,7 @@ The `scan_event` sub-component (entity class `event`) also appears as a device t
 ```bash
 git clone https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner.git
 cd esphome-m5stack-atom-barcode-scanner
-uv sync --all-extras --dev
+uv sync
 uv run pre-commit install
 ```
 
@@ -108,8 +112,11 @@ uv run esphome compile firmware/atom_lite.yaml
 # Lint everything
 uv run pre-commit run --all-files
 
-# Run config validation tests
+# Config validation, code generation and consistency tests
 uv run pytest tests/
+
+# Host-platform integration tests against an emulated scanner (compiles ESPHome)
+uv run pytest -m integration
 
 # Python linting only
 uv run ruff check .
@@ -121,7 +128,7 @@ uv run pre-commit run clang-tidy --hook-stage manual
 
 ### Code Style
 
-- **C++**: C++17, column limit 120 (`.clang-format`), clang-format v17
+- **C++**: C++17, column limit 120 (`.clang-format`), clang-format version pinned in `.pre-commit-config.yaml`
 - **Python**: line length 88, ruff with all rules (see `pyproject.toml`)
 - **YAML**: validated by yamllint (`.yamllint.yaml`)
 

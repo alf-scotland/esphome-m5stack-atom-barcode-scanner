@@ -18,7 +18,7 @@ This project adheres to the [ESPHome Code of Conduct](https://github.com/esphome
 
 2. Install all dependencies (including dev tools):
    ```bash
-   uv sync --all-extras --dev
+   uv sync
    ```
 
 3. Install pre-commit hooks:
@@ -52,8 +52,10 @@ This project adheres to the [ESPHome Code of Conduct](https://github.com/esphome
    uv run pre-commit run --all-files
    ```
 
-4. Verify the firmware compiles:
+4. Run the tests and verify the firmware compiles:
    ```bash
+   uv run pytest tests/                 # config, codegen and consistency tests
+   uv run pytest -m integration         # host build against an emulated scanner
    uv run esphome compile firmware/atom_lite.yaml
    ```
 
@@ -109,13 +111,18 @@ See `.github/BRANCHING_AND_RELEASES.md` for full details.
 ## Code Style
 
 - Python: We follow the [ESPHome Python style guide](https://github.com/esphome/esphome/blob/dev/CONTRIBUTING.md#python-style); enforced by `ruff`
-- C++: C++17, column limit 120; enforced by `clang-format` v17 (`.clang-format`)
+- C++: C++17, column limit 120; enforced by `clang-format` (`.clang-format`, version pinned in `.pre-commit-config.yaml`)
 - YAML: enforced by `yamllint` (`.yamllint.yaml`)
 
 ## Testing
 
 - Test your changes with actual hardware whenever possible
 - Ensure your code works with the pinned ESPHome release (`pyproject.toml`)
+- Protocol behaviour (ACKs, framing, timeouts) is covered by `tests/integration/`, which
+  runs the component on ESPHome's host platform against `fake_scanner.py`; extend the
+  emulator when you rely on new scanner behaviour
+- When adding a setting, keep the option order in `__init__.py`, the C++ enum and the
+  option tables in `types.cpp` identical (`tests/test_enum_consistency.py` checks this)
 
 ## Documentation
 

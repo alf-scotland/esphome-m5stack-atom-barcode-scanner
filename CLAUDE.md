@@ -20,9 +20,14 @@ The component must support full control of the scanner from Home Assistant — e
 uv run esphome compile firmware/atom_lite.yaml
 ```
 
-**Run config validation tests:**
+**Run config validation, codegen and consistency tests:**
 ```bash
 uv run pytest tests/
+```
+
+**Run host-platform integration tests** (compiles the component for ESPHome's `host` platform and runs it against `tests/integration/fake_scanner.py`, a pty emulation of the scanner protocol):
+```bash
+uv run pytest -m integration
 ```
 
 **Lint everything (pre-commit):**
@@ -62,16 +67,18 @@ uv run pre-commit install
 ### ESPHome component pattern (two layers)
 
 **Python layer** (`components/m5stack_barcode/__init__.py`):
-- Validates and parses the user's YAML config
-- Generates C++ object instantiation and wiring via `cg` (ESPHome codegen)
-- Must use factory functions: `select.select_schema(X)`, `switch.switch_schema(X)`, `button.button_schema(X)`, `binary_sensor.binary_sensor_schema(X)` — never `.extend()` on the private `_*_SCHEMA` objects
+- Validates and parses the user's YAML config; `FINAL_VALIDATE_SCHEMA` enforces a 9600 baud UART with TX and RX
+- Table-driven: one `Setting` entry per scanner setting defines its YAML option, default, HA entity and `set_*` action
+- Generates C++ via `cg`, using the entity factories (`select.new_select`, `switch.new_switch`, `button.new_button`, …) and `cg.register_parented`
+- Must use schema factory functions: `select.select_schema(X)`, `switch.switch_schema(X)`, `button.button_schema(X)`, `binary_sensor.binary_sensor_schema()` — never `.extend()` on the private `_*_SCHEMA` objects
+- Option dicts must list keys in C++ enum order: a select's option index is cast straight to the enum (`tests/test_enum_consistency.py` enforces this)
 
 **C++ layer** (the runtime):
-- `m5stack_barcode.h/.cpp` — `BarcodeScanner` extends `Component` + `uart::UARTDevice`
-- `types.h/.cpp` — all enums for scanner settings; string conversion helpers
+- `m5stack_barcode.h/.cpp` — `BarcodeScanner` extends `Component` + `uart::UARTDevice`: command queue, RX framing, settings state, NVS. The header also defines the HA entities as `Parented<BarcodeScanner>` templates (`SettingSelect`, `SettingSwitch`, `ScannerButton`) — entities are not `Component`s
+- `types.h/.cpp` — enums for scanner settings (order is load-bearing, see the header comment), option-key parsers and log-string helpers
 - `commands.h/.cpp` — static byte arrays for every UART command, derived from the manufacturer PDFs
-- `command_handlers.h/.cpp` — processes UART responses (ACKs, barcode data, version responses)
-- `actions.h/.cpp` — ESPHome automation actions and conditions. Template bodies live in `actions.h` (implicit instantiation). `actions.cpp` only holds `TAG_ACTION`. All `play()`/`check()` signatures use `const Ts &...x`.
+- `command.h/.cpp` — `Command` (bytes + ACK/failure callbacks) and `CommandFactory`, which maps each setting value to its command via per-setting tables indexed by enum value
+- `automation.h` — triggers, actions (`ScannerMethodAction`, `SetSettingAction` aliases) and conditions; all `Parented<BarcodeScanner>`, registered `synchronous=True`. All `play()`/`check()` signatures use `const Ts &...x`
 
 ### Data flow
 
@@ -79,7 +86,7 @@ uv run pre-commit install
 YAML → __init__.py (validate + codegen) → C++ component instantiation
                                                     ↓
                                        UART TX → scanner hardware
-                                       UART RX ← HOST ACK (6 bytes) or barcode data
+                                       UART RX ← ACK (6 bytes), version response, or unframed barcode data
                                                     ↓
                                        NVS flash (ScannerPreferences, SETTINGS_VERSION=2)
                                                     ↓
@@ -87,7 +94,9 @@ YAML → __init__.py (validate + codegen) → C++ component instantiation
 ```
 
 ### Key runtime behaviours
-- **Command queue**: commands are enqueued and sent one at a time; the scanner must ACK before the next command is sent; unacknowledged commands time out
+- **Command queue**: commands are enqueued and sent one at a time; the scanner must ACK before the next command is sent; unacknowledged commands are retried once, then dropped. The ACK is searched for anywhere in the RX buffer and only its 6 bytes are consumed, so barcode data around it survives
+- **Barcode framing**: barcode output is unframed in every operation mode — a barcode ends at the configured terminator or after a 20 ms idle gap. The PDF's `05 D1 00 00 06 FF 24` is only the reply to start/stop decoding outside host mode, not a delimiter
+- **Settings apply on ACK**: in-memory state, NVS and HA entities change only in the `set_*_state()` callbacks run when the scanner ACKs; the scan state follows the ACKed operation mode
 - **Smart reconfiguration**: `ScannerPreferences` is persisted to NVS flash; only settings that differ from the persisted state are re-sent on boot, reducing unnecessary UART traffic
 - **Wake-up sequence**: the scanner requires a wake-up command before accepting configuration commands
 - **Sub-components**: Select/Switch/Button/BinarySensor entities are child components, registered separately, and appear as individual HA entities
@@ -102,8 +111,10 @@ firmware/
   core.yaml           ← shared scanner config: component, selects, switches, text sensors, network
   atom_lite.yaml      ← Atom Lite board/GPIO/LED specifics; packages core.yaml
   # future: atom_s3.yaml, etc.
-firmware.yaml         ← root stub; packages firmware/atom_lite.yaml for OTA backwards compat
+firmware.yaml         ← entry point for dashboard adoption / remote packages; sets component_source to GitHub
 ```
+
+`core.yaml` loads the component from `${component_source}` (default: this checkout's `../components`). Remote packages cannot use that relative path, so `firmware.yaml` overrides it with the GitHub source; `dashboard_import` points at `firmware.yaml`.
 
 The release CI builds `firmware/atom_lite.yaml` and publishes per-device binaries. Add a new device by creating `firmware/<device>.yaml`, packaging `core.yaml`, and adding a build step to `release.yml`.
 
@@ -139,15 +150,15 @@ Use the PDFs as the source of truth for what the scanner *can do*. Use the C++ t
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `lint.yml` | push/PR to `main` | yamllint, ruff check+format, clang-format, cppcheck, pytest config validation |
+| `lint.yml` | push/PR to `main` | pre-commit hooks (yamllint, ruff, clang-format, cppcheck, pip-audit), pytest (config, codegen, consistency), host integration tests, ESP32 compile of the test configs |
 | `pr-firmware.yml` | PR to `main` | compiles firmware, posts artifact download link as PR comment |
 | `release.yml` | tag `v*.*.*` | builds firmware, creates GitHub Release, generates and commits OTA manifest |
 
 ## Code style
 
-- **C++**: C++17, column limit 120 (`.clang-format`), clang-format v17; `.clang-tidy` is a 1:1 copy of ESPHome core's config
+- **C++**: C++17, column limit 120 (`.clang-format`), clang-format version pinned in `.pre-commit-config.yaml` (CI runs the same hook); `.clang-tidy` is a 1:1 copy of ESPHome core's config
 - **Python**: line length 88, ruff with all rules; `ANN401` suppressed only in `__init__.py`
-- **YAML**: validated by yamllint with `.yamllint.yaml`; `firmware.yaml` is intentionally excluded from `check-yaml` (ESPHome YAML uses custom tags)
+- **YAML**: validated by yamllint with `.yamllint.yaml`; ESPHome YAML (`firmware.yaml`, `firmware/`, `tests/`) is intentionally excluded from `check-yaml` (it uses custom tags such as `!lambda`)
 
 ## ESPHome version constraints
 

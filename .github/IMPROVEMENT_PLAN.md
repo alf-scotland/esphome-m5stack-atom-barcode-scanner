@@ -81,6 +81,28 @@ Update status markers as branches land. Each item maps to one branch and one PR.
 
 ---
 
+## Tier 7 — Repository audit (2026-09)
+
+Found with a host-platform build of the component driven by an emulated scanner
+(now `tests/integration/`). All items landed on `claude/repo-audit-improvements-3376ej`.
+
+| # | Status | What |
+|---|--------|------|
+| 33 | ✅ | Non-host modes never published barcodes from `loop()`: framing waited for `05 D1 …`, which is only the reply to start/stop outside host mode |
+| 34 | ✅ | Start ACK and barcode in one read: barcode discarded and a false `on_scan_timeout` fired |
+| 35 | ✅ | `operation_mode: continuous/auto_sense` left the scan state IDLE; mode changes updated it before the ACK |
+| 36 | ✅ | Scan timeout started at queue time, not at the scanner's ACK; GET_VERSION completion relied on an "unreachable" branch |
+| 37 | ✅ | 128-byte barcode cap and RX overflow publishing the tail of oversized QR codes as a barcode |
+| 38 | ✅ | `scanning_binary_sensor` crashed code generation; the documented `m5stack_barcode.start: id` shorthand was rejected |
+| 39 | ✅ | Entities/actions moved to core patterns (`Parented`, index-based selects, `maybe_simple_id`, UART final validation) and deduplicated with templates and tables |
+| 40 | ✅ | Tests: codegen for every test YAML, enum/option consistency, host integration tests; CI compiles the test configs for ESP32 |
+| 41 | ✅ | CI: script injection and secret interpolation, release cache poisoning, clang-format 17 vs 22 drift, redundant uv-lockfile workflow |
+| 42 | ✅ | Firmware: dashboard adoption / `firmware.yaml` could not load the component; DLED buffer race; unlimited scan duration released the hardware trigger immediately |
+| 43 | ⏸ | Public release binaries embed the API encryption key and OTA password (extractable by anyone). Needs a maintainer decision — e.g. API key provisioning by Home Assistant instead of a baked-in key |
+| 44 | ⏸ | `pre-commit-autoupdate` PRs are opened with `GITHUB_TOKEN`, so CI does not run on them; needs a GitHub App or fine-grained PAT secret |
+
+---
+
 ## Notes
 
 - Items within a tier can be worked in parallel; tiers must be completed in order.

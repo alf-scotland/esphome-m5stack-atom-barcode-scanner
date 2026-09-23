@@ -12,8 +12,9 @@ We follow a simplified GitFlow approach with the following branches:
 
 ### Support Branches
 
-- **`feature/*`**: Feature branches for developing new features.
-- **`bugfix/*`**: Branches specifically dedicated to fixing bugs.
+- **`feat/*`**: Feature branches for developing new features.
+- **`fix/*`**: Branches specifically dedicated to fixing bugs.
+- **`refactor/*`**, **`ci/*`**, **`docs/*`**, **`chore/*`**: Refactoring, CI/CD, documentation and maintenance work.
 - **`release/*`**: Release preparation branches, used to prepare and finalize releases.
 - **`release/*-beta.*`** or **`release/*-rc.*`**: Pre-release branches for beta and release candidate testing.
 - **`hotfix/*`**: Emergency fix branches that branch directly from tagged releases to fix critical issues.
@@ -26,7 +27,7 @@ We follow a simplified GitFlow approach with the following branches:
    ```bash
    git checkout main
    git pull
-   git checkout -b feature/my-new-feature
+   git checkout -b feat/my-new-feature
    ```
 
 2. Develop the feature, making regular commits.
@@ -41,7 +42,7 @@ We follow a simplified GitFlow approach with the following branches:
    ```bash
    git checkout main
    git pull
-   git checkout -b bugfix/issue-description
+   git checkout -b fix/issue-description
    ```
 
 2. Fix the bug, making sure to include tests where appropriate.
@@ -59,7 +60,8 @@ We follow a simplified GitFlow approach with the following branches:
    git checkout -b release/YYYY.MM.0
    ```
 
-2. Update version numbers in `firmware.yaml`:
+2. Update `project_version` in the `substitutions:` block of `firmware/atom_lite.yaml`
+   (in its own `chore: bump version to YYYY.MM.0` commit):
    ```yaml
    project_version: "YYYY.MM.0"
    ```
@@ -78,7 +80,8 @@ We follow a simplified GitFlow approach with the following branches:
    git push origin vYYYY.MM.0
    ```
 
-6. The CI system will automatically build and publish the release.
+6. The CI system will automatically build and publish the release. The tag must match
+   `project_version` exactly — CI validates this before building.
 
 ### Pre-release Process
 
@@ -91,7 +94,7 @@ For beta and release candidate testing:
    git checkout -b release/YYYY.MM.0-beta.1
    ```
 
-2. Update version in `firmware.yaml`:
+2. Update `project_version` in `firmware/atom_lite.yaml`:
    ```yaml
    project_version: "YYYY.MM.0-beta.1"
    ```
@@ -136,7 +139,7 @@ We follow ESPHome's versioning scheme, which uses a CalVer approach:
 **`YYYY.MM.PATCH`**
 
 - **YYYY**: Year of the release (e.g., 2024)
-- **MM**: Month of the release (e.g., 06 for June)
+- **MM**: Month of the release, without a leading zero (e.g., 6 for June)
 - **PATCH**: Incremental number for patches/hotfixes (starting at 0)
 
 ### Examples
