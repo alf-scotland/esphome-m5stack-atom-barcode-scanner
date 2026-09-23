@@ -1,0 +1,103 @@
+esphome:
+  name: test-actions
+  on_boot:
+    - m5stack_barcode.start: scanner
+    - m5stack_barcode.stop:
+        id: scanner
+    - m5stack_barcode.process_current_buffer: scanner
+    - m5stack_barcode.factory_reset: scanner
+    - m5stack_barcode.set_mode:
+        id: scanner
+        operation_mode: continuous
+    - m5stack_barcode.set_mode:
+        id: scanner
+        operation_mode: !lambda 'return id(mode_select).current_option();'
+    - m5stack_barcode.set_terminator:
+        id: scanner
+        terminator: crlf
+    - m5stack_barcode.set_light_mode:
+        id: scanner
+        light_mode: always_off
+    - m5stack_barcode.set_locate_light_mode:
+        id: scanner
+        locate_light_mode: always_on
+    - m5stack_barcode.set_buzzer_volume:
+        id: scanner
+        buzzer_volume: high
+    - m5stack_barcode.set_scan_duration:
+        id: scanner
+        scan_duration: unlimited
+    - m5stack_barcode.set_stable_induction_time:
+        id: scanner
+        stable_induction_time: 1s
+    - m5stack_barcode.set_reading_interval:
+        id: scanner
+        reading_interval: 1.5s
+    - m5stack_barcode.set_same_code_interval:
+        id: scanner
+        same_code_interval: 0ms
+    - m5stack_barcode.set_sound_mode:
+        id: scanner
+        sound_mode: enabled
+    - m5stack_barcode.set_boot_sound_mode:
+        id: scanner
+        boot_sound_mode: disabled
+    - m5stack_barcode.set_decode_sound_mode:
+        id: scanner
+        decode_sound_mode: !lambda 'return std::string("disabled");'
+    - m5stack_barcode.set_decoding_success_light_mode:
+        id: scanner
+        decoding_success_light_mode: enabled
+    - m5stack_barcode.set_cmd_ack_sound_mode:
+        id: scanner
+        cmd_ack_sound_mode: disabled
+    - m5stack_barcode.set_config_code_scan_mode:
+        id: scanner
+        config_code_scan_mode: disabled
+    - if:
+        condition:
+          and:
+            - m5stack_barcode.is_idle: scanner
+            - not:
+                m5stack_barcode.is_manual_scanning:
+                  id: scanner
+            - not:
+                m5stack_barcode.is_continuous_mode: scanner
+        then:
+          - logger.log: "Scanner idle"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source: ../components
+    components: [m5stack_barcode]
+
+logger:
+
+uart:
+  id: uart_bus
+  baud_rate: 9600
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+
+select:
+  - platform: template
+    id: mode_select
+    optimistic: true
+    options: [host, continuous]
+
+m5stack_barcode:
+  id: scanner
+  uart_id: uart_bus
+  on_barcode:
+    - m5stack_barcode.set_mode:
+        id: scanner
+        operation_mode: host
+    - logger.log:
+        format: "Scanned: %s"
+        args: ["x.c_str()"]
+  on_scan_timeout:
+    - m5stack_barcode.start: scanner

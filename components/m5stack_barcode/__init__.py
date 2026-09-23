@@ -1,6 +1,8 @@
 """ESPHome M5Stack Atom Barcode Scanner component."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
@@ -16,254 +18,373 @@ from esphome.components import (
 )
 from esphome.const import CONF_ID, CONF_TRIGGER_ID
 
-# Dependencies
+if TYPE_CHECKING:
+    from esphome.cpp_generator import MockObj, MockObjClass
+
+CODEOWNERS = ["@alf-scotland"]
 DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["binary_sensor", "button", "event", "select", "switch", "text_sensor"]
 
-
-# Helper function to get the scanner from config
-async def get_scanner(config: dict[str, Any]) -> Any:
-    """Get scanner instance from a component config dictionary."""
-    return await cg.get_variable(config[CONF_ID])
-
-
-# Component namespace
 m5stack_barcode_ns = cg.esphome_ns.namespace("m5stack_barcode")
 BarcodeScanner = m5stack_barcode_ns.class_(
     "BarcodeScanner",
     cg.Component,
     uart.UARTDevice,
 )
+_Parented = cg.Parented.template(BarcodeScanner)
 
-# Configuration constants
 CONF_BARCODE_SENSOR = "barcode_sensor"
 CONF_VERSION_SENSOR = "version_sensor"
 CONF_SCAN_EVENT = "scan_event"
-CONF_ON_BARCODE = "on_barcode"
-CONF_ON_SCAN_TIMEOUT = "on_scan_timeout"
-
-# Sub-component config keys
-CONF_OPERATION_MODE_SELECT = "operation_mode_select"
-CONF_BUZZER_VOLUME_SELECT = "buzzer_volume_select"
-CONF_LIGHT_MODE_SELECT = "light_mode_select"
-CONF_LOCATE_LIGHT_MODE_SELECT = "locate_light_mode_select"
-CONF_SCAN_DURATION_SELECT = "scan_duration_select"
-CONF_TERMINATOR_SELECT = "terminator_select"
-CONF_STABLE_INDUCTION_TIME_SELECT = "stable_induction_time_select"
-CONF_READING_INTERVAL_SELECT = "reading_interval_select"
-CONF_SAME_CODE_INTERVAL_SELECT = "same_code_interval_select"
-CONF_SOUND_SWITCH = "sound_switch"
-CONF_BOOT_SOUND_SWITCH = "boot_sound_switch"
-CONF_DECODE_SOUND_SWITCH = "decode_sound_switch"
-CONF_DECODING_SUCCESS_LIGHT_SWITCH = "decoding_success_light_switch"
-CONF_CMD_ACK_SOUND_SWITCH = "cmd_ack_sound_switch"
-CONF_CONFIG_CODE_SCAN_SWITCH = "config_code_scan_switch"
+CONF_SCANNING_BINARY_SENSOR = "scanning_binary_sensor"
 CONF_START_BUTTON = "start_button"
 CONF_STOP_BUTTON = "stop_button"
 CONF_FACTORY_RESET_BUTTON = "factory_reset_button"
-CONF_SCANNING_BINARY_SENSOR = "scanning_binary_sensor"
+CONF_ON_BARCODE = "on_barcode"
+CONF_ON_SCAN_TIMEOUT = "on_scan_timeout"
 
-# Event types
-EVENT_TYPES = [
-    "scan_successful",
+EVENT_TYPE_SCAN_SUCCESSFUL = "scan_successful"
+
+
+def _enum(
+    name: str,
+    options: dict[str, str],
+) -> tuple[MockObjClass, dict[str, MockObj]]:
+    """Map YAML option keys to C++ enumerators, preserving the enum order."""
+    enum = m5stack_barcode_ns.enum(name, is_class=True)
+    return enum, {key: getattr(enum, value) for key, value in options.items()}
+
+
+# Every dict below lists the options in C++ enum declaration order (types.h): the select
+# option index is the enum value.  tests/test_enum_consistency.py enforces this.
+OperationMode, OPERATION_MODES = _enum(
+    "OperationMode",
+    {
+        "host": "HOST",
+        "level": "LEVEL",
+        "pulse": "PULSE",
+        "continuous": "CONTINUOUS",
+        "auto_sense": "AUTO_SENSE",
+    },
+)
+Terminator, TERMINATORS = _enum(
+    "Terminator",
+    {
+        "none": "NONE",
+        "crlf": "CRLF",
+        "cr": "CR",
+        "tab": "TAB",
+        "crcr": "CRCR",
+        "crlfcrlf": "CRLFCRLF",
+    },
+)
+LightMode, LIGHT_MODES = _enum(
+    "LightMode",
+    {
+        "on_when_reading": "LIGHT_ON_WHEN_READING",
+        "always_on": "LIGHT_ALWAYS_ON",
+        "always_off": "LIGHT_ALWAYS_OFF",
+    },
+)
+LocateLightMode, LOCATE_LIGHT_MODES = _enum(
+    "LocateLightMode",
+    {
+        "on_when_reading": "LOCATE_LIGHT_ON_WHEN_READING",
+        "always_on": "LOCATE_LIGHT_ALWAYS_ON",
+        "always_off": "LOCATE_LIGHT_ALWAYS_OFF",
+    },
+)
+BuzzerVolume, BUZZER_VOLUMES = _enum(
+    "BuzzerVolume",
+    {
+        "high": "BUZZER_VOLUME_HIGH",
+        "medium": "BUZZER_VOLUME_MEDIUM",
+        "low": "BUZZER_VOLUME_LOW",
+    },
+)
+ScanDuration, SCAN_DURATIONS = _enum(
+    "ScanDuration",
+    {
+        "500ms": "MS_500",
+        "1s": "MS_1000",
+        "3s": "MS_3000",
+        "5s": "MS_5000",
+        "10s": "MS_10000",
+        "15s": "MS_15000",
+        "20s": "MS_20000",
+        "unlimited": "UNLIMITED",
+    },
+)
+_INTERVALS = {
+    "0ms": "MS_0",
+    "100ms": "MS_100",
+    "300ms": "MS_300",
+    "500ms": "MS_500",
+    "1s": "MS_1000",
+    "1.5s": "MS_1500",
+    "2s": "MS_2000",
+}
+StableInductionTime, STABLE_INDUCTION_TIMES = _enum(
+    "StableInductionTime",
+    {key: _INTERVALS[key] for key in ("0ms", "100ms", "300ms", "500ms", "1s")},
+)
+ReadingInterval, READING_INTERVALS = _enum("ReadingInterval", _INTERVALS)
+SameCodeInterval, SAME_CODE_INTERVALS = _enum("SameCodeInterval", _INTERVALS)
+
+
+def _on_off_enum(
+    name: str,
+    prefix: str,
+) -> tuple[MockObjClass, dict[str, MockObj]]:
+    return _enum(
+        name,
+        {"disabled": f"{prefix}_DISABLED", "enabled": f"{prefix}_ENABLED"},
+    )
+
+
+SoundMode, SOUND_MODES = _on_off_enum("SoundMode", "SOUND")
+BootSoundMode, BOOT_SOUND_MODES = _on_off_enum("BootSoundMode", "BOOT_SOUND")
+DecodeSoundMode, DECODE_SOUND_MODES = _on_off_enum("DecodeSoundMode", "DECODE_SOUND")
+DecodingSuccessLightMode, DECODING_SUCCESS_LIGHT_MODES = _on_off_enum(
+    "DecodingSuccessLightMode",
+    "DECODING_LIGHT",
+)
+CmdAckSoundMode, CMD_ACK_SOUND_MODES = _on_off_enum("CmdAckSoundMode", "CMD_ACK_SOUND")
+ConfigCodeScanMode, CONFIG_CODE_SCAN_MODES = _on_off_enum(
+    "ConfigCodeScanMode",
+    "CONFIG_CODE_SCAN",
+)
+
+
+class Setting(NamedTuple):
+    """A scanner setting: YAML option, optional HA entity and set action."""
+
+    key: str  # YAML key; C++ uses set_<key>_initial() and set_<entity_key>()
+    options: dict[str, MockObj]
+    default: str
+    entity_key: str  # "<...>_select" or "<...>_switch"
+    entity_class: str
+    action: str  # m5stack_barcode.<action>
+    action_class: str
+
+    @property
+    def is_select(self) -> bool:
+        """Whether the setting is exposed as a select (else a switch)."""
+        return self.entity_key.endswith("_select")
+
+    @property
+    def entity_type(self) -> MockObjClass:
+        """C++ class of the HA entity."""
+        base = select.Select if self.is_select else switch.Switch
+        return m5stack_barcode_ns.class_(self.entity_class, base, _Parented)
+
+    @property
+    def action_type(self) -> MockObjClass:
+        """C++ class of the set action."""
+        return m5stack_barcode_ns.class_(
+            self.action_class,
+            automation.Action,
+            _Parented,
+        )
+
+
+# Defaults match the scanner's factory defaults except sound_mode, buzzer_volume and
+# boot_sound_mode, which are quieter to suit a Home Assistant installation.
+SETTINGS = [
+    Setting(
+        "operation_mode",
+        OPERATION_MODES,
+        "host",
+        "operation_mode_select",
+        "OperationModeSelect",
+        "set_mode",
+        "SetModeAction",
+    ),
+    Setting(
+        "terminator",
+        TERMINATORS,
+        "none",
+        "terminator_select",
+        "TerminatorSelect",
+        "set_terminator",
+        "SetTerminatorAction",
+    ),
+    Setting(
+        "light_mode",
+        LIGHT_MODES,
+        "on_when_reading",
+        "light_mode_select",
+        "LightModeSelect",
+        "set_light_mode",
+        "SetLightModeAction",
+    ),
+    Setting(
+        "locate_light_mode",
+        LOCATE_LIGHT_MODES,
+        "on_when_reading",
+        "locate_light_mode_select",
+        "LocateLightModeSelect",
+        "set_locate_light_mode",
+        "SetLocateLightModeAction",
+    ),
+    Setting(
+        "buzzer_volume",
+        BUZZER_VOLUMES,
+        "low",
+        "buzzer_volume_select",
+        "BuzzerVolumeSelect",
+        "set_buzzer_volume",
+        "SetBuzzerVolumeAction",
+    ),
+    Setting(
+        "scan_duration",
+        SCAN_DURATIONS,
+        "3s",
+        "scan_duration_select",
+        "ScanDurationSelect",
+        "set_scan_duration",
+        "SetScanDurationAction",
+    ),
+    Setting(
+        "stable_induction_time",
+        STABLE_INDUCTION_TIMES,
+        "500ms",
+        "stable_induction_time_select",
+        "StableInductionTimeSelect",
+        "set_stable_induction_time",
+        "SetStableInductionTimeAction",
+    ),
+    Setting(
+        "reading_interval",
+        READING_INTERVALS,
+        "500ms",
+        "reading_interval_select",
+        "ReadingIntervalSelect",
+        "set_reading_interval",
+        "SetReadingIntervalAction",
+    ),
+    Setting(
+        "same_code_interval",
+        SAME_CODE_INTERVALS,
+        "500ms",
+        "same_code_interval_select",
+        "SameCodeIntervalSelect",
+        "set_same_code_interval",
+        "SetSameCodeIntervalAction",
+    ),
+    Setting(
+        "sound_mode",
+        SOUND_MODES,
+        "disabled",
+        "sound_switch",
+        "SoundSwitch",
+        "set_sound_mode",
+        "SetSoundModeAction",
+    ),
+    Setting(
+        "boot_sound_mode",
+        BOOT_SOUND_MODES,
+        "disabled",
+        "boot_sound_switch",
+        "BootSoundSwitch",
+        "set_boot_sound_mode",
+        "SetBootSoundModeAction",
+    ),
+    Setting(
+        "decode_sound_mode",
+        DECODE_SOUND_MODES,
+        "enabled",
+        "decode_sound_switch",
+        "DecodeSoundSwitch",
+        "set_decode_sound_mode",
+        "SetDecodeSoundModeAction",
+    ),
+    Setting(
+        "decoding_success_light_mode",
+        DECODING_SUCCESS_LIGHT_MODES,
+        "enabled",
+        "decoding_success_light_switch",
+        "DecodingSuccessLightSwitch",
+        "set_decoding_success_light_mode",
+        "SetDecodingSuccessLightModeAction",
+    ),
+    Setting(
+        "cmd_ack_sound_mode",
+        CMD_ACK_SOUND_MODES,
+        "enabled",
+        "cmd_ack_sound_switch",
+        "CmdAckSoundSwitch",
+        "set_cmd_ack_sound_mode",
+        "SetCmdAckSoundModeAction",
+    ),
+    Setting(
+        "config_code_scan_mode",
+        CONFIG_CODE_SCAN_MODES,
+        "enabled",
+        "config_code_scan_switch",
+        "ConfigCodeScanSwitch",
+        "set_config_code_scan_mode",
+        "SetConfigCodeScanModeAction",
+    ),
 ]
 
-# Scanner operation settings
-CONF_OPERATION_MODE = "operation_mode"
-CONF_TERMINATOR = "terminator"
-CONF_LIGHT_MODE = "light_mode"
-CONF_LOCATE_LIGHT_MODE = "locate_light_mode"
-CONF_SOUND_MODE = "sound_mode"
-CONF_BUZZER_VOLUME = "buzzer_volume"
-CONF_DECODING_SUCCESS_LIGHT_MODE = "decoding_success_light_mode"
-CONF_BOOT_SOUND_MODE = "boot_sound_mode"
-CONF_DECODE_SOUND_MODE = "decode_sound_mode"
-CONF_CMD_ACK_SOUND_MODE = "cmd_ack_sound_mode"
-CONF_CONFIG_CODE_SCAN_MODE = "config_code_scan_mode"
-
-# Scanner timing settings
-CONF_SCAN_DURATION = "scan_duration"
-CONF_STABLE_INDUCTION_TIME = "stable_induction_time"
-CONF_READING_INTERVAL = "reading_interval"
-CONF_SAME_CODE_INTERVAL = "same_code_interval"
-
-# Enums
-OperationMode = m5stack_barcode_ns.enum("OperationMode", is_class=True)
-OPERATION_MODES = {
-    "host": OperationMode.HOST,
-    "level": OperationMode.LEVEL,
-    "pulse": OperationMode.PULSE,
-    "continuous": OperationMode.CONTINUOUS,
-    "auto_sense": OperationMode.AUTO_SENSE,
+# Buttons: config key -> C++ class (each calls one BarcodeScanner method)
+BUTTONS = {
+    CONF_START_BUTTON: m5stack_barcode_ns.class_(
+        "StartButton",
+        button.Button,
+        _Parented,
+    ),
+    CONF_STOP_BUTTON: m5stack_barcode_ns.class_("StopButton", button.Button, _Parented),
+    CONF_FACTORY_RESET_BUTTON: m5stack_barcode_ns.class_(
+        "FactoryResetButton",
+        button.Button,
+        _Parented,
+    ),
 }
 
-Terminator = m5stack_barcode_ns.enum("Terminator", is_class=True)
-TERMINATORS = {
-    "none": Terminator.NONE,
-    "crlf": Terminator.CRLF,
-    "cr": Terminator.CR,
-    "tab": Terminator.TAB,
-    "crcr": Terminator.CRCR,
-    "crlfcrlf": Terminator.CRLFCRLF,
+# Parameterless actions: action name -> C++ class
+SIMPLE_ACTIONS = {
+    "m5stack_barcode.start": m5stack_barcode_ns.class_(
+        "StartAction",
+        automation.Action,
+        _Parented,
+    ),
+    "m5stack_barcode.stop": m5stack_barcode_ns.class_(
+        "StopAction",
+        automation.Action,
+        _Parented,
+    ),
+    "m5stack_barcode.factory_reset": m5stack_barcode_ns.class_(
+        "FactoryResetAction",
+        automation.Action,
+        _Parented,
+    ),
+    "m5stack_barcode.process_current_buffer": m5stack_barcode_ns.class_(
+        "ProcessCurrentBufferAction",
+        automation.Action,
+        _Parented,
+    ),
 }
 
-LightMode = m5stack_barcode_ns.enum("LightMode", is_class=True)
-LIGHT_MODES = {
-    "on_when_reading": LightMode.LIGHT_ON_WHEN_READING,
-    "always_on": LightMode.LIGHT_ALWAYS_ON,
-    "always_off": LightMode.LIGHT_ALWAYS_OFF,
+CONDITIONS = {
+    "m5stack_barcode.is_idle": m5stack_barcode_ns.class_(
+        "IsIdleCondition",
+        automation.Condition,
+        _Parented,
+    ),
+    "m5stack_barcode.is_manual_scanning": m5stack_barcode_ns.class_(
+        "IsManualScanningCondition",
+        automation.Condition,
+        _Parented,
+    ),
+    "m5stack_barcode.is_continuous_mode": m5stack_barcode_ns.class_(
+        "IsContinuousModeCondition",
+        automation.Condition,
+        _Parented,
+    ),
 }
 
-# Locate light modes
-LocateLightMode = m5stack_barcode_ns.enum("LocateLightMode", is_class=True)
-LOCATE_LIGHT_MODES = {
-    "on_when_reading": LocateLightMode.LOCATE_LIGHT_ON_WHEN_READING,
-    "always_on": LocateLightMode.LOCATE_LIGHT_ALWAYS_ON,
-    "always_off": LocateLightMode.LOCATE_LIGHT_ALWAYS_OFF,
-}
-
-SoundMode = m5stack_barcode_ns.enum("SoundMode", is_class=True)
-SOUND_MODES = {
-    "disabled": SoundMode.SOUND_DISABLED,
-    "enabled": SoundMode.SOUND_ENABLED,
-}
-
-BuzzerVolume = m5stack_barcode_ns.enum("BuzzerVolume", is_class=True)
-BUZZER_VOLUMES = {
-    "high": BuzzerVolume.BUZZER_VOLUME_HIGH,
-    "medium": BuzzerVolume.BUZZER_VOLUME_MEDIUM,
-    "low": BuzzerVolume.BUZZER_VOLUME_LOW,
-}
-
-DecodingSuccessLightMode = m5stack_barcode_ns.enum(
-    "DecodingSuccessLightMode",
-    is_class=True,
-)
-DECODING_SUCCESS_LIGHT_MODES = {
-    "enabled": DecodingSuccessLightMode.DECODING_LIGHT_ENABLED,
-    "disabled": DecodingSuccessLightMode.DECODING_LIGHT_DISABLED,
-}
-
-BootSoundMode = m5stack_barcode_ns.enum("BootSoundMode", is_class=True)
-BOOT_SOUND_MODES = {
-    "enabled": BootSoundMode.BOOT_SOUND_ENABLED,
-    "disabled": BootSoundMode.BOOT_SOUND_DISABLED,
-}
-
-DecodeSoundMode = m5stack_barcode_ns.enum("DecodeSoundMode", is_class=True)
-DECODE_SOUND_MODES = {
-    "enabled": DecodeSoundMode.DECODE_SOUND_ENABLED,
-    "disabled": DecodeSoundMode.DECODE_SOUND_DISABLED,
-}
-
-CmdAckSoundMode = m5stack_barcode_ns.enum("CmdAckSoundMode", is_class=True)
-CMD_ACK_SOUND_MODES = {
-    "enabled": CmdAckSoundMode.CMD_ACK_SOUND_ENABLED,
-    "disabled": CmdAckSoundMode.CMD_ACK_SOUND_DISABLED,
-}
-
-ConfigCodeScanMode = m5stack_barcode_ns.enum("ConfigCodeScanMode", is_class=True)
-CONFIG_CODE_SCAN_MODES = {
-    "enabled": ConfigCodeScanMode.CONFIG_CODE_SCAN_ENABLED,
-    "disabled": ConfigCodeScanMode.CONFIG_CODE_SCAN_DISABLED,
-}
-
-ScanDuration = m5stack_barcode_ns.enum("ScanDuration", is_class=True)
-SCAN_DURATIONS = {
-    "500ms": ScanDuration.MS_500,
-    "1s": ScanDuration.MS_1000,
-    "3s": ScanDuration.MS_3000,
-    "5s": ScanDuration.MS_5000,
-    "10s": ScanDuration.MS_10000,
-    "15s": ScanDuration.MS_15000,
-    "20s": ScanDuration.MS_20000,
-    "unlimited": ScanDuration.UNLIMITED,
-}
-
-StableInductionTime = m5stack_barcode_ns.enum("StableInductionTime", is_class=True)
-STABLE_INDUCTION_TIMES = {
-    "0ms": StableInductionTime.MS_0,
-    "100ms": StableInductionTime.MS_100,
-    "300ms": StableInductionTime.MS_300,
-    "500ms": StableInductionTime.MS_500,
-    "1s": StableInductionTime.MS_1000,
-}
-
-ReadingInterval = m5stack_barcode_ns.enum("ReadingInterval", is_class=True)
-READING_INTERVALS = {
-    "0ms": ReadingInterval.MS_0,
-    "100ms": ReadingInterval.MS_100,
-    "300ms": ReadingInterval.MS_300,
-    "500ms": ReadingInterval.MS_500,
-    "1s": ReadingInterval.MS_1000,
-    "1.5s": ReadingInterval.MS_1500,
-    "2s": ReadingInterval.MS_2000,
-}
-
-SameCodeInterval = m5stack_barcode_ns.enum("SameCodeInterval", is_class=True)
-SAME_CODE_INTERVALS = {
-    "0ms": SameCodeInterval.MS_0,
-    "100ms": SameCodeInterval.MS_100,
-    "300ms": SameCodeInterval.MS_300,
-    "500ms": SameCodeInterval.MS_500,
-    "1s": SameCodeInterval.MS_1000,
-    "1.5s": SameCodeInterval.MS_1500,
-    "2s": SameCodeInterval.MS_2000,
-}
-
-# Actions
-StartAction = m5stack_barcode_ns.class_("StartAction", automation.Action)
-StopAction = m5stack_barcode_ns.class_("StopAction", automation.Action)
-SetModeAction = m5stack_barcode_ns.class_("SetModeAction", automation.Action)
-SetTerminatorAction = m5stack_barcode_ns.class_(
-    "SetTerminatorAction",
-    automation.Action,
-)
-SetLightModeAction = m5stack_barcode_ns.class_("SetLightModeAction", automation.Action)
-SetLocateLightModeAction = m5stack_barcode_ns.class_(
-    "SetLocateLightModeAction",
-    automation.Action,
-)
-SetSoundModeAction = m5stack_barcode_ns.class_("SetSoundModeAction", automation.Action)
-SetBuzzerVolumeAction = m5stack_barcode_ns.class_(
-    "SetBuzzerVolumeAction",
-    automation.Action,
-)
-SetDecodingSuccessLightModeAction = m5stack_barcode_ns.class_(
-    "SetDecodingSuccessLightModeAction",
-    automation.Action,
-)
-SetBootSoundModeAction = m5stack_barcode_ns.class_(
-    "SetBootSoundModeAction",
-    automation.Action,
-)
-SetDecodeSoundModeAction = m5stack_barcode_ns.class_(
-    "SetDecodeSoundModeAction",
-    automation.Action,
-)
-SetScanDurationAction = m5stack_barcode_ns.class_(
-    "SetScanDurationAction",
-    automation.Action,
-)
-SetStableInductionTimeAction = m5stack_barcode_ns.class_(
-    "SetStableInductionTimeAction",
-    automation.Action,
-)
-SetReadingIntervalAction = m5stack_barcode_ns.class_(
-    "SetReadingIntervalAction",
-    automation.Action,
-)
-SetSameCodeIntervalAction = m5stack_barcode_ns.class_(
-    "SetSameCodeIntervalAction",
-    automation.Action,
-)
-
-ProcessCurrentBufferAction = m5stack_barcode_ns.class_(
-    "ProcessCurrentBufferAction",
-    automation.Action,
-)
-
-# Triggers
 BarcodeTrigger = m5stack_barcode_ns.class_(
     "BarcodeTrigger",
     automation.Trigger.template(cg.std_string),
@@ -273,935 +394,159 @@ ScanTimeoutTrigger = m5stack_barcode_ns.class_(
     automation.Trigger.template(),
 )
 
-# Sub-components — select
-OperationModeSelect = m5stack_barcode_ns.class_(
-    "OperationModeSelect",
-    select.Select,
-    cg.Component,
-)
-BuzzerVolumeSelect = m5stack_barcode_ns.class_(
-    "BuzzerVolumeSelect",
-    select.Select,
-    cg.Component,
-)
-LightModeSelect = m5stack_barcode_ns.class_(
-    "LightModeSelect",
-    select.Select,
-    cg.Component,
-)
-LocateLightModeSelect = m5stack_barcode_ns.class_(
-    "LocateLightModeSelect",
-    select.Select,
-    cg.Component,
-)
-ScanDurationSelect = m5stack_barcode_ns.class_(
-    "ScanDurationSelect",
-    select.Select,
-    cg.Component,
-)
-TerminatorSelect = m5stack_barcode_ns.class_(
-    "TerminatorSelect",
-    select.Select,
-    cg.Component,
-)
-StableInductionTimeSelect = m5stack_barcode_ns.class_(
-    "StableInductionTimeSelect",
-    select.Select,
-    cg.Component,
-)
-ReadingIntervalSelect = m5stack_barcode_ns.class_(
-    "ReadingIntervalSelect",
-    select.Select,
-    cg.Component,
-)
-SameCodeIntervalSelect = m5stack_barcode_ns.class_(
-    "SameCodeIntervalSelect",
-    select.Select,
-    cg.Component,
-)
 
-# Sub-components — switch
-SoundSwitch = m5stack_barcode_ns.class_(
-    "SoundSwitch",
-    switch.Switch,
-    cg.Component,
-)
-BootSoundSwitch = m5stack_barcode_ns.class_(
-    "BootSoundSwitch",
-    switch.Switch,
-    cg.Component,
-)
-DecodeSoundSwitch = m5stack_barcode_ns.class_(
-    "DecodeSoundSwitch",
-    switch.Switch,
-    cg.Component,
-)
-DecodingSuccessLightSwitch = m5stack_barcode_ns.class_(
-    "DecodingSuccessLightSwitch",
-    switch.Switch,
-    cg.Component,
-)
-CmdAckSoundSwitch = m5stack_barcode_ns.class_(
-    "CmdAckSoundSwitch",
-    switch.Switch,
-    cg.Component,
-)
-ConfigCodeScanSwitch = m5stack_barcode_ns.class_(
-    "ConfigCodeScanSwitch",
-    switch.Switch,
-    cg.Component,
-)
-
-# Sub-components — button
-StartButton = m5stack_barcode_ns.class_(
-    "StartButton",
-    button.Button,
-    cg.Component,
-)
-StopButton = m5stack_barcode_ns.class_(
-    "StopButton",
-    button.Button,
-    cg.Component,
-)
-FactoryResetButton = m5stack_barcode_ns.class_(
-    "FactoryResetButton",
-    button.Button,
-    cg.Component,
-)
-
-# Conditions
-IsContinuousModeCondition = m5stack_barcode_ns.class_(
-    "IsContinuousModeCondition",
-    automation.Condition,
-)
-
-IsManualScanningCondition = m5stack_barcode_ns.class_(
-    "IsManualScanningCondition",
-    automation.Condition,
-)
-
-IsIdleCondition = m5stack_barcode_ns.class_(
-    "IsIdleCondition",
-    automation.Condition,
-)
-
-# Configuration schema
-CONFIG_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(): cv.declare_id(BarcodeScanner),
-        cv.Optional(CONF_BARCODE_SENSOR): text_sensor.text_sensor_schema(
-            text_sensor.TextSensor,
-        ),
-        cv.Optional(CONF_VERSION_SENSOR): text_sensor.text_sensor_schema(
-            text_sensor.TextSensor,
-        ),
-        cv.Optional(CONF_SCAN_EVENT): event.event_schema(event.Event),
-        cv.Optional(CONF_ON_BARCODE): automation.validate_automation(
-            {
-                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger),
-            },
-        ),
-        cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation(
-            {
-                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ScanTimeoutTrigger),
-            },
-        ),
-        cv.Optional(CONF_OPERATION_MODE_SELECT): select.select_schema(
-            OperationModeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_BUZZER_VOLUME_SELECT): select.select_schema(
-            BuzzerVolumeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_LIGHT_MODE_SELECT): select.select_schema(
-            LightModeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_LOCATE_LIGHT_MODE_SELECT): select.select_schema(
-            LocateLightModeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SCAN_DURATION_SELECT): select.select_schema(
-            ScanDurationSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_TERMINATOR_SELECT): select.select_schema(
-            TerminatorSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_STABLE_INDUCTION_TIME_SELECT): select.select_schema(
-            StableInductionTimeSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_READING_INTERVAL_SELECT): select.select_schema(
-            ReadingIntervalSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SAME_CODE_INTERVAL_SELECT): select.select_schema(
-            SameCodeIntervalSelect,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SOUND_SWITCH): switch.switch_schema(
-            SoundSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_BOOT_SOUND_SWITCH): switch.switch_schema(
-            BootSoundSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_DECODE_SOUND_SWITCH): switch.switch_schema(
-            DecodeSoundSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_DECODING_SUCCESS_LIGHT_SWITCH): switch.switch_schema(
-            DecodingSuccessLightSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_CMD_ACK_SOUND_SWITCH): switch.switch_schema(
-            CmdAckSoundSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_CONFIG_CODE_SCAN_SWITCH): switch.switch_schema(
-            ConfigCodeScanSwitch,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_START_BUTTON): button.button_schema(
-            StartButton,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_STOP_BUTTON): button.button_schema(
-            StopButton,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_FACTORY_RESET_BUTTON): button.button_schema(
-            FactoryResetButton,
-        ).extend(cv.COMPONENT_SCHEMA),
-        cv.Optional(CONF_SCANNING_BINARY_SENSOR): (
-            binary_sensor.binary_sensor_schema(binary_sensor.BinarySensor).extend(
-                cv.COMPONENT_SCHEMA,
-            )
-        ),
-        cv.Optional(CONF_OPERATION_MODE, default="host"): cv.enum(
-            OPERATION_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_TERMINATOR, default="none"): cv.enum(TERMINATORS, lower=True),
-        cv.Optional(CONF_LIGHT_MODE, default="on_when_reading"): cv.enum(
-            LIGHT_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_LOCATE_LIGHT_MODE, default="on_when_reading"): cv.enum(
-            LOCATE_LIGHT_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_SOUND_MODE, default="disabled"): cv.enum(
-            SOUND_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_BUZZER_VOLUME, default="low"): cv.enum(
-            BUZZER_VOLUMES,
-            lower=True,
-        ),
-        cv.Optional(CONF_DECODING_SUCCESS_LIGHT_MODE, default="enabled"): cv.enum(
-            DECODING_SUCCESS_LIGHT_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_BOOT_SOUND_MODE, default="disabled"): cv.enum(
-            BOOT_SOUND_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_DECODE_SOUND_MODE, default="enabled"): cv.enum(
-            DECODE_SOUND_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_CMD_ACK_SOUND_MODE, default="enabled"): cv.enum(
-            CMD_ACK_SOUND_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_CONFIG_CODE_SCAN_MODE, default="enabled"): cv.enum(
-            CONFIG_CODE_SCAN_MODES,
-            lower=True,
-        ),
-        cv.Optional(CONF_SCAN_DURATION, default="3s"): cv.enum(
-            SCAN_DURATIONS,
-            lower=True,
-        ),
-        cv.Optional(CONF_STABLE_INDUCTION_TIME, default="500ms"): cv.enum(
-            STABLE_INDUCTION_TIMES,
-            lower=True,
-        ),
-        cv.Optional(CONF_READING_INTERVAL, default="500ms"): cv.enum(
-            READING_INTERVALS,
-            lower=True,
-        ),
-        cv.Optional(CONF_SAME_CODE_INTERVAL, default="500ms"): cv.enum(
-            SAME_CODE_INTERVALS,
-            lower=True,
-        ),
-    },
-).extend(uart.UART_DEVICE_SCHEMA)
+def _entity_schema(setting: Setting) -> cv.Schema:
+    if setting.is_select:
+        return select.select_schema(setting.entity_type)
+    # The state comes from the scanner (ACKed value), not from a restored switch state.
+    return switch.switch_schema(setting.entity_type, default_restore_mode="DISABLED")
 
 
-# Code generation
-async def handle_operation_config(var: Any, config: dict[str, Any]) -> None:
-    """Handle operation mode and terminator configuration."""
-    if CONF_OPERATION_MODE in config:
-        cg.add(var.set_operation_mode_initial(config[CONF_OPERATION_MODE]))
-    if CONF_TERMINATOR in config:
-        cg.add(var.set_terminator_initial(config[CONF_TERMINATOR]))
-
-
-async def handle_light_config(var: Any, config: dict[str, Any]) -> None:
-    """Handle light-related configuration."""
-    if CONF_LIGHT_MODE in config:
-        cg.add(var.set_light_mode_initial(config[CONF_LIGHT_MODE]))
-
-    if CONF_LOCATE_LIGHT_MODE in config:
-        cg.add(var.set_locate_light_mode_initial(config[CONF_LOCATE_LIGHT_MODE]))
-
-    if CONF_DECODING_SUCCESS_LIGHT_MODE in config:
-        cg.add(
-            var.set_decoding_success_light_mode_initial(
-                config[CONF_DECODING_SUCCESS_LIGHT_MODE],
+CONFIG_SCHEMA = (
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(BarcodeScanner),
+            cv.Optional(CONF_BARCODE_SENSOR): text_sensor.text_sensor_schema(),
+            cv.Optional(CONF_VERSION_SENSOR): text_sensor.text_sensor_schema(),
+            cv.Optional(CONF_SCAN_EVENT): event.event_schema(event.Event),
+            cv.Optional(
+                CONF_SCANNING_BINARY_SENSOR,
+            ): binary_sensor.binary_sensor_schema(),
+            cv.Optional(CONF_ON_BARCODE): automation.validate_automation(
+                {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger)},
             ),
-        )
+            cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation(
+                {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ScanTimeoutTrigger)},
+            ),
+            **{
+                cv.Optional(key): button.button_schema(cls)
+                for key, cls in BUTTONS.items()
+            },
+            **{
+                cv.Optional(s.key, default=s.default): cv.enum(s.options, lower=True)
+                for s in SETTINGS
+            },
+            **{cv.Optional(s.entity_key): _entity_schema(s) for s in SETTINGS},
+        },
+    )
+    .extend(cv.COMPONENT_SCHEMA)
+    .extend(uart.UART_DEVICE_SCHEMA)
+)
+
+# The scanner's serial port is fixed at 9600 8N1 (changing it is not supported, see the
+# protocol PDF item 6) and the component both sends commands and receives data.
+FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
+    "m5stack_barcode",
+    baud_rate=9600,
+    require_tx=True,
+    require_rx=True,
+)
 
 
-async def handle_sound_config(var: Any, config: dict[str, Any]) -> None:
-    """Handle sound-related configuration."""
-    if CONF_SOUND_MODE in config:
-        cg.add(var.set_sound_mode_initial(config[CONF_SOUND_MODE]))
-
-    if CONF_BUZZER_VOLUME in config:
-        cg.add(var.set_buzzer_volume_initial(config[CONF_BUZZER_VOLUME]))
-
-    if CONF_BOOT_SOUND_MODE in config:
-        cg.add(var.set_boot_sound_mode_initial(config[CONF_BOOT_SOUND_MODE]))
-
-    if CONF_DECODE_SOUND_MODE in config:
-        cg.add(var.set_decode_sound_mode_initial(config[CONF_DECODE_SOUND_MODE]))
-
-    if CONF_CMD_ACK_SOUND_MODE in config:
-        cg.add(var.set_cmd_ack_sound_mode_initial(config[CONF_CMD_ACK_SOUND_MODE]))
-
-    if CONF_CONFIG_CODE_SCAN_MODE in config:
-        cg.add(
-            var.set_config_code_scan_mode_initial(config[CONF_CONFIG_CODE_SCAN_MODE]),
-        )
-
-
-async def handle_timing_config(var: Any, config: dict[str, Any]) -> None:
-    """Handle timing-related configuration."""
-    if CONF_SCAN_DURATION in config:
-        cg.add(var.set_scan_duration_initial(config[CONF_SCAN_DURATION]))
-
-    if CONF_STABLE_INDUCTION_TIME in config:
-        cg.add(
-            var.set_stable_induction_time_initial(config[CONF_STABLE_INDUCTION_TIME]),
-        )
-
-    if CONF_READING_INTERVAL in config:
-        cg.add(var.set_reading_interval_initial(config[CONF_READING_INTERVAL]))
-
-    if CONF_SAME_CODE_INTERVAL in config:
-        cg.add(var.set_same_code_interval_initial(config[CONF_SAME_CODE_INTERVAL]))
-
-
-async def _register_select(
-    var: Any,
-    sel_conf: dict[str, Any],
-    options: list[str],
-    setter: Any,
+async def _setting_to_code(
+    var: MockObj,
+    setting: Setting,
+    config: dict[str, Any],
 ) -> None:
-    """Register a select sub-component and wire it to the scanner."""
-    sel_var = cg.new_Pvariable(sel_conf[CONF_ID])
-    await cg.register_component(sel_var, sel_conf)
-    await select.register_select(sel_var, sel_conf, options=options)
-    cg.add(sel_var.set_scanner(var))
-    cg.add(setter(sel_var))
+    cg.add(getattr(var, f"set_{setting.key}_initial")(config[setting.key]))
+    if conf := config.get(setting.entity_key):
+        if setting.is_select:
+            entity = await select.new_select(conf, options=list(setting.options))
+        else:
+            entity = await switch.new_switch(conf)
+        await cg.register_parented(entity, var)
+        cg.add(getattr(var, f"set_{setting.entity_key}")(entity))
 
 
-async def handle_select_subcomponents(var: Any, config: dict[str, Any]) -> None:
-    """Wire up select sub-components."""
-    if CONF_OPERATION_MODE_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_OPERATION_MODE_SELECT],
-            list(OPERATION_MODES.keys()),
-            var.set_operation_mode_select,
-        )
-    if CONF_BUZZER_VOLUME_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_BUZZER_VOLUME_SELECT],
-            list(BUZZER_VOLUMES.keys()),
-            var.set_buzzer_volume_select,
-        )
-    if CONF_LIGHT_MODE_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_LIGHT_MODE_SELECT],
-            list(LIGHT_MODES.keys()),
-            var.set_light_mode_select,
-        )
-    if CONF_LOCATE_LIGHT_MODE_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_LOCATE_LIGHT_MODE_SELECT],
-            list(LOCATE_LIGHT_MODES.keys()),
-            var.set_locate_light_mode_select,
-        )
-    if CONF_SCAN_DURATION_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_SCAN_DURATION_SELECT],
-            list(SCAN_DURATIONS.keys()),
-            var.set_scan_duration_select,
-        )
-    if CONF_TERMINATOR_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_TERMINATOR_SELECT],
-            list(TERMINATORS.keys()),
-            var.set_terminator_select,
-        )
-    if CONF_STABLE_INDUCTION_TIME_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_STABLE_INDUCTION_TIME_SELECT],
-            list(STABLE_INDUCTION_TIMES.keys()),
-            var.set_stable_induction_time_select,
-        )
-    if CONF_READING_INTERVAL_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_READING_INTERVAL_SELECT],
-            list(READING_INTERVALS.keys()),
-            var.set_reading_interval_select,
-        )
-    if CONF_SAME_CODE_INTERVAL_SELECT in config:
-        await _register_select(
-            var,
-            config[CONF_SAME_CODE_INTERVAL_SELECT],
-            list(SAME_CODE_INTERVALS.keys()),
-            var.set_same_code_interval_select,
-        )
+async def to_code(config: dict[str, Any]) -> None:
+    """Generate C++ code for the component and its entities."""
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    await uart.register_uart_device(var, config)
 
+    if conf := config.get(CONF_BARCODE_SENSOR):
+        cg.add(var.set_barcode_sensor(await text_sensor.new_text_sensor(conf)))
+    if conf := config.get(CONF_VERSION_SENSOR):
+        cg.add(var.set_version_sensor(await text_sensor.new_text_sensor(conf)))
+    if conf := config.get(CONF_SCAN_EVENT):
+        ev = await event.new_event(conf, event_types=[EVENT_TYPE_SCAN_SUCCESSFUL])
+        cg.add(var.set_scan_event(ev))
+    if conf := config.get(CONF_SCANNING_BINARY_SENSOR):
+        bs = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_scanning_binary_sensor(bs))
 
-async def handle_switch_subcomponents(var: Any, config: dict[str, Any]) -> None:
-    """Wire up switch sub-components."""
-    switch_map = [
-        (CONF_SOUND_SWITCH, var.set_sound_switch),
-        (CONF_BOOT_SOUND_SWITCH, var.set_boot_sound_switch),
-        (CONF_DECODE_SOUND_SWITCH, var.set_decode_sound_switch),
-        (CONF_DECODING_SUCCESS_LIGHT_SWITCH, var.set_decoding_success_light_switch),
-        (CONF_CMD_ACK_SOUND_SWITCH, var.set_cmd_ack_sound_switch),
-        (CONF_CONFIG_CODE_SCAN_SWITCH, var.set_config_code_scan_switch),
-    ]
-    for conf_key, setter in switch_map:
-        if conf_key in config:
-            sw_conf = config[conf_key]
-            sw_var = cg.new_Pvariable(sw_conf[CONF_ID])
-            await cg.register_component(sw_var, sw_conf)
-            await switch.register_switch(sw_var, sw_conf)
-            cg.add(sw_var.set_scanner(var))
-            cg.add(setter(sw_var))
+    for setting in SETTINGS:
+        await _setting_to_code(var, setting, config)
 
+    for key in BUTTONS:
+        if conf := config.get(key):
+            btn = await button.new_button(conf)
+            await cg.register_parented(btn, var)
 
-async def handle_button_subcomponents(var: Any, config: dict[str, Any]) -> None:
-    """Wire up button sub-components."""
-    for conf_key in (CONF_START_BUTTON, CONF_STOP_BUTTON, CONF_FACTORY_RESET_BUTTON):
-        if conf_key in config:
-            btn_conf = config[conf_key]
-            btn_var = cg.new_Pvariable(btn_conf[CONF_ID])
-            await cg.register_component(btn_var, btn_conf)
-            await button.register_button(btn_var, btn_conf)
-            cg.add(btn_var.set_scanner(var))
-
-
-async def handle_automation_triggers(var: Any, config: dict[str, Any]) -> None:
-    """Wire up automation triggers."""
     for conf in config.get(CONF_ON_BARCODE, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
         await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
-
     for conf in config.get(CONF_ON_SCAN_TIMEOUT, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
         await automation.build_automation(trigger, [], conf)
 
 
-async def to_code(config: dict[str, Any]) -> None:
-    """Generate C++ code for component."""
-    var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
-    await uart.register_uart_device(var, config)
+# ── Actions and conditions ────────────────────────────────────────────────────
 
-    if CONF_BARCODE_SENSOR in config:
-        ts_conf = config[CONF_BARCODE_SENSOR]
-        ts_var = cg.new_Pvariable(ts_conf[CONF_ID])
-        await text_sensor.register_text_sensor(ts_var, ts_conf)
-        cg.add(var.set_barcode_sensor(ts_var))
-
-    if CONF_VERSION_SENSOR in config:
-        ts_conf = config[CONF_VERSION_SENSOR]
-        ts_var = cg.new_Pvariable(ts_conf[CONF_ID])
-        await text_sensor.register_text_sensor(ts_var, ts_conf)
-        cg.add(var.set_version_sensor(ts_var))
-
-    if CONF_SCAN_EVENT in config:
-        ev_conf = config[CONF_SCAN_EVENT]
-        ev_var = cg.new_Pvariable(ev_conf[CONF_ID])
-        await event.register_event(ev_var, ev_conf, event_types=["scan_successful"])
-        cg.add(var.set_scan_event(ev_var))
-
-    await handle_operation_config(var, config)
-    await handle_light_config(var, config)
-    await handle_sound_config(var, config)
-    await handle_timing_config(var, config)
-    await handle_automation_triggers(var, config)
-    await handle_select_subcomponents(var, config)
-    await handle_switch_subcomponents(var, config)
-    await handle_button_subcomponents(var, config)
-
-    if CONF_SCANNING_BINARY_SENSOR in config:
-        bs_conf = config[CONF_SCANNING_BINARY_SENSOR]
-        bs_var = cg.new_Pvariable(bs_conf[CONF_ID])
-        await cg.register_component(bs_var, bs_conf)
-        await binary_sensor.register_binary_sensor(bs_var, bs_conf)
-        cg.add(var.set_scanning_binary_sensor(bs_var))
-
-
-# Action registrations
-@automation.register_action(
-    "m5stack_barcode.start",
-    StartAction,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
-    synchronous=False,
+_SCANNER_ID_SCHEMA = automation.maybe_simple_id(
+    {cv.GenerateID(): cv.use_id(BarcodeScanner)},
 )
-async def barcode_start_to_code(
+
+
+async def _parented_to_code(
     config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,  # noqa: ARG001
-) -> StartAction:
-    """Register start action."""
-    return cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-
-
-@automation.register_action(
-    "m5stack_barcode.stop",
-    StopAction,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
-    synchronous=False,
-)
-async def barcode_stop_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,  # noqa: ARG001
-) -> StopAction:
-    """Register stop action."""
-    return cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-
-
-@automation.register_action(
-    "m5stack_barcode.set_mode",
-    SetModeAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_OPERATION_MODE): cv.templatable(
-                cv.enum(OPERATION_MODES, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_mode_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetModeAction:
-    """Register set operation mode action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(config[CONF_OPERATION_MODE], args, cg.std_string)
-    cg.add(var.set_mode(template_))
+    obj_id: cv.ID,
+    template_arg: cg.TemplateArguments,
+    args: list[tuple[Any, str]],  # noqa: ARG001
+) -> MockObj:
+    var = cg.new_Pvariable(obj_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
     return var
 
 
-@automation.register_action(
-    "m5stack_barcode.set_terminator",
-    SetTerminatorAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_TERMINATOR): cv.templatable(
-                cv.enum(TERMINATORS, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_terminator_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetTerminatorAction:
-    """Register set terminator action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(config[CONF_TERMINATOR], args, cg.std_string)
-    cg.add(var.set_terminator(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_light_mode",
-    SetLightModeAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_LIGHT_MODE): cv.templatable(
-                cv.enum(LIGHT_MODES, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_light_mode_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetLightModeAction:
-    """Register set light mode action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(config[CONF_LIGHT_MODE], args, cg.std_string)
-    cg.add(var.set_light_mode(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_locate_light_mode",
-    SetLocateLightModeAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_LOCATE_LIGHT_MODE): cv.templatable(
-                cv.enum(LOCATE_LIGHT_MODES, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_locate_light_mode_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetLocateLightModeAction:
-    """Register set locate light mode action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(
-        config[CONF_LOCATE_LIGHT_MODE],
-        args,
-        cg.std_string,
+for _name, _cls in SIMPLE_ACTIONS.items():
+    # Every action only queues a command, so play_next_() always runs synchronously.
+    automation.register_action(_name, _cls, _SCANNER_ID_SCHEMA, synchronous=True)(
+        _parented_to_code,
     )
-    cg.add(var.set_locate_light_mode(template_))
-    return var
+
+for _name, _cls in CONDITIONS.items():
+    automation.register_condition(_name, _cls, _SCANNER_ID_SCHEMA)(_parented_to_code)
 
 
-@automation.register_action(
-    "m5stack_barcode.set_sound_mode",
-    SetSoundModeAction,
-    cv.Schema(
+def _register_setting_action(setting: Setting) -> None:
+    async def _to_code(
+        config: dict[str, Any],
+        action_id: cv.ID,
+        template_arg: cg.TemplateArguments,
+        args: list[tuple[Any, str]],
+    ) -> MockObj:
+        var = await _parented_to_code(config, action_id, template_arg, args)
+        # Static values are passed as their option key; lambdas must return one too.
+        value = await cg.templatable(config[setting.key], args, cg.std_string)
+        cg.add(var.set_value(value))
+        return var
+
+    schema = cv.Schema(
         {
             cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_SOUND_MODE): cv.templatable(
-                cv.enum(SOUND_MODES, lower=True),
+            cv.Required(setting.key): cv.templatable(
+                cv.one_of(*setting.options, lower=True),
             ),
         },
-    ),
-    synchronous=False,
-)
-async def barcode_set_sound_mode_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetSoundModeAction:
-    """Register set sound mode action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(config[CONF_SOUND_MODE], args, cg.std_string)
-    cg.add(var.set_sound_mode(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_buzzer_volume",
-    SetBuzzerVolumeAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_BUZZER_VOLUME): cv.templatable(
-                cv.enum(BUZZER_VOLUMES, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_buzzer_volume_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetBuzzerVolumeAction:
-    """Register set buzzer volume action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(config[CONF_BUZZER_VOLUME], args, cg.std_string)
-    cg.add(var.set_volume(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_decoding_success_light_mode",
-    SetDecodingSuccessLightModeAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_DECODING_SUCCESS_LIGHT_MODE): cv.templatable(
-                cv.enum(DECODING_SUCCESS_LIGHT_MODES, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_decoding_success_light_mode_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetDecodingSuccessLightModeAction:
-    """Register set decoding success light mode action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(
-        config[CONF_DECODING_SUCCESS_LIGHT_MODE],
-        args,
-        cg.std_string,
     )
-    cg.add(var.set_decoding_success_light_mode(template_))
-    return var
+    automation.register_action(
+        f"m5stack_barcode.{setting.action}",
+        setting.action_type,
+        schema,
+        synchronous=True,
+    )(_to_code)
 
 
-@automation.register_action(
-    "m5stack_barcode.set_boot_sound_mode",
-    SetBootSoundModeAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_BOOT_SOUND_MODE): cv.templatable(
-                cv.enum(BOOT_SOUND_MODES, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_boot_sound_mode_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetBootSoundModeAction:
-    """Register set boot sound mode action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(config[CONF_BOOT_SOUND_MODE], args, cg.std_string)
-    cg.add(var.set_boot_sound_mode(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_decode_sound_mode",
-    SetDecodeSoundModeAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_DECODE_SOUND_MODE): cv.templatable(
-                cv.enum(DECODE_SOUND_MODES, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_decode_sound_mode_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetDecodeSoundModeAction:
-    """Register set decode sound mode action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(
-        config[CONF_DECODE_SOUND_MODE],
-        args,
-        cg.std_string,
-    )
-    cg.add(var.set_decode_sound_mode(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_scan_duration",
-    SetScanDurationAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_SCAN_DURATION): cv.templatable(
-                cv.enum(SCAN_DURATIONS, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_scan_duration_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetScanDurationAction:
-    """Register set scan duration action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(config[CONF_SCAN_DURATION], args, cg.std_string)
-    cg.add(var.set_duration(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_stable_induction_time",
-    SetStableInductionTimeAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_STABLE_INDUCTION_TIME): cv.templatable(
-                cv.enum(STABLE_INDUCTION_TIMES, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_stable_induction_time_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetStableInductionTimeAction:
-    """Register set stable induction time action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(
-        config[CONF_STABLE_INDUCTION_TIME],
-        args,
-        cg.std_string,
-    )
-    cg.add(var.set_time(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_reading_interval",
-    SetReadingIntervalAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_READING_INTERVAL): cv.templatable(
-                cv.enum(READING_INTERVALS, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_reading_interval_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetReadingIntervalAction:
-    """Register set reading interval action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(config[CONF_READING_INTERVAL], args, cg.std_string)
-    cg.add(var.set_interval(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.set_same_code_interval",
-    SetSameCodeIntervalAction,
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.use_id(BarcodeScanner),
-            cv.Required(CONF_SAME_CODE_INTERVAL): cv.templatable(
-                cv.enum(SAME_CODE_INTERVALS, lower=True),
-            ),
-        },
-    ),
-    synchronous=False,
-)
-async def barcode_set_same_code_interval_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,
-) -> SetSameCodeIntervalAction:
-    """Register set same code interval action."""
-    var = cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-    template_ = await cg.templatable(
-        config[CONF_SAME_CODE_INTERVAL],
-        args,
-        cg.std_string,
-    )
-    cg.add(var.set_interval(template_))
-    return var
-
-
-@automation.register_action(
-    "m5stack_barcode.process_current_buffer",
-    ProcessCurrentBufferAction,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
-    synchronous=False,
-)
-async def barcode_process_current_buffer_to_code(
-    config: dict[str, Any],
-    action_id: str,
-    template_arg: Any,
-    args: Any,  # noqa: ARG001
-) -> ProcessCurrentBufferAction:
-    """Register process current buffer action."""
-    return cg.new_Pvariable(action_id, template_arg, await get_scanner(config))
-
-
-@automation.register_condition(
-    "m5stack_barcode.is_continuous_mode",
-    IsContinuousModeCondition,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
-)
-async def barcode_is_continuous_mode_to_code(
-    config: dict[str, Any],
-    condition_id: str,
-    template_arg: Any,
-    args: Any,  # noqa: ARG001
-) -> IsContinuousModeCondition:
-    """Register is continuous mode condition."""
-    return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
-
-
-@automation.register_condition(
-    "m5stack_barcode.is_manual_scanning",
-    IsManualScanningCondition,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
-)
-async def barcode_is_manual_scanning_to_code(
-    config: dict[str, Any],
-    condition_id: str,
-    template_arg: Any,
-    args: Any,  # noqa: ARG001
-) -> IsManualScanningCondition:
-    """Register is manual scanning condition."""
-    return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
-
-
-@automation.register_condition(
-    "m5stack_barcode.is_idle",
-    IsIdleCondition,
-    cv.Schema({cv.GenerateID(): cv.use_id(BarcodeScanner)}),
-)
-async def barcode_is_idle_to_code(
-    config: dict[str, Any],
-    condition_id: str,
-    template_arg: Any,
-    args: Any,  # noqa: ARG001
-) -> IsIdleCondition:
-    """Register is idle condition."""
-    return cg.new_Pvariable(condition_id, template_arg, await get_scanner(config))
+for _setting_entry in SETTINGS:
+    _register_setting_action(_setting_entry)

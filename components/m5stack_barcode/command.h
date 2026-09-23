@@ -3,7 +3,6 @@
 #include <functional>
 #include <memory>
 
-#include "esphome/core/log.h"
 #include "types.h"
 
 namespace esphome {
@@ -19,18 +18,22 @@ class Command {
  public:
   using Callback = std::function<void(BarcodeScanner *)>;
 
-  Command(const uint8_t *data, size_t length, const char *description, Callback on_success = nullptr,
+  /// @param name  What the command does or which setting it changes (static string, used in logs)
+  /// @param value The value being applied, or "" for commands without one (static string)
+  Command(const uint8_t *data, size_t length, const char *name, const char *value, Callback on_success = nullptr,
           Callback on_failure = nullptr, ResponseType expected_response = ResponseType::NONE)
       : data_(data),
         length_(length),
-        description_(description),
+        name_(name),
+        value_(value),
         expected_response_(expected_response),
         on_success_(std::move(on_success)),
         on_failure_(std::move(on_failure)) {}
 
   const uint8_t *get_data() const { return this->data_; }
   size_t get_length() const { return this->length_; }
-  const char *get_description() const { return this->description_; }
+  const char *get_name() const { return this->name_; }
+  const char *get_value() const { return this->value_; }
   ResponseType get_expected_response() const { return this->expected_response_; }
   void on_success(BarcodeScanner *scanner) {
     if (this->on_success_)
@@ -45,20 +48,22 @@ class Command {
  private:
   const uint8_t *data_;
   size_t length_;
-  const char *description_;
+  const char *name_;
+  const char *value_;
   ResponseType expected_response_;
   Callback on_success_;
   Callback on_failure_;
 };
 
-/// Creates Command instances for every scanner operation.  The on_success lambdas call
-/// BarcodeScanner::set_*_state(), which is why CommandFactory is declared a friend of
-/// BarcodeScanner — it is the only external class that requires access to those methods.
+/// Creates Command instances for every scanner operation.  The on_success callbacks call
+/// BarcodeScanner's protected set_*_state() methods, which is why CommandFactory is a friend
+/// of BarcodeScanner.
 class CommandFactory {
  public:
   static std::unique_ptr<Command> create_start_command();
   static std::unique_ptr<Command> create_stop_command();
   static std::unique_ptr<Command> create_version_command();
+  static std::unique_ptr<Command> create_factory_reset_command();
 
   static std::unique_ptr<Command> create_mode_command(OperationMode mode);
   static std::unique_ptr<Command> create_terminator_command(Terminator term);
@@ -75,7 +80,6 @@ class CommandFactory {
   static std::unique_ptr<Command> create_same_code_interval_command(SameCodeInterval interval);
   static std::unique_ptr<Command> create_cmd_ack_sound_command(CmdAckSoundMode mode);
   static std::unique_ptr<Command> create_config_code_scan_command(ConfigCodeScanMode mode);
-  static std::unique_ptr<Command> create_factory_reset_command();
 };
 
 }  // namespace m5stack_barcode
