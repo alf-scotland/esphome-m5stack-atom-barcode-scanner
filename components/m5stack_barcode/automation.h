@@ -85,7 +85,8 @@ template<typename... Ts>
 using SetSameCodeIntervalAction =
     SetSettingAction<SameCodeInterval, parse_same_code_interval, &BarcodeScanner::set_same_code_interval, Ts...>;
 template<typename... Ts>
-using SetSoundModeAction = SetSettingAction<SoundMode, parse_enabled<SoundMode>, &BarcodeScanner::set_sound_mode, Ts...>;
+using SetSoundModeAction =
+    SetSettingAction<SoundMode, parse_enabled<SoundMode>, &BarcodeScanner::set_sound_mode, Ts...>;
 template<typename... Ts>
 using SetBootSoundModeAction =
     SetSettingAction<BootSoundMode, parse_enabled<BootSoundMode>, &BarcodeScanner::set_boot_sound_mode, Ts...>;

@@ -267,7 +267,7 @@ void BarcodeScanner::handle_ack_or_timeout_() {
   if (millis() - this->last_command_time_ <= COMMAND_TIMEOUT_MS)
     return;
 
-  Command *command = this->command_queue_.front().get();
+  const Command *command = this->command_queue_.front().get();
   if (this->command_attempts_ < MAX_COMMAND_ATTEMPTS) {
     // Reset to IDLE so process_command_queue_() retries with a fresh wake-up + send cycle.
     ESP_LOGD(TAG_SCANNER, "Command '%s %s' timed out (attempt %u/%u), retrying", command->get_name(),
