@@ -240,6 +240,23 @@ auto scan_state_to_string(ScanState state) -> const char * {
   }
 }
 
+auto terminator_to_bytes(Terminator term) -> const char * {
+  switch (term) {
+    case Terminator::CRLF:
+      return "\r\n";
+    case Terminator::CR:
+      return "\r";
+    case Terminator::TAB:
+      return "\t";
+    case Terminator::CRCR:
+      return "\r\r";
+    case Terminator::CRLFCRLF:
+      return "\r\n\r\n";
+    default:
+      return "";
+  }
+}
+
 auto scan_duration_to_ms(ScanDuration duration) -> uint32_t {
   switch (duration) {
     case ScanDuration::MS_500:

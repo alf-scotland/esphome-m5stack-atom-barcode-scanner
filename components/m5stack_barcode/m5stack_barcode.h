@@ -493,21 +493,23 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
    */
   void wake_up_();
 
-  /**
-   * @brief Check if the given data contains an acknowledgment sequence.
-   * @param data Pointer to the data to check
-   * @param len Length of the data
-   * @param offset Offset into the data to start checking
-   * @return bool True if an ACK sequence is found
-   */
-  bool is_ack_sequence_(const uint8_t *data, size_t len, size_t offset = 0) const;
+  /// Consume the ACK for the in-flight command, or retry / drop it once COMMAND_TIMEOUT_MS elapses.
+  void handle_ack_or_timeout_();
 
-  // Response Processing Methods
-  /**
-   * @brief Check whether the configured terminator sequence is present at the end of rx_buffer_.
-   * Used to gate barcode processing so partial UART data is not fired as an event.
-   */
-  bool has_terminator_in_buffer_() const;
+  /// Collect the unframed GET_VERSION response once the line has gone idle.
+  void handle_version_response_();
+
+  /// Pop the in-flight command off the queue and reset the command state machine.
+  void finish_command_();
+
+  /// Called when the scanner ACKs a start command: starts the on_scan_timeout timer.
+  void on_scan_started_();
+
+  /// Length of the configured terminator if rx_buffer_ currently ends with it, else 0.
+  size_t terminator_length_in_buffer_() const;
+
+  /// Whether rx_buffer_ holds a complete barcode frame (terminator received or line idle).
+  bool has_complete_frame_() const;
 
   /**
    * @brief Process received barcode data.
@@ -604,13 +606,14 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   std::vector<uint8_t> rx_buffer_;                       ///< Buffer for received data
   std::vector<std::unique_ptr<Command>> command_queue_;  ///< Queue of pending commands
 
-  ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
-  bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
-  bool initial_states_published_{false};                ///< Guard for one-shot publish_initial_states_() in loop()
-  uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
-  uint32_t last_rx_time_{0};                            ///< millis() of the last byte received into rx_buffer_
-  uint32_t scan_started_at_{0};                         ///< millis() when start_scan() was called; 0 = idle
-  CommandState command_state_{CommandState::IDLE};      ///< Current command processing state
+  ScanState scan_state_{ScanState::IDLE};           ///< Current detailed scan state
+  bool waiting_for_ack_{false};                     ///< Whether waiting for command acknowledgment
+  bool initial_states_published_{false};            ///< Guard for one-shot publish_initial_states_() in loop()
+  bool discard_frame_{false};                       ///< Drop the rest of the current frame after an RX buffer overflow
+  uint32_t last_command_time_{0};                   ///< Timestamp of last command sent
+  uint32_t last_rx_time_{0};                        ///< millis() of the last byte received into rx_buffer_
+  uint32_t scan_started_at_{0};                     ///< millis() when the scanner ACKed start; 0 = no timer
+  CommandState command_state_{CommandState::IDLE};  ///< Current command processing state
   ResponseType expected_response_{ResponseType::NONE};  ///< Expected response type
   uint8_t command_attempts_{0};  ///< Send attempts for the current front-of-queue command; reset on success or drop
 

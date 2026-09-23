@@ -103,7 +103,6 @@ constexpr uint8_t Commands::FactoryReset::FACTORY_RESET[];
 
 // Response codes
 constexpr uint8_t Commands::Responses::ACK[];
-constexpr uint8_t Commands::Responses::NON_HOST_ACK[];
 
 }  // namespace m5stack_barcode
 }  // namespace esphome

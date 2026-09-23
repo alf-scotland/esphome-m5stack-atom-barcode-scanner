@@ -38,8 +38,7 @@ void Command::log_command_data(const char *tag, const char *prefix) const {
 std::unique_ptr<Command> CommandFactory::create_start_command() {
   return std::make_unique<Command>(
       Commands::START_SCAN, Commands::START_SCAN_SIZE, "Start scanning",
-      [](BarcodeScanner *s) { s->set_scan_state(ScanState::MANUAL_SCANNING); },
-      [](BarcodeScanner *s) { s->set_scan_state(ScanState::IDLE); }, ResponseType::BARCODE);
+      [](BarcodeScanner *s) { s->on_scan_started_(); }, [](BarcodeScanner *s) { s->set_scan_state(ScanState::IDLE); });
 }
 
 std::unique_ptr<Command> CommandFactory::create_stop_command() {

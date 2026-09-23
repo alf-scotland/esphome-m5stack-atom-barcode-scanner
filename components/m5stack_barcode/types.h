@@ -26,7 +26,8 @@ enum class Terminator {
 };
 
 // Response types for command handling
-enum class ResponseType : uint8_t { NONE = 0x00, VERSION = 0x01, BARCODE = 0x02 };
+// Response the scanner sends for a command other than the standard ACK
+enum class ResponseType : uint8_t { NONE, VERSION };
 
 // Command processing states
 enum class CommandState : uint8_t {
@@ -159,6 +160,9 @@ auto same_code_interval_to_string(SameCodeInterval interval) -> const char *;
 auto cmd_ack_sound_mode_to_string(CmdAckSoundMode mode) -> const char *;
 auto config_code_scan_mode_to_string(ConfigCodeScanMode mode) -> const char *;
 auto scan_state_to_string(ScanState state) -> const char *;
+
+// Bytes the scanner appends to barcode output for a terminator setting ("" for NONE)
+auto terminator_to_bytes(Terminator term) -> const char *;
 
 // Duration conversion helper
 auto scan_duration_to_ms(ScanDuration duration) -> uint32_t;

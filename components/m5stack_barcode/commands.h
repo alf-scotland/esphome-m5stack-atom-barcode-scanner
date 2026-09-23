@@ -269,17 +269,13 @@ class Commands {
   };
 
   /**
-   * Response codes from the scanner.
-   * These are used to acknowledge commands or indicate status.
+   * ACK the scanner returns for every setting command and for start/stop decoding in host mode.
+   * (Start/stop sent in a non-host mode is answered with 05 D1 00 00 06 FF 24 instead; the
+   * component never sends them outside host mode.)  Barcode output itself is unframed.
    */
   struct Responses {
     static constexpr uint8_t ACK[] = {0x04, 0xD0, 0x00, 0x00, 0xFF, 0x2C};
-    // Non-host mode acknowledgment has a different format
-    static constexpr uint8_t NON_HOST_ACK[] = {0x05, 0xD1, 0x00, 0x00, 0x06, 0xFF, 0x24};
-
-    // Size constants for responses (these differ, so we keep both)
     static constexpr size_t ACK_SIZE = 6;
-    static constexpr size_t NON_HOST_ACK_SIZE = 7;
   };
 };
 
