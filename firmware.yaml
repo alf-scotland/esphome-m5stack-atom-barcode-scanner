@@ -1,6 +1,10 @@
-# Deprecated: the primary firmware file is now atom_lite.yaml.
-# This stub exists for backwards compatibility with existing OTA installations
-# and CI tooling that referenced firmware.yaml.  It will be removed once all
-# devices have been migrated to update from atom_lite.yaml.
+# Entry point for remote use of the reference firmware: ESPHome dashboard adoption
+# (dashboard_import in firmware/atom_lite.yaml) and configs that package it via github://.
+#
+# A remote package cannot use the local ../components path (external_components paths
+# resolve relative to the top-level config), so this file loads the component from GitHub.
+substitutions:
+  component_source: github://alf-scotland/esphome-m5stack-atom-barcode-scanner@main
+
 packages:
   device: !include firmware/atom_lite.yaml

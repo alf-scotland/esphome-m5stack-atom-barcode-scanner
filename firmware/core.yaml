@@ -8,7 +8,9 @@
 #   - uart_bus  (uart component id for the scanner serial connection)
 
 external_components:
-  - source: ../components
+  # Local builds use this checkout; firmware.yaml (the entry point for remote packages and
+  # dashboard adoption) sets component_source to the GitHub repository instead.
+  - source: ${component_source | default("../components")}
     components: [m5stack_barcode]
 
 logger:

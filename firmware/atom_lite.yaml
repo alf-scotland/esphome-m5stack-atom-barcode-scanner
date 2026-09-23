@@ -32,9 +32,10 @@ update:
     name: "Firmware Update"
     source: https://raw.githubusercontent.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/main/manifests/atom_lite.json
 
+# Adoption packages firmware.yaml remotely rather than copying it: the firmware spans
+# several files (core.yaml is !include'd), which import_full_config cannot carry.
 dashboard_import:
-  package_import_url: github://alf-scotland/esphome-m5stack-atom-barcode-scanner/atom_lite.yaml@main
-  import_full_config: true
+  package_import_url: github://alf-scotland/esphome-m5stack-atom-barcode-scanner/firmware.yaml@main
 
 esphome:
   name: ${name}
@@ -244,12 +245,15 @@ script:
       - script.execute: led_off
 
   # Hardware trigger: activates the scanner trig pin and waits for scan_duration
-  # before timing out if the scanner hasn't responded.
+  # before timing out if the scanner hasn't responded.  With scan_duration: unlimited
+  # (0 ms) the trigger is held for at most 60 s rather than released immediately.
   - id: hardware_trigger_with_timeout
     then:
       - script.execute: led_manual_scan_start
       - switch.turn_on: scanner_trigger_internal
-      - delay: !lambda 'return id(barcode_scanner).get_scan_duration_ms();'
+      - delay: !lambda |-
+          const uint32_t ms = id(barcode_scanner).get_scan_duration_ms();
+          return ms == 0 ? 60000 : ms;
       - if:
           condition:
             switch.is_on: scanner_trigger_internal
@@ -261,7 +265,8 @@ script:
 
 binary_sensor:
   # DLED: scanner hardware output — HIGH while the laser/LED is active.
-  # Used to detect scan activity in non-HOST modes and to drive the ack LED flash.
+  # Drives the ack LED flash and releases the hardware trigger.  Barcode data needs
+  # no help from this pin: the component frames it on the UART in every mode.
   - platform: gpio
     pin:
       number: GPIO33
@@ -277,15 +282,7 @@ binary_sensor:
     on_press:
       then:
         - script.execute: led_command_ack
-        - if:
-            condition:
-              m5stack_barcode.is_continuous_mode:
-                id: barcode_scanner
-            then:
-              - m5stack_barcode.process_current_buffer:
-                  id: barcode_scanner
-            else:
-              - switch.turn_off: scanner_trigger_internal
+        - switch.turn_off: scanner_trigger_internal
 
   # Atom Lite built-in button — triggers a manual scan when idle.
   - platform: gpio
@@ -347,8 +344,7 @@ button:
           then:
             - script.execute: hardware_trigger_with_timeout
 
-# ── Operation mode select (device-specific: drives LED on mode change) ────────
-# ── Scan event LED hooks (device-specific) ────────────────────────────────────
+# ── Scan event LED hooks and operation mode select (device-specific) ─────────
 
 m5stack_barcode:
   # Wire scan outcome events to the LED scripts defined in this file.
