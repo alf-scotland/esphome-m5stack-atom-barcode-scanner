@@ -349,7 +349,6 @@ void BarcodeScanner::dump_config() {
   LOG_TEXT_SENSOR("  ", "Barcode", this->barcode_sensor_);
   LOG_TEXT_SENSOR("  ", "Version", this->version_sensor_);
   LOG_BINARY_SENSOR("  ", "Scanning", this->scanning_binary_sensor_);
-  this->check_uart_settings(9600);
 }
 
 // Buffer Management Methods
