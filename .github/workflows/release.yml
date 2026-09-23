@@ -7,6 +7,11 @@ on:
       - 'v*.*.*-beta.*'
       - 'v*.*.*-rc.*'
 
+# Releases push the OTA manifest to main; never run two at once or cancel one midway.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -14,23 +19,19 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version-file: 'pyproject.toml'
+        # Credentials stay persisted: the last step pushes the OTA manifest to main.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1  # zizmor: ignore[artipacked]
 
       - name: Install uv
+        # No dependency cache here: release binaries must not be built from a cache
+        # that another (e.g. pull request) workflow could have populated.
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
         with:
-          enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
-          version: "0.6.10"
+          enable-cache: false
 
       - name: Install dependencies
-        # No --dev: release builds only need esphome, not lint/format tools.
-        run: uv sync --all-extras
+        # No dev group: release builds only need esphome, not lint/format tools.
+        run: uv sync --locked --no-dev
 
       - name: Extract and validate version from tag
         id: extract_version
@@ -52,8 +53,9 @@ jobs:
           fi
 
       - name: Verify firmware version matches tag
+        env:
+          VERSION: ${{ steps.extract_version.outputs.version }}
         run: |
-          VERSION="${{ steps.extract_version.outputs.version }}"
           YAML_VERSION=$(grep 'project_version:' firmware/atom_lite.yaml | sed 's/.*"\(.*\)".*/\1/')
           if [ "$YAML_VERSION" != "$VERSION" ]; then
             echo "ERROR: tag v$VERSION does not match project_version '$YAML_VERSION' in firmware/atom_lite.yaml"
@@ -63,20 +65,24 @@ jobs:
           echo "Version verified: $VERSION"
 
       - name: Create secrets for release build
+        # Secrets are passed through the environment, never interpolated into the script.
+        env:
+          API_ENCRYPTION_KEY: ${{ secrets.API_ENCRYPTION_KEY }}
+          OTA_PASSWORD: ${{ secrets.OTA_PASSWORD }}
         run: |
-          cat > firmware/secrets.yaml << EOF
-          api_encryption_key: "${{ secrets.API_ENCRYPTION_KEY }}"
-          ota_password: "${{ secrets.OTA_PASSWORD }}"
-          EOF
+          if [ -z "$API_ENCRYPTION_KEY" ] || [ -z "$OTA_PASSWORD" ]; then
+            echo "ERROR: the API_ENCRYPTION_KEY and OTA_PASSWORD repository secrets must be set"
+            exit 1
+          fi
+          printf 'api_encryption_key: "%s"\nota_password: "%s"\n' "$API_ENCRYPTION_KEY" "$OTA_PASSWORD" > firmware/secrets.yaml
 
       - name: Build firmware
-        run: |
-          uv run esphome compile firmware/atom_lite.yaml
+        run: uv run esphome compile firmware/atom_lite.yaml
 
       - name: Copy firmware binaries to release directory
         run: |
           mkdir -p release-files
-          find . -path '*/.esphome/*' -type f \( -name "firmware.ota.bin" -o -name "firmware.factory.bin" \) -exec cp -v {} release-files/ \;
+          find firmware/.esphome -type f \( -name "firmware.ota.bin" -o -name "firmware.factory.bin" \) -exec cp -v {} release-files/ \;
           if [ -z "$(ls -A release-files/)" ]; then
             echo "ERROR: No firmware binaries found after build"
             exit 1
@@ -86,7 +92,7 @@ jobs:
 
       - name: Create GitHub Release
         id: create_release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           name: Release v${{ steps.extract_version.outputs.version }}
           draft: false
@@ -113,11 +119,11 @@ jobs:
           # export so the Python heredoc subprocess inherits it via os.environ.
           export RELEASE_SUMMARY=$(gh release view "v${VERSION}" --json body --jq '.body')
 
-          mkdir -p manifests
+          # Written outside the checkout; the next step commits it on top of main.
           # Use Python for safe JSON serialisation — release body contains newlines and quotes.
-          python3 - "$VERSION" "$OTA_URL" "$MD5" "$RELEASE_URL" <<'PYEOF'
+          python3 - "$VERSION" "$OTA_URL" "$MD5" "$RELEASE_URL" "$RUNNER_TEMP/atom_lite.json" <<'PYEOF'
           import json, sys, os
-          version, ota_url, md5, release_url = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+          version, ota_url, md5, release_url, path = sys.argv[1:6]
           manifest = {
               "name": "atom-barcode",
               "version": version,
@@ -131,22 +137,29 @@ jobs:
                   },
               }],
           }
-          with open("manifests/atom_lite.json", "w") as f:
+          with open(path, "w") as f:
               json.dump(manifest, f, indent=2)
               f.write("\n")
           PYEOF
 
-          echo "Generated manifests/atom_lite.json:"
-          cat manifests/atom_lite.json
+          echo "Generated manifest:"
+          cat "$RUNNER_TEMP/atom_lite.json"
 
       - name: Commit manifest to main
         if: steps.extract_version.outputs.is_prerelease == 'false'
+        env:
+          VERSION: ${{ steps.extract_version.outputs.version }}
         run: |
-          VERSION="${{ steps.extract_version.outputs.version }}"
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
-          git checkout main
+          git checkout -B main origin/main
+          cp "$RUNNER_TEMP/atom_lite.json" manifests/atom_lite.json
           git add manifests/atom_lite.json
           git commit -m "chore: update OTA manifest for v${VERSION} [skip ci]"
-          git push origin main
+          # main may have moved while the firmware was building.
+          for attempt in 1 2 3; do
+            git push origin main && exit 0
+            git pull --rebase origin main
+          done
+          exit 1

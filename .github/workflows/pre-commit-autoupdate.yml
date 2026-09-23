@@ -16,15 +16,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
 
-      - name: Install pre-commit
-        run: uv sync --all-extras
-
       - name: Run pre-commit autoupdate
-        run: uv run pre-commit autoupdate
+        # uvx runs pre-commit on its own; installing the project (esphome) is not needed.
+        run: uvx pre-commit autoupdate
 
       - name: Open PR if hooks changed
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1

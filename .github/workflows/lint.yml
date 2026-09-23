@@ -9,105 +9,178 @@ on:
       - main
   workflow_dispatch:  # Allow manual triggering
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# The lint jobs run the hooks from .pre-commit-config.yaml so CI uses exactly the tool
+# versions contributors run locally with `uv run pre-commit run --all-files`.
 jobs:
   yamllint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Run yamllint
-        uses: frenck/action-yamllint@34b4bbcaeabedcfefad6adea8c5bbc42af0e2d47  # v1.5.0
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+
+      - name: Run yamllint and generic file checks
+        run: |
+          uvx pre-commit run --all-files --show-diff-on-failure yamllint
+          uvx pre-commit run --all-files --show-diff-on-failure check-yaml
+          uvx pre-commit run --all-files --show-diff-on-failure trailing-whitespace
+          uvx pre-commit run --all-files --show-diff-on-failure end-of-file-fixer
 
   ruff:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
-          python-version-file: 'pyproject.toml'
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
-          version: "0.6.10"
-
-      - name: Install dependencies
-        # --dev installs ruff and other lint tools (pre-commit, yamllint).
-        # Firmware build workflows omit --dev as they only need esphome.
-        run: uv sync --all-extras --dev
 
       - name: Run ruff
         run: |
-          uv run ruff check .
-          uv run ruff format --check .
-
-  component-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version-file: 'pyproject.toml'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
-          version: "0.6.10"
-
-      - name: Install dependencies
-        # --dev installs pytest alongside esphome for config validation tests.
-        run: uv sync --all-extras --dev
-
-      - name: Run component config validation tests
-        run: uv run pytest tests/ -v
+          uvx pre-commit run --all-files --show-diff-on-failure ruff-check
+          uvx pre-commit run --all-files --show-diff-on-failure ruff-format
 
   cpp-format:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
 
       - name: Run clang-format
-        uses: jidicula/clang-format-action@654a770daa28443dd111d133e4083e21c1075674  # v4.18.0
-        with:
-          clang-format-version: '17'
-          check-path: 'components'
-          exclude-regex: '(test|examples|docs)'
+        run: uvx pre-commit run --all-files --show-diff-on-failure clang-format
 
   cpp-lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install cppcheck
         run: sudo apt-get install -y cppcheck
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+
       - name: Run cppcheck
-        # Mirrors the cppcheck pre-commit hook config in .pre-commit-config.yaml.
-        # actions.h is excluded: it contains template bodies that generate false
-        # positives without the full ESPHome include path available.
-        run: |
-          find components/m5stack_barcode \( -name '*.cpp' -o -name '*.h' \) \
-            ! -name 'actions.h' | sort | xargs \
-          cppcheck \
-            --std=c++17 \
-            --language=c++ \
-            --enable=warning,style,performance,portability \
-            --suppress=missingInclude \
-            --suppress=unusedFunction \
-            --suppress=unusedStructMember \
-            --suppress=constVariableReference \
-            --suppress=unknownMacro \
-            --error-exitcode=1
+        run: uvx pre-commit run --all-files cppcheck
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Audit the project environment for known vulnerabilities
+        run: uv run pre-commit run --all-files pip-audit
+
+  component-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Run config validation, codegen and consistency tests
+        run: uv run pytest tests/ -v
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Cache PlatformIO
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.platformio
+          key: platformio-host-${{ hashFiles('uv.lock') }}
+
+      - name: Run host-platform tests against the emulated scanner
+        run: uv run pytest tests/integration -m integration -v
+
+  component-compile:
+    # Builds the test configs for the real target so every action, condition and
+    # entity template is instantiated by the ESP32 toolchain (the reference
+    # firmware only uses a subset of them).
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - tests/test_m5stack_barcode_all_entities.yaml
+          - tests/test_m5stack_barcode_actions.yaml
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --no-dev
+
+      - name: Cache ESPHome toolchains
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.esphome
+            ~/.platformio
+          key: esphome-esp32-${{ hashFiles('uv.lock') }}
+
+      - name: Compile
+        env:
+          CONFIG: ${{ matrix.config }}
+        run: uv run esphome compile "$CONFIG"
