@@ -269,13 +269,18 @@ class Commands {
   };
 
   /**
-   * ACK the scanner returns for every setting command and for start/stop decoding in host mode.
-   * (Start/stop sent in a non-host mode is answered with 05 D1 00 00 06 FF 24 instead; the
-   * component never sends them outside host mode.)  Barcode output itself is unframed.
+   * Replies to commands.  Every setting command and start/stop decoding in host mode is
+   * ACKed; start/stop decoding outside host mode is answered with the NAK
+   * 05 D1 00 00 06 FF 24 (PDF item 3).  A NAK is recognised by its first four bytes (length,
+   * opcode, two zero bytes); the cause byte and checksum follow.  Barcode output is unframed.
    */
   struct Responses {
     static constexpr uint8_t ACK[] = {0x04, 0xD0, 0x00, 0x00, 0xFF, 0x2C};
     static constexpr size_t ACK_SIZE = 6;
+    static constexpr uint8_t NAK_PREFIX[] = {0x05, 0xD1, 0x00, 0x00};
+    static constexpr size_t NAK_PREFIX_SIZE = 4;
+    static constexpr size_t NAK_SIZE = 7;
+    static constexpr size_t NAK_CAUSE_INDEX = 4;
   };
 };
 

@@ -125,15 +125,18 @@ def run(
     """Start the fake scanner and the firmware; yield a starter function."""
     started: list[tuple[FakeScanner, subprocess.Popen[bytes]]] = []
 
-    def _start(
+    def _start(  # noqa: PLR0913 - keyword-only scenario options
         *,
         mode: str = "host",
         terminator: str = "crlf",
         start_scan: bool = False,
         start_reply: str = "scan",
+        nak_params: frozenset[int] = frozenset(),
+        extra_env: dict[str, str] | None = None,
     ) -> tuple[FakeScanner, Firmware]:
         scanner = FakeScanner(PORT)
         scanner.start_reply = start_reply
+        scanner.nak_params = set(nak_params)
         scanner.__enter__()
         env = {
             **os.environ,
@@ -143,6 +146,7 @@ def run(
         }
         if start_scan:
             env["SIM_START"] = "1"
+        env.update(extra_env or {})
         # A pty (not a pipe) keeps the firmware's stdout line-buffered.
         output_fd, firmware_tty = pty.openpty()
         proc = subprocess.Popen(
@@ -234,3 +238,54 @@ def test_long_barcode_is_truncated_to_ha_state_limit(run: callable) -> None:
     scanner.emit_barcode(b"A" * 300)
     match = firmware.wait_for(r"BARCODE\[(A+)\]")
     assert len(match.group(1)) == 255  # noqa: PLR2004
+
+
+PARAM_VOLUME = 0x8C
+VOLUME_HIGH = 0x00
+
+
+def test_setting_reverted_before_ack_ends_at_last_value(run: callable) -> None:
+    """Changing a setting and changing it back before the ACK applies the last value."""
+    scanner, firmware = run(extra_env={"SIM_TOGGLE": "1"})
+    firmware.wait_for(r"TOGGLED")
+    firmware.assert_absent(r"VOLUME\[high\]", duration=2)
+    volume_commands = [f[6] for f in scanner.received if f[5] == PARAM_VOLUME]
+    assert VOLUME_HIGH not in volume_commands
+
+
+def test_rejected_setting_fails_fast_and_keeps_state(run: callable) -> None:
+    """A NAKed command is dropped at once (no 2 s timeout and retry)."""
+    scanner, firmware = run(
+        nak_params=frozenset({PARAM_VOLUME}),
+        extra_env={"SIM_SET_VOLUME": "1"},
+    )
+    firmware.wait_for(r"rejected", timeout=1)
+    firmware.assert_absent(r"VOLUME\[high\]|timed out", duration=2.5)
+    # Sent exactly once: no retry after the NAK.
+    high = [f for f in scanner.received if f[5] == PARAM_VOLUME and f[6] == VOLUME_HIGH]
+    assert len(high) == 1
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        # 150 two-byte characters (300 bytes): truncation must not split a character.
+        ("é".encode() * 150, "é" * 127),
+        # Latin-1 / invalid UTF-8 byte: replaced, not the whole barcode dropped.
+        (b"caf\xe9", "caf\ufffd"),
+        # Overlong encoding of '/' and a UTF-16 surrogate: protobuf rejects both.
+        (b"A\xc0\xafB\xed\xa0\x80C", "A\ufffd\ufffdB\ufffd\ufffd\ufffdC"),
+    ],
+    ids=["multibyte-truncation", "latin1", "overlong-surrogate"],
+)
+def test_barcodes_are_published_as_valid_utf8(
+    run: callable,
+    payload: bytes,
+    expected: str,
+) -> None:
+    """Barcodes reach HA as valid UTF-8 no longer than HA's state limit."""
+    scanner, firmware = run(mode="continuous")
+    firmware.wait_for(r"MODE\[continuous\]")
+    scanner.emit_barcode(payload)
+    match = firmware.wait_for(r"BARCODE\[(.*)\]")
+    assert match.group(1) == expected

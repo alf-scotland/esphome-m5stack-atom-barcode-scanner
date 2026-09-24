@@ -19,7 +19,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 ACK = bytes([0x04, 0xD0, 0x00, 0x00, 0xFF, 0x2C])
-NON_HOST_START_REPLY = bytes([0x05, 0xD1, 0x00, 0x00, 0x06, 0xFF, 0x24])
+# NAK: the reply to start/stop decoding outside host mode (PDF item 3)
+NAK = bytes([0x05, 0xD1, 0x00, 0x00, 0x06, 0xFF, 0x24])
 TERMINATORS = {0: b"", 1: b"\r\n", 2: b"\r", 3: b"\t", 4: b"\r\r", 5: b"\r\n\r\n"}
 MODES = {0x08: "host", 0x00: "level", 0x02: "pulse", 0x04: "continuous"}
 VERSION_RESPONSE = (
@@ -53,6 +54,8 @@ class FakeScanner:
         # and barcode in a single write) or "ack" (ACK only; the scan times out).
         self.start_reply = "scan"
         self.barcode = b"HELLO-123"
+        # Parameter bytes (frame[5]) of setting commands to NAK instead of ACK.
+        self.nak_params: set[int] = set()
         self.received: list[bytes] = []
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -81,7 +84,9 @@ class FakeScanner:
     def _handle(self, frame: bytes) -> None:
         self.received.append(frame)
         op = frame[1]
-        if op == OP_SETTING:
+        if op == OP_SETTING and frame[5] in self.nak_params:
+            self.emit(NAK)
+        elif op == OP_SETTING:
             if frame[5] == PARAM_MODE:
                 self.mode = MODES.get(frame[6], "auto_sense")
             elif frame[5] == PARAM_F2 and frame[6] == F2_TERMINATOR:
@@ -92,7 +97,7 @@ class FakeScanner:
             self.emit(VERSION_RESPONSE)
         elif op in (OP_START, OP_STOP):
             if self.mode != "host":
-                self.emit(NON_HOST_START_REPLY)
+                self.emit(NAK)
             elif op == OP_START and self.start_reply == "burst":
                 self.emit(ACK + self.barcode + self.terminator)
             else:

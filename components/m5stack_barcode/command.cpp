@@ -36,8 +36,9 @@ static std::unique_ptr<Command> make_setting_command(const char *name, const cha
     ESP_LOGW(TAG_CMD, "Invalid %s value: %zu", name, index);
     return nullptr;
   }
-  return std::make_unique<Command>(table[index], length, name, value,
-                                   [apply, setting](BarcodeScanner *s) { (s->*apply)(setting); });
+  return std::make_unique<Command>(
+      table[index], length, name, value, [apply, setting](BarcodeScanner *s) { (s->*apply)(setting); }, nullptr,
+      ResponseType::NONE, true);
 }
 
 // ── Basic commands ────────────────────────────────────────────────────────────

@@ -200,6 +200,9 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void do_factory_reset_();
 
   void queue_command(std::unique_ptr<Command> command);
+  /// Queue a setting command, superseding any queued command for the same setting.
+  /// @param is_current Whether the value equals the current (ACKed) one
+  void queue_setting_(std::unique_ptr<Command> command, bool is_current);
   void process_command_queue_();
   void wake_up_();
   void write_command_(const std::unique_ptr<Command> &command);
@@ -222,6 +225,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void process_version_();
 
   ESPPreferenceObject pref_;
+  /// Per-setting flags (1 = the scanner already had the YAML value at boot, per NVS)
+  ScannerPreferences confirmed_at_boot_{};
 
   CallbackManager<void(const std::string &)> barcode_callback_;
   CallbackManager<void()> scan_timeout_callback_;

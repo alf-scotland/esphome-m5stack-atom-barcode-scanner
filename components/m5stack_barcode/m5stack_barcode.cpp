@@ -32,7 +32,8 @@ static const size_t MAX_QUEUE_SIZE = 20;        // Maximum number of commands qu
 static const uint8_t MAX_COMMAND_ATTEMPTS = 2;  // Send attempts before dropping a command (1 retry)
 
 // Data size limits
-// Home Assistant rejects entity states longer than 255 characters, so longer codes are truncated.
+// Home Assistant rejects entity states longer than 255 characters, so longer codes are
+// truncated to 255 bytes (on a character boundary).
 static const size_t MAX_BARCODE_LENGTH = 255;
 // Maximum version response length (binary header + full product info string)
 static const size_t MAX_VERSION_LENGTH = 256;
@@ -70,6 +71,9 @@ void BarcodeScanner::setup() {
   while (this->available()) {
     this->read();
   }
+  // Allocate the RX buffer once: it is cleared (keeping its capacity) after every frame, so a
+  // long-running device does not fragment the heap with a reallocation per barcode.
+  this->rx_buffer_.reserve(MAX_RX_BUFFER_SIZE + 64);
 
   // Initialise preference storage keyed to this component instance
   this->pref_ = global_preferences->make_preference<ScannerPreferences>(fnv1_hash("m5stack_barcode"));
@@ -127,6 +131,8 @@ void BarcodeScanner::configure_defaults_() {
 #define QUEUE_IF_CHANGED(field, create_fn, value) \
   if (!has_valid_prefs || stored.field != static_cast<uint8_t>(value)) { \
     this->queue_command(create_fn(value)); \
+  } else { \
+    this->confirmed_at_boot_.field = 1; \
   }
 
   QUEUE_IF_CHANGED(operation_mode, CommandFactory::create_mode_command, this->operation_mode_)
@@ -161,21 +167,39 @@ static void publish_switch(switch_::Switch *sw, uint8_t enabled) {
 }
 
 void BarcodeScanner::publish_initial_states_() {
-  publish_select(this->operation_mode_select_, static_cast<uint8_t>(this->operation_mode_));
-  publish_select(this->terminator_select_, static_cast<uint8_t>(this->terminator_));
-  publish_select(this->light_mode_select_, static_cast<uint8_t>(this->light_mode_));
-  publish_select(this->locate_light_mode_select_, static_cast<uint8_t>(this->locate_light_mode_));
-  publish_select(this->buzzer_volume_select_, static_cast<uint8_t>(this->buzzer_volume_));
-  publish_select(this->scan_duration_select_, static_cast<uint8_t>(this->scan_duration_));
-  publish_select(this->stable_induction_time_select_, static_cast<uint8_t>(this->stable_induction_time_));
-  publish_select(this->reading_interval_select_, static_cast<uint8_t>(this->reading_interval_));
-  publish_select(this->same_code_interval_select_, static_cast<uint8_t>(this->same_code_interval_));
-  publish_switch(this->sound_switch_, static_cast<uint8_t>(this->sound_mode_));
-  publish_switch(this->boot_sound_switch_, static_cast<uint8_t>(this->boot_sound_mode_));
-  publish_switch(this->decode_sound_switch_, static_cast<uint8_t>(this->decode_sound_mode_));
-  publish_switch(this->decoding_success_light_switch_, static_cast<uint8_t>(this->decoding_success_light_mode_));
-  publish_switch(this->cmd_ack_sound_switch_, static_cast<uint8_t>(this->cmd_ack_sound_mode_));
-  publish_switch(this->config_code_scan_switch_, static_cast<uint8_t>(this->config_code_scan_mode_));
+  // Only settings the scanner already had (per NVS) are published here.  Settings sent at
+  // boot are published when the scanner ACKs them, so HA never shows a value the scanner
+  // has not confirmed — e.g. they stay unknown while the scanner is not responding.
+  if (this->confirmed_at_boot_.operation_mode)
+    publish_select(this->operation_mode_select_, static_cast<uint8_t>(this->operation_mode_));
+  if (this->confirmed_at_boot_.terminator)
+    publish_select(this->terminator_select_, static_cast<uint8_t>(this->terminator_));
+  if (this->confirmed_at_boot_.light_mode)
+    publish_select(this->light_mode_select_, static_cast<uint8_t>(this->light_mode_));
+  if (this->confirmed_at_boot_.locate_light_mode)
+    publish_select(this->locate_light_mode_select_, static_cast<uint8_t>(this->locate_light_mode_));
+  if (this->confirmed_at_boot_.buzzer_volume)
+    publish_select(this->buzzer_volume_select_, static_cast<uint8_t>(this->buzzer_volume_));
+  if (this->confirmed_at_boot_.scan_duration)
+    publish_select(this->scan_duration_select_, static_cast<uint8_t>(this->scan_duration_));
+  if (this->confirmed_at_boot_.stable_induction_time)
+    publish_select(this->stable_induction_time_select_, static_cast<uint8_t>(this->stable_induction_time_));
+  if (this->confirmed_at_boot_.reading_interval)
+    publish_select(this->reading_interval_select_, static_cast<uint8_t>(this->reading_interval_));
+  if (this->confirmed_at_boot_.same_code_interval)
+    publish_select(this->same_code_interval_select_, static_cast<uint8_t>(this->same_code_interval_));
+  if (this->confirmed_at_boot_.sound_mode)
+    publish_switch(this->sound_switch_, static_cast<uint8_t>(this->sound_mode_));
+  if (this->confirmed_at_boot_.boot_sound_mode)
+    publish_switch(this->boot_sound_switch_, static_cast<uint8_t>(this->boot_sound_mode_));
+  if (this->confirmed_at_boot_.decode_sound_mode)
+    publish_switch(this->decode_sound_switch_, static_cast<uint8_t>(this->decode_sound_mode_));
+  if (this->confirmed_at_boot_.decoding_success_light_mode)
+    publish_switch(this->decoding_success_light_switch_, static_cast<uint8_t>(this->decoding_success_light_mode_));
+  if (this->confirmed_at_boot_.cmd_ack_sound_mode)
+    publish_switch(this->cmd_ack_sound_switch_, static_cast<uint8_t>(this->cmd_ack_sound_mode_));
+  if (this->confirmed_at_boot_.config_code_scan_mode)
+    publish_switch(this->config_code_scan_switch_, static_cast<uint8_t>(this->config_code_scan_mode_));
 }
 
 void BarcodeScanner::save_settings_() {
@@ -261,6 +285,22 @@ void BarcodeScanner::handle_ack_or_timeout_() {
     std::unique_ptr<Command> command = std::move(this->command_queue_.front());
     this->finish_command_();
     command->on_success(this);
+    return;
+  }
+
+  const auto *nak_begin = Commands::Responses::NAK_PREFIX;
+  const auto *nak_end = nak_begin + Commands::Responses::NAK_PREFIX_SIZE;
+  auto nak = std::search(this->rx_buffer_.begin(), this->rx_buffer_.end(), nak_begin, nak_end);
+  if (nak != this->rx_buffer_.end() &&
+      this->rx_buffer_.end() - nak >= static_cast<ptrdiff_t>(Commands::Responses::NAK_SIZE)) {
+    // The scanner rejected the command; resending it would be rejected again.
+    const uint8_t cause = nak[Commands::Responses::NAK_CAUSE_INDEX];
+    this->rx_buffer_.erase(nak, nak + Commands::Responses::NAK_SIZE);
+    std::unique_ptr<Command> rejected = std::move(this->command_queue_.front());
+    ESP_LOGW(TAG_SCANNER, "Scanner rejected command [%s %s] (cause 0x%02X)", rejected->get_name(),
+             rejected->get_value(), cause);
+    this->finish_command_();
+    rejected->on_failure(this);
     return;
   }
 
@@ -480,63 +520,84 @@ bool BarcodeScanner::has_complete_frame_() const {
 
 // Response Processing Methods
 
-// Returns true if s is valid UTF-8.  aioesphomeapi deserialises TextSensorStateResponse
-// with google.protobuf, which rejects strings containing invalid UTF-8 sequences and
-// closes the API connection — causing HA to reconnect every ~160 ms.
-static bool is_valid_utf8(const std::string &s) {
-  const auto *bytes = reinterpret_cast<const uint8_t *>(s.data());
-  const size_t len = s.size();
-  for (size_t i = 0; i < len;) {
-    uint8_t b = bytes[i];
-    size_t seqlen;
-    if (b <= 0x7F) {
-      seqlen = 1;
-    } else if (b >= 0xC2 && b <= 0xDF) {
-      seqlen = 2;
-    } else if (b >= 0xE0 && b <= 0xEF) {
-      seqlen = 3;
-    } else if (b >= 0xF0 && b <= 0xF4) {
-      seqlen = 4;
+// Copy data into a string, replacing each invalid UTF-8 sequence (maximal subpart) with U+FFFD.
+// aioesphomeapi decodes states with google.protobuf, which rejects invalid UTF-8 — including
+// overlong encodings and UTF-16 surrogates — and drops the API connection (HA reconnect loop).
+// Barcodes are often Latin-1 or GBK, so replacing keeps the rest of the code usable.
+static std::string sanitize_utf8(const uint8_t *data, size_t len, size_t &replaced) {
+  static const char REPLACEMENT[] = "\xEF\xBF\xBD";
+  std::string out;
+  out.reserve(len);
+  replaced = 0;
+  size_t i = 0;
+  while (i < len) {
+    const uint8_t lead = data[i];
+    if (lead < 0x80) {
+      out += static_cast<char>(lead);
+      i++;
+      continue;
+    }
+    size_t continuation;
+    uint8_t lo = 0x80, hi = 0xBF;  // allowed range of the first continuation byte
+    if (lead >= 0xC2 && lead <= 0xDF) {
+      continuation = 1;
+    } else if (lead >= 0xE0 && lead <= 0xEF) {
+      continuation = 2;
+      lo = lead == 0xE0 ? 0xA0 : 0x80;  // no overlong forms
+      hi = lead == 0xED ? 0x9F : 0xBF;  // no surrogates
+    } else if (lead >= 0xF0 && lead <= 0xF4) {
+      continuation = 3;
+      lo = lead == 0xF0 ? 0x90 : 0x80;  // no overlong forms
+      hi = lead == 0xF4 ? 0x8F : 0xBF;  // nothing above U+10FFFF
     } else {
-      return false;  // invalid lead byte
+      out += REPLACEMENT;
+      replaced++;
+      i++;
+      continue;
     }
-    if (i + seqlen > len)
-      return false;  // truncated sequence
-    for (size_t j = 1; j < seqlen; j++) {
-      if ((bytes[i + j] & 0xC0) != 0x80)
-        return false;  // invalid continuation byte
+    size_t n = 1;
+    while (n <= continuation && i + n < len) {
+      const uint8_t byte = data[i + n];
+      if (byte < (n == 1 ? lo : 0x80) || byte > (n == 1 ? hi : 0xBF))
+        break;
+      n++;
     }
-    i += seqlen;
+    if (n == continuation + 1) {
+      out.append(reinterpret_cast<const char *>(data + i), n);
+    } else {
+      out += REPLACEMENT;
+      replaced++;
+    }
+    i += n;
   }
-  return true;
+  return out;
 }
 
 void BarcodeScanner::process_barcode_() {
   if (this->rx_buffer_.empty()) {
     return;
   }
-  size_t data_length = this->rx_buffer_.size() - this->terminator_length_in_buffer_();
-  if (data_length > MAX_BARCODE_LENGTH) {
-    ESP_LOGW(TAG_SCANNER, "Barcode too long (%zu bytes), truncating to %zu bytes", data_length, MAX_BARCODE_LENGTH);
-    data_length = MAX_BARCODE_LENGTH;
-  }
-  std::string barcode(reinterpret_cast<const char *>(this->rx_buffer_.data()), data_length);
+  const size_t data_length = this->rx_buffer_.size() - this->terminator_length_in_buffer_();
+  size_t replaced;
+  std::string barcode = sanitize_utf8(this->rx_buffer_.data(), data_length, replaced);
   this->clear_buffer_();
   if (barcode.empty())
     return;
+  if (replaced > 0) {
+    ESP_LOGW(TAG_SCANNER, "Barcode is not valid UTF-8; replaced %zu invalid sequence(s) with U+FFFD", replaced);
+  }
+  if (barcode.size() > MAX_BARCODE_LENGTH) {
+    ESP_LOGW(TAG_SCANNER, "Barcode too long (%zu bytes), truncating to %zu bytes", barcode.size(), MAX_BARCODE_LENGTH);
+    size_t cut = MAX_BARCODE_LENGTH;
+    while (cut > 0 && (static_cast<uint8_t>(barcode[cut]) & 0xC0) == 0x80)
+      cut--;  // never split a multi-byte character
+    barcode.resize(cut);
+  }
 
   // A HOST-mode scan is complete once its barcode arrives — cancel the pending timeout.
   this->scan_started_at_ = 0;
   if (this->scan_state_ == ScanState::MANUAL_SCANNING)
     this->set_scan_state(ScanState::IDLE);
-
-  // Guard against publishing invalid UTF-8: aioesphomeapi uses google.protobuf which
-  // rejects malformed strings and closes the API connection (HA reconnect loop).
-  if (!is_valid_utf8(barcode)) {
-    ESP_LOGW(TAG_SCANNER, "Barcode contains invalid UTF-8 (%zu bytes) — discarding to protect HA API connection",
-             barcode.size());
-    return;
-  }
   ESP_LOGD(TAG_SCANNER, "Barcode received: %s", barcode.c_str());
 
   if (this->barcode_sensor_ != nullptr)
@@ -639,12 +700,6 @@ void BarcodeScanner::process_version_() {
     }
   }
 
-  // Reject if not valid UTF-8 — same protection applied to barcodes.
-  if (!version.empty() && !is_valid_utf8(version)) {
-    ESP_LOGW(TAG_SCANNER, "Version string contains invalid UTF-8 — discarding to protect HA API connection");
-    version.clear();
-  }
-
   if (this->version_sensor_ != nullptr) {
     if (!version.empty()) {
       ESP_LOGD(TAG_SCANNER, "Publishing version: '%s'", version.c_str());
@@ -708,129 +763,92 @@ void BarcodeScanner::stop_scan() {
 
 // Setting changes: queue the command; the value is applied once the scanner ACKs it.
 
-void BarcodeScanner::set_operation_mode(OperationMode value) {
-  if (value == this->operation_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Operation mode already set to %s", operation_mode_to_string(value));
+void BarcodeScanner::queue_setting_(std::unique_ptr<Command> command, bool is_current) {
+  if (command == nullptr)
+    return;
+  // A newer value supersedes one for the same setting that has not been sent yet.  Without
+  // this, changing a setting and changing it back before the first ACK would compare the
+  // second value with the not-yet-updated current one, skip it, and leave the first applied.
+  const bool in_flight = !this->command_queue_.empty() && this->command_state_ != CommandState::IDLE &&
+                         this->command_queue_.front()->is_same_setting(*command);
+  const auto first_waiting = this->command_queue_.begin() + (this->command_state_ != CommandState::IDLE ? 1 : 0);
+  for (auto it = first_waiting; it != this->command_queue_.end();) {
+    if ((*it)->is_same_setting(*command)) {
+      ESP_LOGD(TAG_SCANNER, "Superseding queued command [%s %s]", (*it)->get_name(), (*it)->get_value());
+      it = this->command_queue_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  // An in-flight command for this setting will still be applied, so the value must be re-sent
+  // even if it equals the current one.
+  if (is_current && !in_flight) {
+    ESP_LOGD(TAG_SCANNER, "%s already set to %s", command->get_name(), command->get_value());
     return;
   }
-  this->queue_command(CommandFactory::create_mode_command(value));
+  this->queue_command(std::move(command));
+}
+
+void BarcodeScanner::set_operation_mode(OperationMode value) {
+  this->queue_setting_(CommandFactory::create_mode_command(value), value == this->operation_mode_);
 }
 
 void BarcodeScanner::set_terminator(Terminator value) {
-  if (value == this->terminator_) {
-    ESP_LOGD(TAG_SCANNER, "Terminator already set to %s", terminator_to_string(value));
-    return;
-  }
-  this->queue_command(CommandFactory::create_terminator_command(value));
+  this->queue_setting_(CommandFactory::create_terminator_command(value), value == this->terminator_);
 }
 
 void BarcodeScanner::set_light_mode(LightMode value) {
-  if (value == this->light_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Light mode already set to %s", light_mode_to_string(value));
-    return;
-  }
-  this->queue_command(CommandFactory::create_light_command(value));
+  this->queue_setting_(CommandFactory::create_light_command(value), value == this->light_mode_);
 }
 
 void BarcodeScanner::set_locate_light_mode(LocateLightMode value) {
-  if (value == this->locate_light_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Locate light mode already set to %s", light_mode_to_string(static_cast<LightMode>(value)));
-    return;
-  }
-  this->queue_command(CommandFactory::create_locate_light_command(value));
+  this->queue_setting_(CommandFactory::create_locate_light_command(value), value == this->locate_light_mode_);
 }
 
 void BarcodeScanner::set_sound_mode(SoundMode value) {
-  if (value == this->sound_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Sound mode already set to %s", enabled_to_string(value == SoundMode::SOUND_ENABLED));
-    return;
-  }
-  this->queue_command(CommandFactory::create_sound_command(value));
+  this->queue_setting_(CommandFactory::create_sound_command(value), value == this->sound_mode_);
 }
 
 void BarcodeScanner::set_buzzer_volume(BuzzerVolume value) {
-  if (value == this->buzzer_volume_) {
-    ESP_LOGD(TAG_SCANNER, "Buzzer volume already set to %s", buzzer_volume_to_string(value));
-    return;
-  }
-  this->queue_command(CommandFactory::create_volume_command(value));
+  this->queue_setting_(CommandFactory::create_volume_command(value), value == this->buzzer_volume_);
 }
 
 void BarcodeScanner::set_decoding_success_light_mode(DecodingSuccessLightMode value) {
-  if (value == this->decoding_success_light_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Decoding success light mode already set to %s",
-             enabled_to_string(value == DecodingSuccessLightMode::DECODING_LIGHT_ENABLED));
-    return;
-  }
-  this->queue_command(CommandFactory::create_decoding_success_light_command(value));
+  this->queue_setting_(CommandFactory::create_decoding_success_light_command(value),
+                       value == this->decoding_success_light_mode_);
 }
 
 void BarcodeScanner::set_boot_sound_mode(BootSoundMode value) {
-  if (value == this->boot_sound_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Boot sound mode already set to %s",
-             enabled_to_string(value == BootSoundMode::BOOT_SOUND_ENABLED));
-    return;
-  }
-  this->queue_command(CommandFactory::create_boot_sound_command(value));
+  this->queue_setting_(CommandFactory::create_boot_sound_command(value), value == this->boot_sound_mode_);
 }
 
 void BarcodeScanner::set_decode_sound_mode(DecodeSoundMode value) {
-  if (value == this->decode_sound_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Decode sound mode already set to %s",
-             enabled_to_string(value == DecodeSoundMode::DECODE_SOUND_ENABLED));
-    return;
-  }
-  this->queue_command(CommandFactory::create_decode_sound_command(value));
+  this->queue_setting_(CommandFactory::create_decode_sound_command(value), value == this->decode_sound_mode_);
 }
 
 void BarcodeScanner::set_scan_duration(ScanDuration value) {
-  if (value == this->scan_duration_) {
-    ESP_LOGD(TAG_SCANNER, "Scan duration already set to %s", scan_duration_to_string(value));
-    return;
-  }
-  this->queue_command(CommandFactory::create_scan_duration_command(value));
+  this->queue_setting_(CommandFactory::create_scan_duration_command(value), value == this->scan_duration_);
 }
 
 void BarcodeScanner::set_stable_induction_time(StableInductionTime value) {
-  if (value == this->stable_induction_time_) {
-    ESP_LOGD(TAG_SCANNER, "Stable induction time already set to %s", interval_to_string(static_cast<uint8_t>(value)));
-    return;
-  }
-  this->queue_command(CommandFactory::create_stable_induction_time_command(value));
+  this->queue_setting_(CommandFactory::create_stable_induction_time_command(value),
+                       value == this->stable_induction_time_);
 }
 
 void BarcodeScanner::set_reading_interval(ReadingInterval value) {
-  if (value == this->reading_interval_) {
-    ESP_LOGD(TAG_SCANNER, "Reading interval already set to %s", interval_to_string(static_cast<uint8_t>(value)));
-    return;
-  }
-  this->queue_command(CommandFactory::create_reading_interval_command(value));
+  this->queue_setting_(CommandFactory::create_reading_interval_command(value), value == this->reading_interval_);
 }
 
 void BarcodeScanner::set_same_code_interval(SameCodeInterval value) {
-  if (value == this->same_code_interval_) {
-    ESP_LOGD(TAG_SCANNER, "Same code interval already set to %s", interval_to_string(static_cast<uint8_t>(value)));
-    return;
-  }
-  this->queue_command(CommandFactory::create_same_code_interval_command(value));
+  this->queue_setting_(CommandFactory::create_same_code_interval_command(value), value == this->same_code_interval_);
 }
 
 void BarcodeScanner::set_cmd_ack_sound_mode(CmdAckSoundMode value) {
-  if (value == this->cmd_ack_sound_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Command ACK sound mode already set to %s",
-             enabled_to_string(value == CmdAckSoundMode::CMD_ACK_SOUND_ENABLED));
-    return;
-  }
-  this->queue_command(CommandFactory::create_cmd_ack_sound_command(value));
+  this->queue_setting_(CommandFactory::create_cmd_ack_sound_command(value), value == this->cmd_ack_sound_mode_);
 }
 
 void BarcodeScanner::set_config_code_scan_mode(ConfigCodeScanMode value) {
-  if (value == this->config_code_scan_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Config code scan mode already set to %s",
-             enabled_to_string(value == ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED));
-    return;
-  }
-  this->queue_command(CommandFactory::create_config_code_scan_command(value));
+  this->queue_setting_(CommandFactory::create_config_code_scan_command(value), value == this->config_code_scan_mode_);
 }
 
 void BarcodeScanner::process_current_buffer() {

@@ -25,6 +25,26 @@ esphome:
             lambda: 'return getenv("SIM_START") != nullptr;'
           then:
             - m5stack_barcode.start: scanner
+      - if:
+          # Change a setting and change it back before the scanner has ACKed the first
+          # change (the default buzzer_volume is low).
+          condition:
+            lambda: 'return getenv("SIM_TOGGLE") != nullptr;'
+          then:
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: high
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: low
+            - logger.log: "TOGGLED"
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_SET_VOLUME") != nullptr;'
+          then:
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: high
 
 host:
 
@@ -48,6 +68,12 @@ m5stack_barcode:
     on_value:
       - logger.log:
           format: "VERSION[%s]"
+          args: ["x.c_str()"]
+  buzzer_volume_select:
+    name: Volume
+    on_value:
+      - logger.log:
+          format: "VOLUME[%s]"
           args: ["x.c_str()"]
   scanning_binary_sensor:
     name: Scanning

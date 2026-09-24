@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include <functional>
 #include <memory>
 
@@ -20,13 +21,16 @@ class Command {
 
   /// @param name  What the command does or which setting it changes (static string, used in logs)
   /// @param value The value being applied, or "" for commands without one (static string)
+  /// @param setting True for setting commands: a newer value for the same setting (same name)
+  ///                replaces this command while it is still waiting in the queue
   Command(const uint8_t *data, size_t length, const char *name, const char *value, Callback on_success = nullptr,
-          Callback on_failure = nullptr, ResponseType expected_response = ResponseType::NONE)
+          Callback on_failure = nullptr, ResponseType expected_response = ResponseType::NONE, bool setting = false)
       : data_(data),
         length_(length),
         name_(name),
         value_(value),
         expected_response_(expected_response),
+        setting_(setting),
         on_success_(std::move(on_success)),
         on_failure_(std::move(on_failure)) {}
 
@@ -35,6 +39,10 @@ class Command {
   const char *get_name() const { return this->name_; }
   const char *get_value() const { return this->value_; }
   ResponseType get_expected_response() const { return this->expected_response_; }
+  /// Whether this command sets the same scanner setting as `other`.
+  bool is_same_setting(const Command &other) const {
+    return this->setting_ && other.setting_ && strcmp(this->name_, other.name_) == 0;
+  }
   void on_success(BarcodeScanner *scanner) {
     if (this->on_success_)
       this->on_success_(scanner);
@@ -51,6 +59,7 @@ class Command {
   const char *name_;
   const char *value_;
   ResponseType expected_response_;
+  bool setting_;
   Callback on_success_;
   Callback on_failure_;
 };
