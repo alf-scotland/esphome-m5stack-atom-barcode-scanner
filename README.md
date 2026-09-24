@@ -30,6 +30,7 @@ uart:
   baud_rate: 9600
   tx_pin: GPIO19
   rx_pin: GPIO22
+  rx_buffer_size: 512
 
 m5stack_barcode:
   id: barcode_scanner

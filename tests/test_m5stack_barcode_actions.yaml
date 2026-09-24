@@ -82,6 +82,7 @@ uart:
   baud_rate: 9600
   tx_pin: GPIO17
   rx_pin: GPIO16
+  rx_buffer_size: 512
 
 select:
   - platform: template

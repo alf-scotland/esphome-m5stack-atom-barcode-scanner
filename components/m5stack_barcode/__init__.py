@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
+import esphome.final_validate as fv
 from esphome import automation
 from esphome.components import (
     binary_sensor,
@@ -16,10 +18,12 @@ from esphome.components import (
     text_sensor,
     uart,
 )
-from esphome.const import CONF_ID, CONF_TRIGGER_ID
+from esphome.const import CONF_ID, CONF_RX_BUFFER_SIZE, CONF_TRIGGER_ID, CONF_UART_ID
 
 if TYPE_CHECKING:
     from esphome.cpp_generator import MockObj, MockObjClass
+
+_LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@alf-scotland"]
 DEPENDENCIES = ["uart"]
@@ -33,6 +37,7 @@ BarcodeScanner = m5stack_barcode_ns.class_(
 )
 _Parented = cg.Parented.template(BarcodeScanner)
 
+CONF_UART = "uart"
 CONF_BARCODE_SENSOR = "barcode_sensor"
 CONF_VERSION_SENSOR = "version_sensor"
 CONF_SCAN_EVENT = "scan_event"
@@ -433,14 +438,38 @@ CONFIG_SCHEMA = (
     .extend(uart.UART_DEVICE_SCHEMA)
 )
 
+# Longest frame: a 255-byte barcode (HA's state limit) plus the 4-byte CRLFCRLF
+# terminator. The UART driver must hold it while loop() is briefly delayed (Wi-Fi, API).
+MIN_RX_BUFFER_SIZE = 512
+
 # The scanner's serial port is fixed at 9600 8N1 (changing it is not supported, see the
 # protocol PDF item 6) and the component both sends commands and receives data.
-FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
+_validate_uart = uart.final_validate_device_schema(
     "m5stack_barcode",
     baud_rate=9600,
     require_tx=True,
     require_rx=True,
 )
+
+
+def _final_validate(config: dict[str, Any]) -> dict[str, Any]:
+    _validate_uart(config)
+    for uart_conf in fv.full_config.get().get(CONF_UART, []):
+        if (
+            uart_conf[CONF_ID] == config[CONF_UART_ID]
+            and uart_conf[CONF_RX_BUFFER_SIZE] < MIN_RX_BUFFER_SIZE
+        ):
+            _LOGGER.warning(
+                "m5stack_barcode: uart '%s' has rx_buffer_size %s; set it to at least "
+                "%s so long barcodes are not truncated while the main loop is busy",
+                uart_conf[CONF_ID],
+                uart_conf[CONF_RX_BUFFER_SIZE],
+                MIN_RX_BUFFER_SIZE,
+            )
+    return config
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 async def _setting_to_code(

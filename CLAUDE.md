@@ -99,7 +99,10 @@ YAML → __init__.py (validate + codegen) → C++ component instantiation
 - **Settings apply on ACK**: in-memory state, NVS and HA entities change only in the `set_*_state()` callbacks run when the scanner ACKs; the scan state follows the ACKed operation mode
 - **Smart reconfiguration**: `ScannerPreferences` is persisted to NVS flash; only settings that differ from the persisted state are re-sent on boot, reducing unnecessary UART traffic
 - **Wake-up sequence**: the scanner requires a wake-up command before accepting configuration commands
-- **Sub-components**: Select/Switch/Button/BinarySensor entities are child components, registered separately, and appear as individual HA entities
+- **Latest value wins**: a setting command still waiting in the queue is replaced by a newer value for the same setting; a NAK (`05 D1 00 00 …`) fails the command at once instead of waiting for the timeout
+- **No optimistic entity state**: at boot only settings confirmed via NVS are published; the rest are published when ACKed (unknown in HA until then)
+- **Barcode text**: invalid UTF-8 sequences are replaced with U+FFFD (protobuf would otherwise drop the API connection) and barcodes are truncated to 255 bytes on a character boundary; the UART needs `rx_buffer_size: 512` (a config warning says so)
+- **Entities**: Select/Switch/Button entities are `Parented<BarcodeScanner>` (not `Component`s) and appear as individual HA entities
 - Use `fnv1_hash("m5stack_barcode")` from `esphome/core/helpers.h` — `get_object_id_hash()` does not exist on non-`EntityBase` classes
 
 ### Firmware structure

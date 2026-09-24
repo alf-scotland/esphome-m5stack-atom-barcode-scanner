@@ -59,6 +59,8 @@ uart:
   baud_rate: 9600
   tx_pin: 19
   rx_pin: 22
+  # Holds a maximum-length barcode while the main loop is busy (default is 256).
+  rx_buffer_size: 512
 
 # ── Hardware ──────────────────────────────────────────────────────────────────
 

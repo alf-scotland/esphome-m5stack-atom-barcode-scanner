@@ -22,6 +22,7 @@ The ``m5stack_barcode`` component provides an interface to the M5Stack 2D/QR Bar
       tx_pin: GPIO19
       rx_pin: GPIO22
       baud_rate: 9600
+      rx_buffer_size: 512  # room for a maximum-length barcode
 
     m5stack_barcode:
       id: barcode_scanner
@@ -42,11 +43,15 @@ Component Options
 
 - **uart_id** (*Optional*, :ref:`config-id`): The ID of the UART bus if you need to specify a particular UART bus.
   The bus must be configured for 9600 baud with both ``tx_pin`` and ``rx_pin``; this is validated.
+  Set ``rx_buffer_size: 512`` (the default is 256) so a maximum-length barcode cannot overflow
+  the UART driver while the main loop is busy; a config warning is shown otherwise.
 - **id** (*Optional*, :ref:`config-id`): Manually specify the ID for this component.
 - **on_barcode** (*Optional*, :ref:`Automation <automation>`): Automation to run whenever a barcode is successfully decoded. The scanned string is available as the variable ``x``.
 - **on_scan_timeout** (*Optional*, :ref:`Automation <automation>`): Automation to run when a HOST-mode scan times out without producing a result (after ``scan_duration`` has elapsed). Use this to give user feedback or retry logic. Not triggered when ``scan_duration`` is set to ``unlimited``.
 - **barcode_sensor** (*Optional*): Expose the most recently scanned barcode as a Home Assistant ``text_sensor`` entity. Updated after every successful decode.
-  Barcodes longer than 255 characters (Home Assistant's state limit) are truncated.
+  Barcodes longer than 255 bytes (Home Assistant's state limit is 255 characters) are
+  truncated on a character boundary. Bytes that are not valid UTF-8 (e.g. Latin-1 or GBK
+  encoded codes) are replaced with ``�``, because Home Assistant's API rejects invalid UTF-8.
 - **version_sensor** (*Optional*): Expose the scanner's firmware version string as a Home Assistant ``text_sensor`` entity. Populated at boot.
 - **scan_event** (*Optional*): Expose successful scans as a Home Assistant ``event`` entity of type ``scan_successful``. Unlike the text sensor, events fire on every decode — including duplicate barcodes.
 - **scanning_binary_sensor** (*Optional*): Expose the current scan state as a Home Assistant ``binary_sensor`` entity. ``on`` while a HOST-mode scan is in progress and throughout ``continuous`` / ``auto_sense`` mode, ``off`` when idle.
@@ -538,7 +543,10 @@ All sub-components are optional inline entities. They stay in bidirectional sync
 scanner: changing a setting in Home Assistant queues the UART command, and the entity only
 updates its displayed state after the scanner ACKs — no optimistic state is shown.
 Switches default to ``restore_mode: DISABLED`` because their state always comes from the
-scanner.
+scanner. At boot, settings the scanner already had are published immediately; settings that
+have to be (re)sent stay unknown until the scanner acknowledges them. If a setting is changed
+again before the scanner has received the previous change, only the latest value is sent. A
+setting the scanner rejects is logged as a warning and the entity keeps its previous state.
 
 .. _m5stack_barcode-barcode_sensor:
 
