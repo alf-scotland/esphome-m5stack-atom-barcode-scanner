@@ -48,6 +48,10 @@ esphome:
 
 host:
 
+# Write preferences immediately so a restarted firmware sees them.
+preferences:
+  flash_write_interval: 0s
+
 external_components:
   - source: ../../components
     components: [m5stack_barcode]

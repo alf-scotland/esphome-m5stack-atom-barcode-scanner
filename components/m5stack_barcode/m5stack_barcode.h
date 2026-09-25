@@ -22,13 +22,12 @@ namespace m5stack_barcode {
 
 /// Version tag for the stored preference struct. Increment when the struct layout changes
 /// to automatically invalidate stale preferences and force a full re-sync.
-static const uint8_t SETTINGS_VERSION = 2;
+static const uint8_t SETTINGS_VERSION = 3;
+/// Version written by firmware before the YAML baseline was stored; migrated once at boot.
+static const uint8_t LEGACY_SETTINGS_VERSION = 2;
 
-/// Packed representation of all scanner settings stored in ESPHome preferences (NVS flash).
-/// On first boot (or after a factory reset / version bump) all fields are sent to the scanner.
-/// On subsequent boots only settings that differ from what was last ACK'd are re-sent.
-struct ScannerPreferences {
-  uint8_t version;
+/// One byte per scanner setting (the enum value), in the order of ScannerPreferences v2.
+struct ScannerSettings {
   uint8_t operation_mode;
   uint8_t terminator;
   uint8_t light_mode;
@@ -45,10 +44,25 @@ struct ScannerPreferences {
   uint8_t cmd_ack_sound_mode;
   uint8_t config_code_scan_mode;
 } __attribute__((packed));
+static_assert(sizeof(ScannerSettings) == 15, "ScannerSettings size changed — bump SETTINGS_VERSION");
 
-// Catch struct layout changes (added/removed fields, unexpected padding) at compile time.
-// Increment SETTINGS_VERSION whenever the struct changes so stale NVS data is discarded.
-static_assert(sizeof(ScannerPreferences) == 16, "ScannerPreferences size changed — bump SETTINGS_VERSION");
+/// Settings persisted to NVS.  `applied` holds what the scanner last ACKed (including changes
+/// made from Home Assistant), `yaml` the YAML values the device last booted with.  At boot a
+/// setting is re-sent only if its YAML value was edited since then; otherwise the applied value
+/// is kept, so runtime changes survive reboots and OTA updates.
+struct ScannerPreferences {
+  uint8_t version;
+  ScannerSettings applied;
+  ScannerSettings yaml;
+} __attribute__((packed));
+static_assert(sizeof(ScannerPreferences) == 31, "ScannerPreferences size changed — bump SETTINGS_VERSION");
+
+/// Layout of LEGACY_SETTINGS_VERSION, stored under a different key.
+struct LegacyScannerPreferences {
+  uint8_t version;
+  ScannerSettings applied;
+} __attribute__((packed));
+static_assert(sizeof(LegacyScannerPreferences) == 16, "legacy layout is fixed");
 
 extern const char *const TAG_SCANNER;
 
@@ -190,7 +204,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_cmd_ack_sound_mode_state(CmdAckSoundMode mode);
   void set_config_code_scan_mode_state(ConfigCodeScanMode mode);
 
-  /// Queue the commands for every setting whose value differs from the NVS-persisted state.
+  /// Restore the persisted settings, then queue commands for settings that must be (re)sent:
+  /// all of them without valid preferences, otherwise those whose YAML value was edited.
   void configure_defaults_();
   /// Publish the current setting values to every attached HA entity.
   void publish_initial_states_();
@@ -225,8 +240,10 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void process_version_();
 
   ESPPreferenceObject pref_;
-  /// Per-setting flags (1 = the scanner already had the YAML value at boot, per NVS)
-  ScannerPreferences confirmed_at_boot_{};
+  /// YAML values this firmware was built with (the baseline saved to NVS)
+  ScannerSettings yaml_settings_{};
+  /// Per-setting flags: 1 = restored from NVS at boot (the scanner already has the value)
+  ScannerSettings confirmed_at_boot_{};
 
   CallbackManager<void(const std::string &)> barcode_callback_;
   CallbackManager<void()> scan_timeout_callback_;

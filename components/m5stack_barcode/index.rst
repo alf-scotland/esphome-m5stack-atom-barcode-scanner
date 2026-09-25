@@ -41,6 +41,12 @@ The ``m5stack_barcode`` component provides an interface to the M5Stack 2D/QR Bar
 Component Options
 -----------------
 
+The scanner settings below (``operation_mode`` … ``same_code_interval``) are **initial
+values**. They are applied on first boot, after a factory reset, and whenever you change the
+value in YAML. Changes made at runtime — from Home Assistant entities or with the ``set_*``
+actions — are stored in flash and kept across reboots and firmware updates until the YAML
+value is edited.
+
 - **uart_id** (*Optional*, :ref:`config-id`): The ID of the UART bus if you need to specify a particular UART bus.
   The bus must be configured for 9600 baud with both ``tx_pin`` and ``rx_pin``; this is validated.
   Set ``rx_buffer_size: 512`` (the default is 256) so a maximum-length barcode cannot overflow

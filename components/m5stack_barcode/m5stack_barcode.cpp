@@ -46,6 +46,10 @@ static const size_t MAX_RX_BUFFER_SIZE = 512;
 // Used for barcodes without a terminator and to detect the end of the version response.
 static const uint32_t RX_IDLE_WINDOW_MS = 20;
 
+// NVS keys for the current and the legacy (LEGACY_SETTINGS_VERSION) preference layouts
+static const char *const PREFERENCES_KEY = "m5stack_barcode_settings";
+static const char *const LEGACY_PREFERENCES_KEY = "m5stack_barcode";
+
 bool BarcodeScanner::is_continuous_mode() const {
   return this->operation_mode_ == OperationMode::CONTINUOUS || this->operation_mode_ == OperationMode::AUTO_SENSE;
 }
@@ -75,8 +79,7 @@ void BarcodeScanner::setup() {
   // long-running device does not fragment the heap with a reallocation per barcode.
   this->rx_buffer_.reserve(MAX_RX_BUFFER_SIZE + 64);
 
-  // Initialise preference storage keyed to this component instance
-  this->pref_ = global_preferences->make_preference<ScannerPreferences>(fnv1_hash("m5stack_barcode"));
+  this->pref_ = global_preferences->make_preference<ScannerPreferences>(fnv1_hash(PREFERENCES_KEY));
 
   // Configure settings, skipping any that the scanner already has from a previous boot
   this->configure_defaults_();
@@ -98,7 +101,7 @@ void BarcodeScanner::setup() {
 // An out-of-range value means the struct was written by a different firmware version
 // or the NVS slot is corrupt — treat the whole entry as invalid rather than casting
 // a garbage byte into a C++ enum.
-static bool prefs_in_range(const ScannerPreferences &p) {
+static bool prefs_in_range(const ScannerSettings &p) {
   return p.operation_mode <= static_cast<uint8_t>(OperationMode::AUTO_SENSE) &&
          p.terminator <= static_cast<uint8_t>(Terminator::CRLFCRLF) &&
          p.light_mode <= static_cast<uint8_t>(LightMode::LIGHT_ALWAYS_OFF) &&
@@ -117,43 +120,65 @@ static bool prefs_in_range(const ScannerPreferences &p) {
 }
 
 void BarcodeScanner::configure_defaults_() {
-  // Load previously-saved settings from NVS flash.  A valid entry means the
-  // scanner was already programmed with those values and does not need them
-  // resent unless they have changed in the YAML configuration.
   ScannerPreferences stored{};
-  const bool has_valid_prefs =
-      this->pref_.load(&stored) && stored.version == SETTINGS_VERSION && prefs_in_range(stored);
-
-  ESP_LOGD(TAG_SCANNER, "Configuring scanner defaults (cached prefs valid=%s)", has_valid_prefs ? "yes" : "no");
-
-// Helper macro: queue a command only when the stored value differs from the
-// desired value (or when there are no valid stored preferences at all).
-#define QUEUE_IF_CHANGED(field, create_fn, value) \
-  if (!has_valid_prefs || stored.field != static_cast<uint8_t>(value)) { \
-    this->queue_command(create_fn(value)); \
-  } else { \
-    this->confirmed_at_boot_.field = 1; \
+  LegacyScannerPreferences legacy{};
+  ESPPreferenceObject legacy_pref =
+      global_preferences->make_preference<LegacyScannerPreferences>(fnv1_hash(LEGACY_PREFERENCES_KEY));
+  // restore: the settings the scanner already has; baseline: the YAML values they were
+  // resolved against (nullptr = the current YAML values).
+  const ScannerSettings *restore = nullptr;
+  const ScannerSettings *baseline = nullptr;
+  bool migrated = false;
+  if (this->pref_.load(&stored) && stored.version == SETTINGS_VERSION && prefs_in_range(stored.applied) &&
+      prefs_in_range(stored.yaml)) {
+    restore = &stored.applied;
+    baseline = &stored.yaml;
+    ESP_LOGD(TAG_SCANNER, "Restoring scanner settings from flash");
+  } else if (legacy_pref.load(&legacy) && legacy.version == LEGACY_SETTINGS_VERSION && prefs_in_range(legacy.applied)) {
+    // Older firmware re-applied every YAML value at boot, so its stored values differ from
+    // the YAML ones only where they were changed at runtime since: keep those changes.
+    restore = &legacy.applied;
+    migrated = true;
+    ESP_LOGI(TAG_SCANNER, "Migrating scanner settings from the previous preferences format");
+  } else {
+    ESP_LOGD(TAG_SCANNER, "No stored scanner settings; applying all configured values");
   }
 
-  QUEUE_IF_CHANGED(operation_mode, CommandFactory::create_mode_command, this->operation_mode_)
-  QUEUE_IF_CHANGED(terminator, CommandFactory::create_terminator_command, this->terminator_)
-  QUEUE_IF_CHANGED(light_mode, CommandFactory::create_light_command, this->light_mode_)
-  QUEUE_IF_CHANGED(locate_light_mode, CommandFactory::create_locate_light_command, this->locate_light_mode_)
-  QUEUE_IF_CHANGED(sound_mode, CommandFactory::create_sound_command, this->sound_mode_)
-  QUEUE_IF_CHANGED(buzzer_volume, CommandFactory::create_volume_command, this->buzzer_volume_)
-  QUEUE_IF_CHANGED(decoding_success_light_mode, CommandFactory::create_decoding_success_light_command,
-                   this->decoding_success_light_mode_)
-  QUEUE_IF_CHANGED(boot_sound_mode, CommandFactory::create_boot_sound_command, this->boot_sound_mode_)
-  QUEUE_IF_CHANGED(decode_sound_mode, CommandFactory::create_decode_sound_command, this->decode_sound_mode_)
-  QUEUE_IF_CHANGED(scan_duration, CommandFactory::create_scan_duration_command, this->scan_duration_)
-  QUEUE_IF_CHANGED(stable_induction_time, CommandFactory::create_stable_induction_time_command,
-                   this->stable_induction_time_)
-  QUEUE_IF_CHANGED(reading_interval, CommandFactory::create_reading_interval_command, this->reading_interval_)
-  QUEUE_IF_CHANGED(same_code_interval, CommandFactory::create_same_code_interval_command, this->same_code_interval_)
-  QUEUE_IF_CHANGED(cmd_ack_sound_mode, CommandFactory::create_cmd_ack_sound_command, this->cmd_ack_sound_mode_)
-  QUEUE_IF_CHANGED(config_code_scan_mode, CommandFactory::create_config_code_scan_command, this->config_code_scan_mode_)
+// Keep the stored value unless the YAML value was edited since it was stored (or nothing is
+// stored), in which case the YAML value is sent to the scanner.
+#define RESOLVE_SETTING(field, create_fn) \
+  this->yaml_settings_.field = static_cast<uint8_t>(this->field##_); \
+  if (restore != nullptr && (baseline == nullptr || baseline->field == this->yaml_settings_.field)) { \
+    this->field##_ = static_cast<decltype(this->field##_)>(restore->field); \
+    this->confirmed_at_boot_.field = 1; \
+  } else { \
+    this->queue_command(create_fn(this->field##_)); \
+  }
 
-#undef QUEUE_IF_CHANGED
+  RESOLVE_SETTING(operation_mode, CommandFactory::create_mode_command)
+  RESOLVE_SETTING(terminator, CommandFactory::create_terminator_command)
+  RESOLVE_SETTING(light_mode, CommandFactory::create_light_command)
+  RESOLVE_SETTING(locate_light_mode, CommandFactory::create_locate_light_command)
+  RESOLVE_SETTING(sound_mode, CommandFactory::create_sound_command)
+  RESOLVE_SETTING(buzzer_volume, CommandFactory::create_volume_command)
+  RESOLVE_SETTING(decoding_success_light_mode, CommandFactory::create_decoding_success_light_command)
+  RESOLVE_SETTING(boot_sound_mode, CommandFactory::create_boot_sound_command)
+  RESOLVE_SETTING(decode_sound_mode, CommandFactory::create_decode_sound_command)
+  RESOLVE_SETTING(scan_duration, CommandFactory::create_scan_duration_command)
+  RESOLVE_SETTING(stable_induction_time, CommandFactory::create_stable_induction_time_command)
+  RESOLVE_SETTING(reading_interval, CommandFactory::create_reading_interval_command)
+  RESOLVE_SETTING(same_code_interval, CommandFactory::create_same_code_interval_command)
+  RESOLVE_SETTING(cmd_ack_sound_mode, CommandFactory::create_cmd_ack_sound_command)
+  RESOLVE_SETTING(config_code_scan_mode, CommandFactory::create_config_code_scan_command)
+
+#undef RESOLVE_SETTING
+
+  // Persist the new YAML baseline (and the migrated values); unchanged data is not rewritten.
+  this->save_settings_();
+  if (migrated) {
+    LegacyScannerPreferences empty{};
+    legacy_pref.save(&empty);
+  }
 }
 
 static void publish_select(select::Select *sel, uint8_t index) {
@@ -205,21 +230,22 @@ void BarcodeScanner::publish_initial_states_() {
 void BarcodeScanner::save_settings_() {
   ScannerPreferences prefs{};
   prefs.version = SETTINGS_VERSION;
-  prefs.operation_mode = static_cast<uint8_t>(this->operation_mode_);
-  prefs.terminator = static_cast<uint8_t>(this->terminator_);
-  prefs.light_mode = static_cast<uint8_t>(this->light_mode_);
-  prefs.locate_light_mode = static_cast<uint8_t>(this->locate_light_mode_);
-  prefs.sound_mode = static_cast<uint8_t>(this->sound_mode_);
-  prefs.buzzer_volume = static_cast<uint8_t>(this->buzzer_volume_);
-  prefs.decoding_success_light_mode = static_cast<uint8_t>(this->decoding_success_light_mode_);
-  prefs.boot_sound_mode = static_cast<uint8_t>(this->boot_sound_mode_);
-  prefs.decode_sound_mode = static_cast<uint8_t>(this->decode_sound_mode_);
-  prefs.scan_duration = static_cast<uint8_t>(this->scan_duration_);
-  prefs.stable_induction_time = static_cast<uint8_t>(this->stable_induction_time_);
-  prefs.reading_interval = static_cast<uint8_t>(this->reading_interval_);
-  prefs.same_code_interval = static_cast<uint8_t>(this->same_code_interval_);
-  prefs.cmd_ack_sound_mode = static_cast<uint8_t>(this->cmd_ack_sound_mode_);
-  prefs.config_code_scan_mode = static_cast<uint8_t>(this->config_code_scan_mode_);
+  prefs.applied.operation_mode = static_cast<uint8_t>(this->operation_mode_);
+  prefs.applied.terminator = static_cast<uint8_t>(this->terminator_);
+  prefs.applied.light_mode = static_cast<uint8_t>(this->light_mode_);
+  prefs.applied.locate_light_mode = static_cast<uint8_t>(this->locate_light_mode_);
+  prefs.applied.sound_mode = static_cast<uint8_t>(this->sound_mode_);
+  prefs.applied.buzzer_volume = static_cast<uint8_t>(this->buzzer_volume_);
+  prefs.applied.decoding_success_light_mode = static_cast<uint8_t>(this->decoding_success_light_mode_);
+  prefs.applied.boot_sound_mode = static_cast<uint8_t>(this->boot_sound_mode_);
+  prefs.applied.decode_sound_mode = static_cast<uint8_t>(this->decode_sound_mode_);
+  prefs.applied.scan_duration = static_cast<uint8_t>(this->scan_duration_);
+  prefs.applied.stable_induction_time = static_cast<uint8_t>(this->stable_induction_time_);
+  prefs.applied.reading_interval = static_cast<uint8_t>(this->reading_interval_);
+  prefs.applied.same_code_interval = static_cast<uint8_t>(this->same_code_interval_);
+  prefs.applied.cmd_ack_sound_mode = static_cast<uint8_t>(this->cmd_ack_sound_mode_);
+  prefs.applied.config_code_scan_mode = static_cast<uint8_t>(this->config_code_scan_mode_);
+  prefs.yaml = this->yaml_settings_;
   if (!this->pref_.save(&prefs)) {
     ESP_LOGW(TAG_SCANNER, "Failed to save scanner preferences to NVS");
   }
@@ -981,7 +1007,8 @@ void BarcodeScanner::factory_reset() {
 
 void BarcodeScanner::do_factory_reset_() {
   // Invalidate NVS by saving a zeroed struct (version=0).  On next boot
-  // configure_defaults_() will see a version mismatch and re-send every setting.
+  // configure_defaults_() finds no valid preferences and re-sends every YAML value.
+  // (A legacy entry was already cleared when it was migrated.)
   ScannerPreferences empty{};
   if (!this->pref_.save(&empty)) {
     ESP_LOGW(TAG_SCANNER, "Failed to invalidate NVS preferences; settings may not fully re-sync after reboot");

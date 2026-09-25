@@ -88,9 +88,22 @@ class Firmware:
                 text = line.decode(errors="replace").rstrip()
                 self._queue.put(ANSI.sub("", text))
 
-    def wait_for(self, pattern: str, timeout: float = 10) -> re.Match[str]:
-        """Return the first new log line matching `pattern`, or fail after `timeout`."""
+    def wait_for(
+        self,
+        pattern: str,
+        timeout: float = 10,
+        *,
+        from_start: bool = False,
+    ) -> re.Match[str]:
+        """Return the first new log line matching `pattern`, or fail after `timeout`.
+
+        With `from_start`, lines logged before this call (e.g. during boot) also count.
+        """
         regex = re.compile(pattern)
+        if from_start:
+            for line in self.lines:
+                if match := regex.search(line):
+                    return match
         deadline = time.monotonic() + timeout
         while (remaining := deadline - time.monotonic()) > 0:
             try:
@@ -163,11 +176,23 @@ def run(
         firmware.wait_for(r"READY", timeout=15)
         return scanner, firmware
 
+    _start.started = started
     yield _start
-    for scanner, proc in started:
+    _stop_all(started)
+
+
+def _stop_all(started: list[tuple[FakeScanner, subprocess.Popen[bytes]]]) -> None:
+    while started:
+        scanner, proc = started.pop()
         proc.kill()
         proc.wait()
         scanner.__exit__()
+
+
+@pytest.fixture
+def restart(run: callable) -> callable:
+    """Stop every running firmware; the next `run()` reuses the same preferences."""
+    return lambda: _stop_all(run.started)
 
 
 def test_version_is_published(run: callable) -> None:
@@ -289,3 +314,74 @@ def test_barcodes_are_published_as_valid_utf8(
     scanner.emit_barcode(payload)
     match = firmware.wait_for(r"BARCODE\[(.*)\]")
     assert match.group(1) == expected
+
+
+# Values of host_scanner.yaml's m5stack_barcode options (C++ enum values, in
+# ScannerSettings field order).  The on_boot actions change some of them at runtime.
+YAML_SETTINGS = bytes([0, 0, 0, 0, 0, 2, 1, 0, 1, 2, 3, 3, 3, 1, 1])
+VOLUME_FIELD = 5  # buzzer_volume in ScannerSettings
+VOLUME_MEDIUM = 0x01
+VOLUME_LOW = 0x02
+
+
+def fnv1_hash(text: str) -> int:
+    """Hash a preference key the way ESPHome does (FNV-1, 32 bit)."""
+    value = 2166136261
+    for char in text.encode():
+        value = (value * 16777619) & 0xFFFFFFFF
+        value ^= char
+    return value
+
+
+def write_prefs(home: Path, key: str, data: bytes) -> None:
+    """Store a preference the way ESPHome's host platform does."""
+    path = home / ".esphome" / "prefs" / "m5stack-barcode-sim.prefs"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(fnv1_hash(key).to_bytes(4, "little") + bytes([len(data)]) + data)
+
+
+def with_volume(settings: bytes, volume: int) -> bytes:
+    """Return `settings` with buzzer_volume replaced."""
+    return settings[:VOLUME_FIELD] + bytes([volume]) + settings[VOLUME_FIELD + 1 :]
+
+
+def volume_commands(scanner: FakeScanner) -> list[int]:
+    """Values of the buzzer volume commands the scanner received."""
+    return [f[6] for f in scanner.received if f[5] == PARAM_VOLUME]
+
+
+def test_runtime_setting_change_survives_restart(
+    run: callable,
+    restart: callable,
+) -> None:
+    """A setting changed at runtime (e.g. from HA) is kept after a reboot."""
+    _, firmware = run(extra_env={"SIM_SET_VOLUME": "1"})
+    firmware.wait_for(r"VOLUME\[high\]")
+    restart()
+    scanner, firmware = run()
+    firmware.wait_for(r"VOLUME\[high\]", from_start=True)
+    firmware.assert_absent(r"VOLUME\[low\]", duration=1)
+    assert volume_commands(scanner) == []
+
+
+def test_yaml_edit_is_applied(run: callable, tmp_path: Path) -> None:
+    """A YAML value that changed since the last boot overrides the stored value."""
+    # Stored: the scanner has 'high'; the YAML used to say 'medium' (now 'low').
+    applied = with_volume(YAML_SETTINGS, VOLUME_HIGH)
+    baseline = with_volume(YAML_SETTINGS, VOLUME_MEDIUM)
+    write_prefs(tmp_path, "m5stack_barcode_settings", bytes([3]) + applied + baseline)
+    scanner, firmware = run()
+    firmware.wait_for(r"VOLUME\[low\]", from_start=True)
+    assert volume_commands(scanner) == [VOLUME_LOW]
+    # Settings whose YAML value did not change were restored, not re-sent.
+    assert len(scanner.received) < 8  # noqa: PLR2004
+
+
+def test_legacy_preferences_are_migrated(run: callable, tmp_path: Path) -> None:
+    """Settings stored by older firmware are kept, including runtime changes."""
+    legacy = bytes([2]) + with_volume(YAML_SETTINGS, VOLUME_HIGH)
+    write_prefs(tmp_path, "m5stack_barcode", legacy)
+    scanner, firmware = run()
+    firmware.wait_for(r"Migrating scanner settings", from_start=True)
+    firmware.wait_for(r"VOLUME\[high\]", from_start=True)
+    assert volume_commands(scanner) == []
