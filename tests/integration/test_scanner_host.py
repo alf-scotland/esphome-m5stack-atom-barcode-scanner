@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from .fake_scanner import FakeScanner
+from .fake_scanner import OP_START, FakeScanner
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -226,6 +226,25 @@ def test_scan_timeout(run: callable) -> None:
     firmware.wait_for(r"SCAN_TIMEOUT")
 
 
+def test_rejected_start_ends_the_scan(run: callable) -> None:
+    """A start the scanner NAKs (e.g. its mode was changed by a config barcode)."""
+    _, firmware = run(start_scan=True, start_reply="nak")
+    firmware.wait_for(r"SCANNING\[1\]")
+    firmware.wait_for(r"SCANNING\[0\]", timeout=1)
+    firmware.assert_absent(r"SCAN_TIMEOUT", duration=1.5)
+
+
+def test_unanswered_start_ends_the_scan_and_warns(run: callable) -> None:
+    """A scanner that stops answering ends the scan and sets the warning status."""
+    scanner, firmware = run(start_scan=True, start_reply="silent")
+    firmware.wait_for(r"SCANNING\[1\]")
+    firmware.wait_for(r"No reply \(attempt 1/2\), retrying", timeout=3)
+    firmware.wait_for(r"Scanner not responding", timeout=3)
+    firmware.wait_for(r"SCANNING\[0\]", timeout=1)
+    starts = [f for f in scanner.received if f[1] == OP_START]
+    assert len(starts) == 2  # noqa: PLR2004 - sent once, retried once
+
+
 @pytest.mark.parametrize(
     ("mode", "terminator"),
     [("continuous", "crlf"), ("continuous", "none"), ("auto_sense", "tab")],
@@ -285,7 +304,7 @@ def test_rejected_setting_fails_fast_and_keeps_state(run: callable) -> None:
         extra_env={"SIM_SET_VOLUME": "1"},
     )
     firmware.wait_for(r"rejected", timeout=1)
-    firmware.assert_absent(r"VOLUME\[high\]|timed out", duration=2.5)
+    firmware.assert_absent(r"VOLUME\[high\]|No reply", duration=2.5)
     # Sent exactly once: no retry after the NAK.
     high = [f for f in scanner.received if f[5] == PARAM_VOLUME and f[6] == VOLUME_HIGH]
     assert len(high) == 1

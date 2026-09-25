@@ -51,7 +51,8 @@ class FakeScanner:
         self.mode = "host"
         self.terminator = b""
         # What a host-mode start does: "scan" (ACK, then the barcode), "burst" (ACK
-        # and barcode in a single write) or "ack" (ACK only; the scan times out).
+        # and barcode in a single write), "ack" (ACK only; the scan times out), "nak"
+        # (rejected, as outside host mode) or "silent" (no reply at all).
         self.start_reply = "scan"
         self.barcode = b"HELLO-123"
         # Parameter bytes (frame[5]) of setting commands to NAK instead of ACK.
@@ -84,27 +85,37 @@ class FakeScanner:
     def _handle(self, frame: bytes) -> None:
         self.received.append(frame)
         op = frame[1]
-        if op == OP_SETTING and frame[5] in self.nak_params:
-            self.emit(NAK)
-        elif op == OP_SETTING:
-            if frame[5] == PARAM_MODE:
-                self.mode = MODES.get(frame[6], "auto_sense")
-            elif frame[5] == PARAM_F2 and frame[6] == F2_TERMINATOR:
-                self.terminator = TERMINATORS[frame[7]]
-            self.emit(ACK)
+        if op == OP_SETTING:
+            self._handle_setting(frame)
         elif op == OP_VERSION:
             time.sleep(0.07)
             self.emit(VERSION_RESPONSE)
         elif op in (OP_START, OP_STOP):
-            if self.mode != "host":
-                self.emit(NAK)
-            elif op == OP_START and self.start_reply == "burst":
-                self.emit(ACK + self.barcode + self.terminator)
-            else:
-                self.emit(ACK)
-                if op == OP_START and self.start_reply == "scan":
-                    time.sleep(0.3)
-                    self.emit_barcode(self.barcode)
+            self._handle_start_stop(op)
+
+    def _handle_setting(self, frame: bytes) -> None:
+        if frame[5] in self.nak_params:
+            self.emit(NAK)
+            return
+        if frame[5] == PARAM_MODE:
+            self.mode = MODES.get(frame[6], "auto_sense")
+        elif frame[5] == PARAM_F2 and frame[6] == F2_TERMINATOR:
+            self.terminator = TERMINATORS[frame[7]]
+        self.emit(ACK)
+
+    def _handle_start_stop(self, op: int) -> None:
+        start = op == OP_START
+        if start and self.start_reply == "silent":
+            return
+        if self.mode != "host" or (start and self.start_reply == "nak"):
+            self.emit(NAK)
+        elif start and self.start_reply == "burst":
+            self.emit(ACK + self.barcode + self.terminator)
+        else:
+            self.emit(ACK)
+            if start and self.start_reply == "scan":
+                time.sleep(0.3)
+                self.emit_barcode(self.barcode)
 
     def _run(self) -> None:
         os.set_blocking(self._master, False)
