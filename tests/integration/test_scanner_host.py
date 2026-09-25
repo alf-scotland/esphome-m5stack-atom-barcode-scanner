@@ -333,11 +333,46 @@ def fnv1_hash(text: str) -> int:
     return value
 
 
+def prefs_path(home: Path) -> Path:
+    """Where ESPHome's host platform stores this firmware's preferences."""
+    return home / ".esphome" / "prefs" / "m5stack-barcode-sim.prefs"
+
+
 def write_prefs(home: Path, key: str, data: bytes) -> None:
     """Store a preference the way ESPHome's host platform does."""
-    path = home / ".esphome" / "prefs" / "m5stack-barcode-sim.prefs"
+    path = prefs_path(home)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(fnv1_hash(key).to_bytes(4, "little") + bytes([len(data)]) + data)
+
+
+def read_prefs(home: Path, key: str) -> bytes | None:
+    """Return a stored preference, parsing the host format (key, length, data)."""
+    try:
+        raw = prefs_path(home).read_bytes()
+    except FileNotFoundError:
+        return None
+    wanted = fnv1_hash(key)
+    offset = 0
+    while offset + 5 <= len(raw):
+        record_key = int.from_bytes(raw[offset : offset + 4], "little")
+        length = raw[offset + 4]
+        data = raw[offset + 5 : offset + 5 + length]
+        if record_key == wanted:
+            return data
+        offset += 5 + length
+    return None
+
+
+def wait_for_stored_volume(home: Path, volume: int, timeout: float = 10) -> None:
+    """Wait until the stored applied buzzer_volume is `volume` (flushed to disk)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        prefs = read_prefs(home, "m5stack_barcode_settings")
+        # version byte, then ScannerSettings `applied`
+        if prefs is not None and prefs[1 + VOLUME_FIELD] == volume:
+            return
+        time.sleep(0.05)
+    pytest.fail(f"buzzer_volume {volume} was not persisted within {timeout} s")
 
 
 def with_volume(settings: bytes, volume: int) -> bytes:
@@ -353,10 +388,13 @@ def volume_commands(scanner: FakeScanner) -> list[int]:
 def test_runtime_setting_change_survives_restart(
     run: callable,
     restart: callable,
+    tmp_path: Path,
 ) -> None:
     """A setting changed at runtime (e.g. from HA) is kept after a reboot."""
     _, firmware = run(extra_env={"SIM_SET_VOLUME": "1"})
     firmware.wait_for(r"VOLUME\[high\]")
+    # The change is published before the preferences are flushed to disk.
+    wait_for_stored_volume(tmp_path, VOLUME_HIGH)
     restart()
     scanner, firmware = run()
     firmware.wait_for(r"VOLUME\[high\]", from_start=True)
