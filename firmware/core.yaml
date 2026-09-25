@@ -27,9 +27,20 @@ logger:
 # - provisioning: an unprovisioned device only accepts Wi-Fi setup and adoption during a
 #   window after power-up (EN 18031). If it closes, power-cycle the device to reopen it.
 # - Wi-Fi setup: over USB with Improv Serial right after flashing (web.esphome.io), or
-#   via the fallback access point and captive portal.
+#   via the fallback access point and captive portal. The access point is open and its
+#   portal accepts firmware uploads, so once the device has been adopted (it has its own
+#   API key) it is no longer started when Wi-Fi is lost; a device that has to join a new
+#   network is reconfigured over USB (Improv Serial) instead.
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: disable_fallback_ap_if_adopted
+
 api:
   encryption: {}
+  on_client_connected:
+    - script.execute: disable_fallback_ap_if_adopted
 
 ota:
   - platform: esphome
@@ -52,6 +63,13 @@ captive_portal:
 
 improv_serial:
 
+script:
+  - id: disable_fallback_ap_if_adopted
+    then:
+      - lambda: |-
+          if (api::global_api_server->get_noise_ctx().has_psk())
+            wifi::global_wifi_component->set_ap_timeout(0);  // 0 = never start the AP
+
 m5stack_barcode:
   id: barcode_scanner
   operation_mode: host
@@ -59,24 +77,22 @@ m5stack_barcode:
   buzzer_volume: medium
   uart_id: uart_bus
 
+  # Entity categories and icons come from the component's defaults.
   barcode_sensor:
     name: "Last Barcode"
-    icon: "mdi:barcode"
-
   version_sensor:
     name: "Scanner Version"
-    entity_category: "diagnostic"
-    icon: "mdi:information-outline"
-
-  factory_reset_button:
-    name: "Factory Reset Scanner"
-    entity_category: "diagnostic"
-    icon: "mdi:restore"
-    disabled_by_default: true
-
+  scanning_binary_sensor:
+    name: "Scanning"
   scan_event:
     name: "Barcode Scanned"
-    icon: "mdi:barcode-scan"
+  start_button:
+    name: "Start Scan"
+  stop_button:
+    name: "Stop Scan"
+  factory_reset_button:
+    name: "Factory Reset Scanner"
+    disabled_by_default: true
 
   on_barcode:
     - homeassistant.event:
@@ -84,75 +100,36 @@ m5stack_barcode:
         data:
           barcode: !lambda return x;
 
-  light_mode_select:
-    name: "Light Mode"
-    entity_category: "config"
-    icon: "mdi:lightbulb"
-
-  locate_light_mode_select:
-    name: "Locate Light Mode"
-    entity_category: "config"
-    icon: "mdi:crosshairs"
-
-  scan_duration_select:
-    name: "Scan Duration"
-    entity_category: "config"
-    icon: "mdi:timer"
-
-  buzzer_volume_select:
-    name: "Volume"
-    entity_category: "config"
-    icon: "mdi:volume-medium"
-
-  sound_switch:
-    name: "Sound"
-    entity_category: "config"
-    icon: "mdi:volume-high"
-
-  boot_sound_switch:
-    name: "Boot Sound"
-    entity_category: "config"
-    icon: "mdi:power"
-
-  decode_sound_switch:
-    name: "Decode Sound"
-    entity_category: "config"
-    icon: "mdi:volume-source"
-
-  decoding_success_light_switch:
-    name: "Decoding Success Light"
-    entity_category: "config"
-    icon: "mdi:led-on"
-
-  cmd_ack_sound_switch:
-    name: "Command ACK Sound"
-    entity_category: "config"
-    icon: "mdi:bell-check"
-
-  config_code_scan_switch:
-    name: "Config Code Scanning"
-    entity_category: "config"
-    icon: "mdi:barcode-off"
-
+  operation_mode_select:
+    name: "Operation Mode"
   terminator_select:
     name: "Terminator"
-    entity_category: "config"
-    icon: "mdi:keyboard-return"
-
+  light_mode_select:
+    name: "Light Mode"
+  locate_light_mode_select:
+    name: "Locate Light Mode"
+  scan_duration_select:
+    name: "Scan Duration"
+  buzzer_volume_select:
+    name: "Volume"
   stable_induction_time_select:
     name: "Stable Induction Time"
-    entity_category: "config"
-    icon: "mdi:timer-sand"
-
   reading_interval_select:
     name: "Reading Interval"
-    entity_category: "config"
-    icon: "mdi:timer-outline"
-
   same_code_interval_select:
     name: "Same Code Interval"
-    entity_category: "config"
-    icon: "mdi:timer-refresh"
+  sound_switch:
+    name: "Sound"
+  boot_sound_switch:
+    name: "Boot Sound"
+  decode_sound_switch:
+    name: "Decode Sound"
+  decoding_success_light_switch:
+    name: "Decoding Success Light"
+  cmd_ack_sound_switch:
+    name: "Command ACK Sound"
+  config_code_scan_switch:
+    name: "Config Code Scanning"
 
 button:
   - platform: restart

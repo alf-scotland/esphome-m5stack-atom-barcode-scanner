@@ -68,8 +68,11 @@ back in to reopen it.
 
 **Security:** the published binary contains no passwords or keys — anything baked into a
 public binary can be extracted by anyone who downloads it. Each device instead gets a unique
-key when it is adopted; only a factory reset of the ESP removes it. Settings changed in Home
-Assistant are kept across reboots and updates.
+key when it is adopted; only a factory reset of the ESP removes it. The fallback access point
+is open and accepts firmware uploads, so an adopted device no longer starts it when Wi-Fi is
+lost: to move it to a new network, connect it over USB and use **Change Wi-Fi** in
+[ESPHome Web](https://web.esphome.io/) (Improv Serial). Settings changed in Home Assistant
+are kept across reboots and updates.
 
 **Updating from a release before this change:** releases up to 2026.7.0 used a shared
 built-in key. After updating, remove the device in Home Assistant and add it again within

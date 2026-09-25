@@ -127,8 +127,10 @@ The release binary is public, so it must contain no credentials. `core.yaml` use
 `api: encryption: {}` (each device gets a unique key from HA/the dashboard at adoption;
 ESPHome OTA is authenticated with it), `ota: esphome` without a password, and
 `provisioning: timeout: 15min` (EN 18031 setup window; power-cycle to reopen). Wi-Fi is set
-up via `improv_serial` or the fallback AP + captive portal. Do not reintroduce `!secret`
-keys or passwords into the published firmware; CI has no secrets for it.
+up via `improv_serial` or the fallback AP + captive portal. The AP is open and the portal
+accepts firmware uploads (`ota.web_server`), so the `disable_fallback_ap_if_adopted` script
+sets `ap_timeout` to 0 once the API has a key; adopted devices change Wi-Fi over USB. Do not
+reintroduce `!secret` keys or passwords into the published firmware; CI has no secrets for it.
 
 ### OTA update delivery
 
