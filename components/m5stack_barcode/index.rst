@@ -554,6 +554,10 @@ have to be (re)sent stay unknown until the scanner acknowledges them. If a setti
 again before the scanner has received the previous change, only the latest value is sent. A
 setting the scanner rejects is logged as a warning and the entity keeps its previous state.
 
+Entities default to sensible icons; setting selects and switches and the factory reset
+button default to ``entity_category: config``, the version sensor to ``diagnostic``. Any of
+these can be overridden per entity.
+
 .. _m5stack_barcode-barcode_sensor:
 
 ``barcode_sensor``
@@ -1179,7 +1183,11 @@ Troubleshooting
 2. Check your wiring - TX on ESP connects to RX on scanner, and vice versa.
 3. When using hardware trigger, ensure the TRIG pin is correctly connected (LOW to activate).
 4. If using the DLED pin for detection, make sure it's properly connected as an input.
-5. Enable logs for more detailed debugging:
+5. If the scanner does not answer a command (after one retry), the component logs
+   ``Scanner not responding`` and sets the component's warning status (shown by a
+   ``status_led``) until the scanner answers again.
+   Check the power and wiring to the scanner.
+6. Enable logs for more detailed debugging:
 
 .. code-block:: yaml
 
