@@ -88,7 +88,7 @@ YAML → __init__.py (validate + codegen) → C++ component instantiation
                                        UART TX → scanner hardware
                                        UART RX ← ACK (6 bytes), version response, or unframed barcode data
                                                     ↓
-                                       NVS flash (ScannerPreferences, SETTINGS_VERSION=2)
+                                       NVS flash (ScannerPreferences, SETTINGS_VERSION=3)
                                                     ↓
                                        ESPHome automations / HA entities
 ```
@@ -97,7 +97,7 @@ YAML → __init__.py (validate + codegen) → C++ component instantiation
 - **Command queue**: commands are enqueued and sent one at a time; the scanner must ACK before the next command is sent; unacknowledged commands are retried once, then dropped. The ACK is searched for anywhere in the RX buffer and only its 6 bytes are consumed, so barcode data around it survives
 - **Barcode framing**: barcode output is unframed in every operation mode — a barcode ends at the configured terminator or after a 20 ms idle gap. The PDF's `05 D1 00 00 06 FF 24` is only the reply to start/stop decoding outside host mode, not a delimiter
 - **Settings apply on ACK**: in-memory state, NVS and HA entities change only in the `set_*_state()` callbacks run when the scanner ACKs; the scan state follows the ACKed operation mode
-- **Smart reconfiguration**: `ScannerPreferences` is persisted to NVS flash; only settings that differ from the persisted state are re-sent on boot, reducing unnecessary UART traffic
+- **Settings persistence**: `ScannerPreferences` (NVS, `SETTINGS_VERSION=3`) stores the values the scanner applied *and* the YAML values the device last booted with. At boot a setting keeps its stored value (so changes from HA survive reboots and OTA) unless its YAML value was edited since, in which case the YAML value is sent. Version-2 preferences (applied values only, older key) are migrated once
 - **Wake-up sequence**: the scanner requires a wake-up command before accepting configuration commands
 - **Latest value wins**: a setting command still waiting in the queue is replaced by a newer value for the same setting; a NAK (`05 D1 00 00 …`) fails the command at once instead of waiting for the timeout
 - **No optimistic entity state**: at boot only settings confirmed via NVS are published; the rest are published when ACKed (unknown in HA until then)
@@ -120,6 +120,15 @@ firmware.yaml         ← entry point for dashboard adoption / remote packages; 
 `core.yaml` loads the component from `${component_source}` (default: this checkout's `../components`). Remote packages cannot use that relative path, so `firmware.yaml` overrides it with the GitHub source; `dashboard_import` points at `firmware.yaml`.
 
 The release CI builds `firmware/atom_lite.yaml` and publishes per-device binaries. Add a new device by creating `firmware/<device>.yaml`, packaging `core.yaml`, and adding a build step to `release.yml`.
+
+### Security model of the published firmware
+
+The release binary is public, so it must contain no credentials. `core.yaml` uses
+`api: encryption: {}` (each device gets a unique key from HA/the dashboard at adoption;
+ESPHome OTA is authenticated with it), `ota: esphome` without a password, and
+`provisioning: timeout: 15min` (EN 18031 setup window; power-cycle to reopen). Wi-Fi is set
+up via `improv_serial` or the fallback AP + captive portal. Do not reintroduce `!secret`
+keys or passwords into the published firmware; CI has no secrets for it.
 
 ### OTA update delivery
 

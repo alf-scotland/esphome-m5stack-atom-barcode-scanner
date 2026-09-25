@@ -16,14 +16,27 @@ external_components:
 logger:
   level: DEBUG
 
+# ── Security and onboarding ──────────────────────────────────────────────────
+# This firmware is published, so it contains no credentials: anything baked into a
+# public binary can be extracted by anyone who downloads it.
+#
+# - API: encrypted, with a key unique to each device. Home Assistant (or the ESPHome
+#   dashboard) sets it when the device is adopted; it is stored in flash and only a
+#   factory reset of the ESP removes it. Until then only the adopting client can set it.
+# - OTA: once the key is set, ESPHome uploads are authenticated and encrypted with it.
+# - provisioning: an unprovisioned device only accepts Wi-Fi setup and adoption during a
+#   window after power-up (EN 18031). If it closes, power-cycle the device to reopen it.
+# - Wi-Fi setup: over USB with Improv Serial right after flashing (web.esphome.io), or
+#   via the fallback access point and captive portal.
 api:
-  encryption:
-    key: !secret api_encryption_key
+  encryption: {}
 
 ota:
   - platform: esphome
-    password: !secret ota_password
   - platform: http_request
+
+provisioning:
+  timeout: 15min
 
 http_request:
   # GitHub release downloads redirect to a CDN with a long signed URL. The HTTP
@@ -36,6 +49,8 @@ wifi:
   ap:
 
 captive_portal:
+
+improv_serial:
 
 m5stack_barcode:
   id: barcode_scanner

@@ -64,18 +64,6 @@ jobs:
           fi
           echo "Version verified: $VERSION"
 
-      - name: Create secrets for release build
-        # Secrets are passed through the environment, never interpolated into the script.
-        env:
-          API_ENCRYPTION_KEY: ${{ secrets.API_ENCRYPTION_KEY }}
-          OTA_PASSWORD: ${{ secrets.OTA_PASSWORD }}
-        run: |
-          if [ -z "$API_ENCRYPTION_KEY" ] || [ -z "$OTA_PASSWORD" ]; then
-            echo "ERROR: the API_ENCRYPTION_KEY and OTA_PASSWORD repository secrets must be set"
-            exit 1
-          fi
-          printf 'api_encryption_key: "%s"\nota_password: "%s"\n' "$API_ENCRYPTION_KEY" "$OTA_PASSWORD" > firmware/secrets.yaml
-
       - name: Build firmware
         run: uv run esphome compile firmware/atom_lite.yaml
 

@@ -13,6 +13,7 @@
 #   Scan success                   → green flash 500ms, then led_off
 #   DLED triggered                 → yellow flash 200ms, then led_off
 #   Scan timeout                   → orange flash 500ms, then led_off
+#   Setup window closed            → red pulse (unprovisioned: power-cycle to retry)
 #
 # led_off is the canonical "return to correct idle state" script.
 # It checks scan state and connectivity rather than always turning the LED
@@ -78,7 +79,7 @@ light:
     default_transition_length: 0s
     chipset: SK6812
     num_leds: 1
-    rgb_order: grb
+    channel_colors: GRB
     disabled_by_default: true
     effects:
       - pulse:
@@ -95,6 +96,12 @@ switch:
     internal: true
 
 # ── Connectivity LED ──────────────────────────────────────────────────────────
+
+# The provisioning window is configured in core.yaml; show when it has closed on a
+# device that was never set up, because only a power cycle reopens it.
+provisioning:
+  on_timeout:
+    - script.execute: led_setup_window_closed
 
 wifi:
   on_connect:
@@ -188,6 +195,16 @@ script:
           effect: none
       - delay: 1000ms
       - script.execute: led_off
+
+  - id: led_setup_window_closed
+    then:
+      - light.turn_on:
+          id: atom_status_led
+          brightness: 50%
+          red: 100%
+          green: 0%
+          blue: 0%
+          effect: pulse
 
   # Scan states
   - id: led_manual_scan_start

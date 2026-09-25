@@ -98,7 +98,9 @@ Found with a host-platform build of the component driven by an emulated scanner
 | 40 | ✅ | Tests: codegen for every test YAML, enum/option consistency, host integration tests; CI compiles the test configs for ESP32 |
 | 41 | ✅ | CI: script injection and secret interpolation, release cache poisoning, clang-format 17 vs 22 drift, redundant uv-lockfile workflow |
 | 42 | ✅ | Firmware: dashboard adoption / `firmware.yaml` could not load the component; DLED buffer race; unlimited scan duration released the hardware trigger immediately |
-| 43 | ⏸ | Public release binaries embed the API encryption key and OTA password (extractable by anyone). Needs a maintainer decision — e.g. API key provisioning by Home Assistant instead of a baked-in key |
+| 43 | ✅ | Public release binaries embedded the API encryption key and OTA password. Now `api: encryption: {}` (per-device key provisioned at adoption, also authenticating OTA), no OTA password, a 15 min `provisioning:` window and Improv Serial; CI needs no secrets |
+| 45 | ✅ | Settings changed from HA were reverted on every reboot. YAML values are now initial values: runtime changes persist, a YAML value is re-applied only when edited (per-setting YAML baseline in NVS, v2 prefs migrated) |
+| 46 | ✅ | Second review: latest queued setting wins, NAK fails fast, UTF-8 sanitising and boundary-safe truncation, no optimistic entity state at boot, RX buffer size warning |
 | 44 | ⏸ | `pre-commit-autoupdate` PRs are opened with `GITHUB_TOKEN`, so CI does not run on them; needs a GitHub App or fine-grained PAT secret |
 
 ---

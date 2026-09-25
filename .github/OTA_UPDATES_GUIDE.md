@@ -112,21 +112,16 @@ safe_mode:
   num_attempts: 5
 ```
 
-### OTA with Password Protection
+### Authentication
 
-Protect OTA with a password in production to prevent unauthorised updates:
+The published firmware contains no password or key: anything baked into a public binary
+can be extracted by anyone who downloads it. Instead, each device gets its own API
+encryption key when it is adopted by Home Assistant or the ESPHome dashboard
+(`api: encryption: {}`); ESPHome OTA uploads are then authenticated and encrypted with that
+key. The key survives OTA updates and is only removed by a factory reset of the ESP.
 
-```yaml
-ota:
-  - platform: esphome
-    password: !secret ota_password
-```
-
-Store the password in `secrets.yaml`:
-
-```yaml
-ota_password: "your-strong-password-here"
-```
+If you build your own firmware from this repository, you can instead set a fixed key
+(`api: encryption: key: !secret ...`) as usual.
 
 ## Best Practices
 
