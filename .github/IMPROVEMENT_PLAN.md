@@ -101,6 +101,10 @@ Found with a host-platform build of the component driven by an emulated scanner
 | 43 | ✅ | Public release binaries embedded the API encryption key and OTA password. Now `api: encryption: {}` (per-device key provisioned at adoption, also authenticating OTA), no OTA password, a 15 min `provisioning:` window and Improv Serial; CI needs no secrets |
 | 45 | ✅ | Settings changed from HA were reverted on every reboot. YAML values are now initial values: runtime changes persist, a YAML value is re-applied only when edited (per-setting YAML baseline in NVS, v2 prefs migrated) |
 | 46 | ✅ | Second review: latest queued setting wins, NAK fails fast, UTF-8 sanitising and boundary-safe truncation, no optimistic entity state at boot, RX buffer size warning |
+| 47 | ✅ | Third review: settings table-driven from one protocol table (each setting was wired in ~20 places); command frames checked at compile time and against the PDF in tests; commands are plain values (no callbacks or per-command heap allocation); warning status while the scanner does not answer |
+| 48 | ✅ | Firmware: scan LED stuck blue when a start never began; Atom button did nothing in level/pulse mode; open fallback AP (captive portal accepts firmware uploads) no longer started on adopted devices |
+| 49 | ✅ | Release: build provenance attestation, stable tags must be on `main`, `gh release` instead of a third-party action; `SECURITY.md` |
+| 50 | ⏸ | Scanner state can drift from HA when settings are changed by scanning configuration barcodes (`config_code_scan_mode: enabled`, the scanner default): the documented protocol has no way to read settings back. The opcodes appear to follow Zebra's SSI protocol (C6 parameter send, D0/D1 ACK/NAK, A3/A4 revision, E4/E5 start/stop decode), whose parameter request (0xC7) might read them back — to be tried on hardware before relying on it |
 | 44 | ⏸ | `pre-commit-autoupdate` PRs are opened with `GITHUB_TOKEN`, so CI does not run on them; needs a GitHub App or fine-grained PAT secret |
 
 ---
