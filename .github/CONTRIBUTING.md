@@ -121,8 +121,9 @@ See `.github/BRANCHING_AND_RELEASES.md` for full details.
 - Protocol behaviour (ACKs, framing, timeouts) is covered by `tests/integration/`, which
   runs the component on ESPHome's host platform against `fake_scanner.py`; extend the
   emulator when you rely on new scanner behaviour
-- When adding a setting, keep the option order in `__init__.py`, the C++ enum and the
-  option tables in `types.cpp` identical (`tests/test_enum_consistency.py` checks this)
+- When adding a setting, append its `SettingId`, add its option keys and PDF frames to
+  `commands.cpp` and a `Setting` row to `__init__.py` (`tests/test_setting_tables.py`
+  checks that they agree and that every frame matches the PDF)
 
 ## Documentation
 

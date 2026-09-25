@@ -68,17 +68,17 @@ uv run pre-commit install
 
 **Python layer** (`components/m5stack_barcode/__init__.py`):
 - Validates and parses the user's YAML config; `FINAL_VALIDATE_SCHEMA` enforces a 9600 baud UART with TX and RX
-- Table-driven: one `Setting` entry per scanner setting defines its YAML option, default, HA entity and `set_*` action
+- Table-driven: one `Setting` entry per scanner setting defines its YAML option keys, default, HA entity (with its default `entity_category: config` and icon) and `set_*` action
 - Generates C++ via `cg`, using the entity factories (`select.new_select`, `switch.new_switch`, `button.new_button`, …) and `cg.register_parented`
 - Must use schema factory functions: `select.select_schema(X)`, `switch.switch_schema(X)`, `button.button_schema(X)`, `binary_sensor.binary_sensor_schema()` — never `.extend()` on the private `_*_SCHEMA` objects
-- Option dicts must list keys in C++ enum order: a select's option index is cast straight to the enum (`tests/test_enum_consistency.py` enforces this)
+- A setting value is an index into its option keys everywhere (select option index, `set_initial_value()`, C++ tables, NVS), so the option lists must match the tables in `commands.cpp` (`tests/test_setting_tables.py` enforces this, and checks every frame against the PDF)
 
 **C++ layer** (the runtime):
-- `m5stack_barcode.h/.cpp` — `BarcodeScanner` extends `Component` + `uart::UARTDevice`: command queue, RX framing, settings state, NVS. The header also defines the HA entities as `Parented<BarcodeScanner>` templates (`SettingSelect`, `SettingSwitch`, `ScannerButton`) — entities are not `Component`s
-- `types.h/.cpp` — enums for scanner settings (order is load-bearing, see the header comment), option-key parsers and log-string helpers
-- `commands.h/.cpp` — static byte arrays for every UART command, derived from the manufacturer PDFs
-- `command.h/.cpp` — `Command` (bytes + ACK/failure callbacks) and `CommandFactory`, which maps each setting value to its command via per-setting tables indexed by enum value
-- `automation.h` — triggers, actions (`ScannerMethodAction`, `SetSettingAction` aliases) and conditions; all `Parented<BarcodeScanner>`, registered `synchronous=True`. All `play()`/`check()` signatures use `const Ts &...x`
+- `m5stack_barcode.h/.cpp` — `BarcodeScanner` extends `Component` + `uart::UARTDevice`: command queue, RX framing, settings state, NVS. The header also defines the HA entities as `Parented<BarcodeScanner>` templates (`SettingSelect<SettingId>`, `SettingSwitch<SettingId>`, `ScannerButton`) — entities are not `Component`s
+- `commands.h/.cpp` — the UART protocol: fixed frames (start/stop, version, factory reset, ACK/NAK), `SettingId` (its order is the NVS layout: append only) and one `SettingInfo` per setting holding its option keys and the PDF frame for each value. Frame length bytes and checksums are verified at compile time (`static_assert`)
+- The queue holds plain `Command` values (type, setting, value); `finish_command_()` applies each command's outcome, so there are no per-command callbacks or heap allocations
+- `automation.h` — triggers, actions (`ScannerMethodAction` aliases, `SetSettingAction<SettingId>`) and conditions; all `Parented<BarcodeScanner>`, registered `synchronous=True`. All `play()`/`check()` signatures use `const Ts &...x`
+- Adding a setting: a `SettingId` entry (at the end), its option keys and frames in `commands.cpp`, a `Setting` row in `__init__.py`, and docs
 
 ### Data flow
 
@@ -94,7 +94,7 @@ YAML → __init__.py (validate + codegen) → C++ component instantiation
 ```
 
 ### Key runtime behaviours
-- **Command queue**: commands are enqueued and sent one at a time; the scanner must ACK before the next command is sent; unacknowledged commands are retried once, then dropped. The ACK is searched for anywhere in the RX buffer and only its 6 bytes are consumed, so barcode data around it survives
+- **Command queue**: commands are enqueued and sent one at a time; the scanner must ACK before the next command is sent; unacknowledged commands are retried once, then dropped and the component shows a warning status ("Scanner not responding") until the scanner answers again. The ACK is searched for anywhere in the RX buffer and only its 6 bytes are consumed, so barcode data around it survives
 - **Barcode framing**: barcode output is unframed in every operation mode — a barcode ends at the configured terminator or after a 20 ms idle gap. The PDF's `05 D1 00 00 06 FF 24` is only the reply to start/stop decoding outside host mode, not a delimiter
 - **Settings apply on ACK**: in-memory state, NVS and HA entities change only in the `set_*_state()` callbacks run when the scanner ACKs; the scan state follows the ACKed operation mode
 - **Settings persistence**: `ScannerPreferences` (NVS, `SETTINGS_VERSION=3`) stores the values the scanner applied *and* the YAML values the device last booted with. At boot a setting keeps its stored value (so changes from HA survive reboots and OTA) unless its YAML value was edited since, in which case the YAML value is sent. Version-2 preferences (applied values only, older key) are migrated once

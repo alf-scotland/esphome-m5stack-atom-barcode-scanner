@@ -18,10 +18,18 @@ from esphome.components import (
     text_sensor,
     uart,
 )
-from esphome.const import CONF_ID, CONF_RX_BUFFER_SIZE, CONF_TRIGGER_ID, CONF_UART_ID
+from esphome.const import (
+    CONF_ID,
+    CONF_RX_BUFFER_SIZE,
+    CONF_TRIGGER_ID,
+    CONF_UART_ID,
+    DEVICE_CLASS_RESTART,
+    ENTITY_CATEGORY_CONFIG,
+    ENTITY_CATEGORY_DIAGNOSTIC,
+)
 
 if TYPE_CHECKING:
-    from esphome.cpp_generator import MockObj, MockObjClass
+    from esphome.cpp_generator import MockObj
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,146 +59,41 @@ CONF_ON_SCAN_TIMEOUT = "on_scan_timeout"
 EVENT_TYPE_SCAN_SUCCESSFUL = "scan_successful"
 
 
-def _enum(
-    name: str,
-    options: dict[str, str],
-) -> tuple[MockObjClass, dict[str, MockObj]]:
-    """Map YAML option keys to C++ enumerators, preserving the enum order."""
-    enum = m5stack_barcode_ns.enum(name, is_class=True)
-    return enum, {key: getattr(enum, value) for key, value in options.items()}
+SettingId = m5stack_barcode_ns.enum("SettingId", is_class=True)
+SettingSelect = m5stack_barcode_ns.class_("SettingSelect", select.Select, _Parented)
+SettingSwitch = m5stack_barcode_ns.class_("SettingSwitch", switch.Switch, _Parented)
+SetSettingAction = m5stack_barcode_ns.class_(
+    "SetSettingAction",
+    automation.Action,
+    _Parented,
+)
 
-
-# Every dict below lists the options in C++ enum declaration order (types.h): the select
-# option index is the enum value.  tests/test_enum_consistency.py enforces this.
-OperationMode, OPERATION_MODES = _enum(
-    "OperationMode",
-    {
-        "host": "HOST",
-        "level": "LEVEL",
-        "pulse": "PULSE",
-        "continuous": "CONTINUOUS",
-        "auto_sense": "AUTO_SENSE",
-    },
-)
-Terminator, TERMINATORS = _enum(
-    "Terminator",
-    {
-        "none": "NONE",
-        "crlf": "CRLF",
-        "cr": "CR",
-        "tab": "TAB",
-        "crcr": "CRCR",
-        "crlfcrlf": "CRLFCRLF",
-    },
-)
-LightMode, LIGHT_MODES = _enum(
-    "LightMode",
-    {
-        "on_when_reading": "LIGHT_ON_WHEN_READING",
-        "always_on": "LIGHT_ALWAYS_ON",
-        "always_off": "LIGHT_ALWAYS_OFF",
-    },
-)
-LocateLightMode, LOCATE_LIGHT_MODES = _enum(
-    "LocateLightMode",
-    {
-        "on_when_reading": "LOCATE_LIGHT_ON_WHEN_READING",
-        "always_on": "LOCATE_LIGHT_ALWAYS_ON",
-        "always_off": "LOCATE_LIGHT_ALWAYS_OFF",
-    },
-)
-BuzzerVolume, BUZZER_VOLUMES = _enum(
-    "BuzzerVolume",
-    {
-        "high": "BUZZER_VOLUME_HIGH",
-        "medium": "BUZZER_VOLUME_MEDIUM",
-        "low": "BUZZER_VOLUME_LOW",
-    },
-)
-ScanDuration, SCAN_DURATIONS = _enum(
-    "ScanDuration",
-    {
-        "500ms": "MS_500",
-        "1s": "MS_1000",
-        "3s": "MS_3000",
-        "5s": "MS_5000",
-        "10s": "MS_10000",
-        "15s": "MS_15000",
-        "20s": "MS_20000",
-        "unlimited": "UNLIMITED",
-    },
-)
-_INTERVALS = {
-    "0ms": "MS_0",
-    "100ms": "MS_100",
-    "300ms": "MS_300",
-    "500ms": "MS_500",
-    "1s": "MS_1000",
-    "1.5s": "MS_1500",
-    "2s": "MS_2000",
-}
-StableInductionTime, STABLE_INDUCTION_TIMES = _enum(
-    "StableInductionTime",
-    {key: _INTERVALS[key] for key in ("0ms", "100ms", "300ms", "500ms", "1s")},
-)
-ReadingInterval, READING_INTERVALS = _enum("ReadingInterval", _INTERVALS)
-SameCodeInterval, SAME_CODE_INTERVALS = _enum("SameCodeInterval", _INTERVALS)
-
-
-def _on_off_enum(
-    name: str,
-    prefix: str,
-) -> tuple[MockObjClass, dict[str, MockObj]]:
-    return _enum(
-        name,
-        {"disabled": f"{prefix}_DISABLED", "enabled": f"{prefix}_ENABLED"},
-    )
-
-
-SoundMode, SOUND_MODES = _on_off_enum("SoundMode", "SOUND")
-BootSoundMode, BOOT_SOUND_MODES = _on_off_enum("BootSoundMode", "BOOT_SOUND")
-DecodeSoundMode, DECODE_SOUND_MODES = _on_off_enum("DecodeSoundMode", "DECODE_SOUND")
-DecodingSuccessLightMode, DECODING_SUCCESS_LIGHT_MODES = _on_off_enum(
-    "DecodingSuccessLightMode",
-    "DECODING_LIGHT",
-)
-CmdAckSoundMode, CMD_ACK_SOUND_MODES = _on_off_enum("CmdAckSoundMode", "CMD_ACK_SOUND")
-ConfigCodeScanMode, CONFIG_CODE_SCAN_MODES = _on_off_enum(
-    "ConfigCodeScanMode",
-    "CONFIG_CODE_SCAN",
-)
+_ON_OFF = ["disabled", "enabled"]
+_LIGHT_MODES = ["on_when_reading", "always_on", "always_off"]
+_INTERVALS = ["0ms", "100ms", "300ms", "500ms", "1s", "1.5s", "2s"]
 
 
 class Setting(NamedTuple):
     """A scanner setting: YAML option, optional HA entity and set action."""
 
-    key: str  # YAML key; C++ uses set_<key>_initial() and set_<entity_key>()
-    options: dict[str, MockObj]
+    key: str  # YAML key; the C++ SettingId is its upper-case form
+    # Option keys; a value is sent to C++ as its index, so the order must match the
+    # tables in commands.cpp (tests/test_setting_tables.py checks this).
+    options: list[str]
     default: str
     entity_key: str  # "<...>_select" or "<...>_switch"
-    entity_class: str
+    icon: str
     action: str  # m5stack_barcode.<action>
-    action_class: str
+
+    @property
+    def id(self) -> MockObj:
+        """The C++ SettingId."""
+        return getattr(SettingId, self.key.upper())
 
     @property
     def is_select(self) -> bool:
         """Whether the setting is exposed as a select (else a switch)."""
         return self.entity_key.endswith("_select")
-
-    @property
-    def entity_type(self) -> MockObjClass:
-        """C++ class of the HA entity."""
-        base = select.Select if self.is_select else switch.Switch
-        return m5stack_barcode_ns.class_(self.entity_class, base, _Parented)
-
-    @property
-    def action_type(self) -> MockObjClass:
-        """C++ class of the set action."""
-        return m5stack_barcode_ns.class_(
-            self.action_class,
-            automation.Action,
-            _Parented,
-        )
 
 
 # Defaults match the scanner's factory defaults except sound_mode, buzzer_volume and
@@ -198,153 +101,143 @@ class Setting(NamedTuple):
 SETTINGS = [
     Setting(
         "operation_mode",
-        OPERATION_MODES,
+        ["host", "level", "pulse", "continuous", "auto_sense"],
         "host",
         "operation_mode_select",
-        "OperationModeSelect",
+        "mdi:tune",
         "set_mode",
-        "SetModeAction",
     ),
     Setting(
         "terminator",
-        TERMINATORS,
+        ["none", "crlf", "cr", "tab", "crcr", "crlfcrlf"],
         "none",
         "terminator_select",
-        "TerminatorSelect",
+        "mdi:keyboard-return",
         "set_terminator",
-        "SetTerminatorAction",
     ),
     Setting(
         "light_mode",
-        LIGHT_MODES,
+        _LIGHT_MODES,
         "on_when_reading",
         "light_mode_select",
-        "LightModeSelect",
+        "mdi:lightbulb",
         "set_light_mode",
-        "SetLightModeAction",
     ),
     Setting(
         "locate_light_mode",
-        LOCATE_LIGHT_MODES,
+        _LIGHT_MODES,
         "on_when_reading",
         "locate_light_mode_select",
-        "LocateLightModeSelect",
+        "mdi:crosshairs",
         "set_locate_light_mode",
-        "SetLocateLightModeAction",
-    ),
-    Setting(
-        "buzzer_volume",
-        BUZZER_VOLUMES,
-        "low",
-        "buzzer_volume_select",
-        "BuzzerVolumeSelect",
-        "set_buzzer_volume",
-        "SetBuzzerVolumeAction",
-    ),
-    Setting(
-        "scan_duration",
-        SCAN_DURATIONS,
-        "3s",
-        "scan_duration_select",
-        "ScanDurationSelect",
-        "set_scan_duration",
-        "SetScanDurationAction",
-    ),
-    Setting(
-        "stable_induction_time",
-        STABLE_INDUCTION_TIMES,
-        "500ms",
-        "stable_induction_time_select",
-        "StableInductionTimeSelect",
-        "set_stable_induction_time",
-        "SetStableInductionTimeAction",
-    ),
-    Setting(
-        "reading_interval",
-        READING_INTERVALS,
-        "500ms",
-        "reading_interval_select",
-        "ReadingIntervalSelect",
-        "set_reading_interval",
-        "SetReadingIntervalAction",
-    ),
-    Setting(
-        "same_code_interval",
-        SAME_CODE_INTERVALS,
-        "500ms",
-        "same_code_interval_select",
-        "SameCodeIntervalSelect",
-        "set_same_code_interval",
-        "SetSameCodeIntervalAction",
     ),
     Setting(
         "sound_mode",
-        SOUND_MODES,
+        _ON_OFF,
         "disabled",
         "sound_switch",
-        "SoundSwitch",
+        "mdi:volume-high",
         "set_sound_mode",
-        "SetSoundModeAction",
     ),
     Setting(
-        "boot_sound_mode",
-        BOOT_SOUND_MODES,
-        "disabled",
-        "boot_sound_switch",
-        "BootSoundSwitch",
-        "set_boot_sound_mode",
-        "SetBootSoundModeAction",
-    ),
-    Setting(
-        "decode_sound_mode",
-        DECODE_SOUND_MODES,
-        "enabled",
-        "decode_sound_switch",
-        "DecodeSoundSwitch",
-        "set_decode_sound_mode",
-        "SetDecodeSoundModeAction",
+        "buzzer_volume",
+        ["high", "medium", "low"],
+        "low",
+        "buzzer_volume_select",
+        "mdi:volume-medium",
+        "set_buzzer_volume",
     ),
     Setting(
         "decoding_success_light_mode",
-        DECODING_SUCCESS_LIGHT_MODES,
+        _ON_OFF,
         "enabled",
         "decoding_success_light_switch",
-        "DecodingSuccessLightSwitch",
+        "mdi:led-on",
         "set_decoding_success_light_mode",
-        "SetDecodingSuccessLightModeAction",
+    ),
+    Setting(
+        "boot_sound_mode",
+        _ON_OFF,
+        "disabled",
+        "boot_sound_switch",
+        "mdi:power",
+        "set_boot_sound_mode",
+    ),
+    Setting(
+        "decode_sound_mode",
+        _ON_OFF,
+        "enabled",
+        "decode_sound_switch",
+        "mdi:volume-source",
+        "set_decode_sound_mode",
+    ),
+    Setting(
+        "scan_duration",
+        ["500ms", "1s", "3s", "5s", "10s", "15s", "20s", "unlimited"],
+        "3s",
+        "scan_duration_select",
+        "mdi:timer",
+        "set_scan_duration",
+    ),
+    Setting(
+        "stable_induction_time",
+        _INTERVALS[:5],
+        "500ms",
+        "stable_induction_time_select",
+        "mdi:timer-sand",
+        "set_stable_induction_time",
+    ),
+    Setting(
+        "reading_interval",
+        _INTERVALS,
+        "500ms",
+        "reading_interval_select",
+        "mdi:timer-outline",
+        "set_reading_interval",
+    ),
+    Setting(
+        "same_code_interval",
+        _INTERVALS,
+        "500ms",
+        "same_code_interval_select",
+        "mdi:timer-refresh",
+        "set_same_code_interval",
     ),
     Setting(
         "cmd_ack_sound_mode",
-        CMD_ACK_SOUND_MODES,
+        _ON_OFF,
         "enabled",
         "cmd_ack_sound_switch",
-        "CmdAckSoundSwitch",
+        "mdi:bell-check",
         "set_cmd_ack_sound_mode",
-        "SetCmdAckSoundModeAction",
     ),
     Setting(
         "config_code_scan_mode",
-        CONFIG_CODE_SCAN_MODES,
+        _ON_OFF,
         "enabled",
         "config_code_scan_switch",
-        "ConfigCodeScanSwitch",
+        "mdi:barcode-off",
         "set_config_code_scan_mode",
-        "SetConfigCodeScanModeAction",
     ),
 ]
 
-# Buttons: config key -> C++ class (each calls one BarcodeScanner method)
+# Buttons: config key -> (C++ class, schema defaults), each calling a scanner method
 BUTTONS = {
-    CONF_START_BUTTON: m5stack_barcode_ns.class_(
-        "StartButton",
-        button.Button,
-        _Parented,
+    CONF_START_BUTTON: (
+        m5stack_barcode_ns.class_("StartButton", button.Button, _Parented),
+        {"icon": "mdi:play-circle-outline"},
     ),
-    CONF_STOP_BUTTON: m5stack_barcode_ns.class_("StopButton", button.Button, _Parented),
-    CONF_FACTORY_RESET_BUTTON: m5stack_barcode_ns.class_(
-        "FactoryResetButton",
-        button.Button,
-        _Parented,
+    CONF_STOP_BUTTON: (
+        m5stack_barcode_ns.class_("StopButton", button.Button, _Parented),
+        {"icon": "mdi:stop-circle-outline"},
+    ),
+    CONF_FACTORY_RESET_BUTTON: (
+        m5stack_barcode_ns.class_("FactoryResetButton", button.Button, _Parented),
+        {
+            "device_class": DEVICE_CLASS_RESTART,
+            "entity_category": ENTITY_CATEGORY_CONFIG,
+            "icon": "mdi:restart-alert",
+        },
     ),
 }
 
@@ -402,21 +295,38 @@ ScanTimeoutTrigger = m5stack_barcode_ns.class_(
 
 def _entity_schema(setting: Setting) -> cv.Schema:
     if setting.is_select:
-        return select.select_schema(setting.entity_type)
+        return select.select_schema(
+            SettingSelect.template(setting.id),
+            entity_category=ENTITY_CATEGORY_CONFIG,
+            icon=setting.icon,
+        )
     # The state comes from the scanner (ACKed value), not from a restored switch state.
-    return switch.switch_schema(setting.entity_type, default_restore_mode="DISABLED")
+    return switch.switch_schema(
+        SettingSwitch.template(setting.id),
+        entity_category=ENTITY_CATEGORY_CONFIG,
+        icon=setting.icon,
+        default_restore_mode="DISABLED",
+    )
 
 
 CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(BarcodeScanner),
-            cv.Optional(CONF_BARCODE_SENSOR): text_sensor.text_sensor_schema(),
-            cv.Optional(CONF_VERSION_SENSOR): text_sensor.text_sensor_schema(),
-            cv.Optional(CONF_SCAN_EVENT): event.event_schema(event.Event),
+            cv.Optional(CONF_BARCODE_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:barcode",
+            ),
+            cv.Optional(CONF_VERSION_SENSOR): text_sensor.text_sensor_schema(
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+                icon="mdi:information-outline",
+            ),
+            cv.Optional(CONF_SCAN_EVENT): event.event_schema(
+                event.Event,
+                icon="mdi:barcode-scan",
+            ),
             cv.Optional(
                 CONF_SCANNING_BINARY_SENSOR,
-            ): binary_sensor.binary_sensor_schema(),
+            ): binary_sensor.binary_sensor_schema(icon="mdi:barcode-scan"),
             cv.Optional(CONF_ON_BARCODE): automation.validate_automation(
                 {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger)},
             ),
@@ -424,11 +334,11 @@ CONFIG_SCHEMA = (
                 {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ScanTimeoutTrigger)},
             ),
             **{
-                cv.Optional(key): button.button_schema(cls)
-                for key, cls in BUTTONS.items()
+                cv.Optional(key): button.button_schema(cls, **defaults)
+                for key, (cls, defaults) in BUTTONS.items()
             },
             **{
-                cv.Optional(s.key, default=s.default): cv.enum(s.options, lower=True)
+                cv.Optional(s.key, default=s.default): cv.one_of(*s.options, lower=True)
                 for s in SETTINGS
             },
             **{cv.Optional(s.entity_key): _entity_schema(s) for s in SETTINGS},
@@ -477,14 +387,16 @@ async def _setting_to_code(
     setting: Setting,
     config: dict[str, Any],
 ) -> None:
-    cg.add(getattr(var, f"set_{setting.key}_initial")(config[setting.key]))
+    value = setting.options.index(config[setting.key])
+    cg.add(var.set_initial_value(setting.id, value))
     if conf := config.get(setting.entity_key):
         if setting.is_select:
-            entity = await select.new_select(conf, options=list(setting.options))
+            entity = await select.new_select(conf, options=setting.options)
+            cg.add(var.set_select(setting.id, entity))
         else:
             entity = await switch.new_switch(conf)
+            cg.add(var.set_switch(setting.id, entity))
         await cg.register_parented(entity, var)
-        cg.add(getattr(var, f"set_{setting.entity_key}")(entity))
 
 
 async def to_code(config: dict[str, Any]) -> None:
@@ -555,7 +467,11 @@ def _register_setting_action(setting: Setting) -> None:
         template_arg: cg.TemplateArguments,
         args: list[tuple[Any, str]],
     ) -> MockObj:
-        var = await _parented_to_code(config, action_id, template_arg, args)
+        var = cg.new_Pvariable(
+            action_id,
+            cg.TemplateArguments(setting.id, *template_arg),
+        )
+        await cg.register_parented(var, config[CONF_ID])
         # Static values are passed as their option key; lambdas must return one too.
         value = await cg.templatable(config[setting.key], args, cg.std_string)
         cg.add(var.set_value(value))
@@ -571,7 +487,7 @@ def _register_setting_action(setting: Setting) -> None:
     )
     automation.register_action(
         f"m5stack_barcode.{setting.action}",
-        setting.action_type,
+        SetSettingAction,
         schema,
         synchronous=True,
     )(_to_code)
