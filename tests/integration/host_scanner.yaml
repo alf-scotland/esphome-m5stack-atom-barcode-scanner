@@ -20,7 +20,7 @@ esphome:
           terminator: !lambda 'const char *v = getenv("SIM_TERMINATOR"); return std::string(v ? v : "crlf");'
       - m5stack_barcode.set_scan_duration:
           id: scanner
-          scan_duration: 1s
+          scan_duration: !lambda 'const char *v = getenv("SIM_DURATION"); return std::string(v ? v : "1s");'
       - wait_until:
           condition:
             lambda: 'return id(version).has_state();'
@@ -51,6 +51,50 @@ esphome:
             - m5stack_barcode.set_buzzer_volume:
                 id: scanner
                 buzzer_volume: high
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_STOP") != nullptr;'
+          then:
+            - delay: 300ms
+            - m5stack_barcode.stop: scanner
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_BAD_VALUE") != nullptr;'
+          then:
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: !lambda 'return std::string("loud");'
+            - lambda: 'id(scanner).set_setting(m5stack_barcode::SettingId::BUZZER_VOLUME, 7);'
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_SOUND") != nullptr;'
+          then:
+            - m5stack_barcode.set_sound_mode:
+                id: scanner
+                sound_mode: enabled
+      - if:
+          # Leave host mode while a scan started above is still running.
+          condition:
+            lambda: 'return getenv("SIM_CONTINUOUS_DURING_SCAN") != nullptr;'
+          then:
+            - delay: 200ms
+            - m5stack_barcode.set_mode:
+                id: scanner
+                operation_mode: continuous
+      - if:
+          # A command well after boot (e.g. once an unresponsive scanner answers again).
+          condition:
+            lambda: 'return getenv("SIM_LATE_VOLUME") != nullptr;'
+          then:
+            - delay: 7s
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: high
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_FACTORY_RESET") != nullptr;'
+          then:
+            - m5stack_barcode.factory_reset: scanner
 
 host:
 
@@ -72,6 +116,24 @@ uart:
 m5stack_barcode:
   id: scanner
   uart_id: uart_bus
+  barcode_sensor:
+    name: Last Barcode
+    on_value:
+      - logger.log:
+          format: "SENSOR[%s]"
+          args: ["x.c_str()"]
+  scan_event:
+    name: Barcode Scanned
+    on_event:
+      - logger.log:
+          format: "EVENT[%s]"
+          args: ["event_type.c_str()"]
+  sound_switch:
+    name: Sound
+    on_state:
+      - logger.log:
+          format: "SOUND[%d]"
+          args: ["x"]
   version_sensor:
     id: version
     name: Version
@@ -87,6 +149,7 @@ m5stack_barcode:
           args: ["x.c_str()"]
   scanning_binary_sensor:
     name: Scanning
+    trigger_on_initial_state: true  # also log the state published at boot
     on_state:
       - logger.log:
           format: "SCANNING[%d]"

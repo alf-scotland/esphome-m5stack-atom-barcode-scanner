@@ -1,15 +1,19 @@
 """Emulates the M5Stack Atom QR scanner's UART protocol on a pseudo-terminal.
 
 Implements the parts of ATOM_QRCODE_CMD_EN.pdf the component relies on: the 0x00
-wake-up byte, the 04 D0 00 00 FF 2C ACK for every setting command and for
-start/stop decoding in host mode, the unframed GET_VERSION response and unframed
-barcode output followed by the configured terminator.
+wake-up byte (a sleeping scanner ignores a command that does not follow it by at least
+50 ms; the fake treats the scanner as asleep before every command), the
+04 D0 00 00 FF 2C ACK for every setting command and for start/stop decoding in host
+mode, the NAK for start/stop outside it, the unframed GET_VERSION response and unframed
+barcode output followed by the configured terminator. Output is paced like a 9600 baud
+line (about 1 ms per byte).
 """
 
 from __future__ import annotations
 
 import os
 import pty
+import queue
 import threading
 import time
 import tty
@@ -34,6 +38,8 @@ OP_STOP = 0xE5
 PARAM_MODE = 0x8A
 PARAM_F2 = 0xF2
 F2_TERMINATOR = 0x05
+BYTE_TIME = 10 / 9600  # 8N1 at 9600 baud
+WAKE_DELAY = 0.045  # 50 ms per the PDF, less a little for scheduling jitter
 
 
 class FakeScanner:
@@ -57,26 +63,56 @@ class FakeScanner:
         self.barcode = b"HELLO-123"
         # Parameter bytes (frame[5]) of setting commands to NAK instead of ACK.
         self.nak_params: set[int] = set()
+        # Reply to GET_VERSION (None: no reply at all).
+        self.version_response: bytes | None = VERSION_RESPONSE
         self.received: list[bytes] = []
+        # Frames ignored because they did not follow a wake-up byte by WAKE_DELAY.
+        self.ignored: list[bytes] = []
+        self._woken_at: float | None = None
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
+        # Output goes through a writer thread, so pacing and reply delays never hold up
+        # reading (the wake-up timing is measured on arrival).
+        self._out: queue.Queue[tuple[bytes | float, bool | None]] = queue.Queue()
+        self._writer = threading.Thread(target=self._write, daemon=True)
 
     def __enter__(self) -> Self:
         """Start serving the protocol."""
         self._thread.start()
+        self._writer.start()
         return self
 
     def __exit__(self, *exc: object) -> None:
         """Stop serving and release the pty."""
         self._stop.set()
         self._thread.join(timeout=2)
+        self._writer.join(timeout=2)
         os.close(self._master)
         os.close(self._slave)
         self.link.unlink(missing_ok=True)
 
-    def emit(self, data: bytes) -> None:
-        """Send raw bytes to the firmware (e.g. a spontaneous continuous-mode scan)."""
-        os.write(self._master, data)
+    def emit(self, data: bytes, *, paced: bool = True) -> None:
+        """Queue bytes for the firmware: at line speed, or at once if not `paced`."""
+        self._out.put((data, paced))
+
+    def pause(self, seconds: float) -> None:
+        """Queue a pause in the output."""
+        self._out.put((seconds, None))
+
+    def _write(self) -> None:
+        while not self._stop.is_set():
+            try:
+                item, paced = self._out.get(timeout=0.05)
+            except queue.Empty:
+                continue
+            if paced is None:
+                time.sleep(item)
+            elif not paced:
+                os.write(self._master, item)
+            else:
+                for byte in item:
+                    os.write(self._master, bytes([byte]))
+                    time.sleep(BYTE_TIME)
 
     def emit_barcode(self, barcode: bytes) -> None:
         """Send a barcode followed by the currently configured terminator."""
@@ -87,9 +123,9 @@ class FakeScanner:
         op = frame[1]
         if op == OP_SETTING:
             self._handle_setting(frame)
-        elif op == OP_VERSION:
-            time.sleep(0.07)
-            self.emit(VERSION_RESPONSE)
+        elif op == OP_VERSION and self.version_response is not None:
+            self.pause(0.07)
+            self.emit(self.version_response)
         elif op in (OP_START, OP_STOP):
             self._handle_start_stop(op)
 
@@ -110,11 +146,11 @@ class FakeScanner:
         if self.mode != "host" or (start and self.start_reply == "nak"):
             self.emit(NAK)
         elif start and self.start_reply == "burst":
-            self.emit(ACK + self.barcode + self.terminator)
+            self.emit(ACK + self.barcode + self.terminator, paced=False)
         else:
             self.emit(ACK)
             if start and self.start_reply == "scan":
-                time.sleep(0.3)
+                self.pause(0.3)
                 self.emit_barcode(self.barcode)
 
     def _run(self) -> None:
@@ -125,9 +161,19 @@ class FakeScanner:
                 buf += os.read(self._master, 256)
             except (BlockingIOError, OSError):
                 time.sleep(0.002)
-            buf = buf.lstrip(b"\x00")  # wake-up bytes
+            buf = self._wake(buf)
             # Every command frame is: length byte, <length> bytes, 2-byte checksum.
             while buf and len(buf) >= buf[0] + 2:
                 frame, buf = buf[: buf[0] + 2], buf[buf[0] + 2 :]
-                self._handle(frame)
-                buf = buf.lstrip(b"\x00")
+                woken_at, self._woken_at = self._woken_at, None
+                if woken_at is None or time.monotonic() - woken_at < WAKE_DELAY:
+                    self.ignored.append(frame)
+                else:
+                    self._handle(frame)
+                buf = self._wake(buf)
+
+    def _wake(self, buf: bytes) -> bytes:
+        """Consume leading wake-up bytes, noting when the scanner woke."""
+        if buf.startswith(b"\x00"):
+            self._woken_at = time.monotonic()
+        return buf.lstrip(b"\x00")
