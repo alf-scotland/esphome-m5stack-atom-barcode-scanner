@@ -88,7 +88,9 @@ See [RELEASING.md](RELEASING.md).
 
 ## Testing
 
-- Test your changes with actual hardware whenever possible
+- Test your changes on hardware with the PR's firmware artifact, following
+  [`tests/hardware/TEST_PLAN.md`](../tests/hardware/TEST_PLAN.md): the steps your change
+  touches, or the whole plan before a release
 - Ensure your code works with the pinned ESPHome release (`pyproject.toml`)
 - Protocol behaviour (ACKs, framing, timeouts) is covered by `tests/integration/`, which
   runs the component on ESPHome's host platform against `fake_scanner.py`; extend the
