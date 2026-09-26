@@ -274,6 +274,8 @@ def test_host_scan_publishes_barcode(run: callable) -> None:
     firmware.wait_for(r"BARCODE\[HELLO-123\]")
     firmware.wait_for(r"EVENT\[scan_successful\]")
     firmware.assert_absent(r"SCAN_TIMEOUT", duration=1.5)  # scan_duration is 1 s
+    # Nor before the barcode: the timeout runs from the start ACK, 1 s before it fires.
+    assert not any("SCAN_TIMEOUT" in line for line in firmware.lines)
 
 
 @pytest.mark.parametrize("terminator", ["none", "cr", "tab", "crcr", "crlfcrlf"])
@@ -486,6 +488,13 @@ def test_barcodes_are_published_as_valid_utf8(
     scanner.emit_barcode(payload)
     match = firmware.wait_for(r"BARCODE\[(.*)\]")
     assert match.group(1) == expected
+    # The log decodes as UTF-8 with replacement too, so also check the firmware's count.
+    replaced = expected.count("\ufffd")
+    warnings = [line for line in firmware.lines if "invalid sequence(s)" in line]
+    if replaced:
+        assert f"replaced {replaced} invalid" in warnings[-1]
+    else:
+        assert not warnings
 
 
 # Values of host_scanner.yaml's m5stack_barcode options (option indices, in SettingId

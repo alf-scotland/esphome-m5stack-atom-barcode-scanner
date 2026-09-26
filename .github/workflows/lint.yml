@@ -154,7 +154,7 @@ jobs:
         run: >-
           uv run gcovr --root tests/integration/.esphome/build/m5stack-barcode-sim
           --filter '.*/components/m5stack_barcode/'
-          --txt --markdown "$GITHUB_STEP_SUMMARY" --fail-under-line 80
+          --txt --markdown "$GITHUB_STEP_SUMMARY" --fail-under-line 90
           tests/integration/.esphome/build/m5stack-barcode-sim
 
   component-compile:
