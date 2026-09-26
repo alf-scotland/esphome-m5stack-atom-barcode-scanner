@@ -215,10 +215,12 @@ void BarcodeScanner::publish_setting_(SettingId id) {
 void BarcodeScanner::apply_setting_(SettingId id, uint8_t value) {
   const size_t i = static_cast<size_t>(id);
   ESP_LOGD(TAG, "%s set to %s", info(i).key, info(i).values[value]);
+  const bool changed = this->settings_[i] != value;
   this->settings_[i] = value;
   this->save_settings_();
-  if (id == SettingId::OPERATION_MODE) {
-    // Continuous/auto-sense scan on their own; leaving them (or HOST mode mid-scan) ends any scan.
+  if (id == SettingId::OPERATION_MODE && changed) {
+    // Continuous/auto-sense scan on their own; leaving them (or host mode mid-scan) ends any
+    // scan.  Re-applying the same mode (e.g. at boot) leaves a scan that was just started alone.
     this->scan_timer_active_ = false;
     this->set_scan_state_(this->is_continuous_mode() ? ScanState::CONTINUOUS_SCANNING : ScanState::IDLE);
   }
@@ -248,17 +250,17 @@ void BarcodeScanner::queue_setting_(SettingId id, uint8_t value) {
   const auto same_setting = [id](const Command &command) {
     return command.type == CommandType::SETTING && command.setting == id;
   };
-  // A newer value supersedes one for the same setting that has not been sent yet.  Without
-  // this, changing a setting and changing it back before the first ACK would compare the
-  // second value with the not-yet-updated current one, skip it, and leave the first applied.
+  // A newer value replaces one for the same setting that has not been sent yet.
   const bool sending = this->command_state_ != CommandState::IDLE;
   const bool in_flight = sending && same_setting(this->command_queue_.front());
-  this->command_queue_.erase(
-      std::remove_if(this->command_queue_.begin() + (sending ? 1 : 0), this->command_queue_.end(), same_setting),
-      this->command_queue_.end());
-  // An in-flight command for this setting will still be applied, so the value must be re-sent
-  // even if it equals the current one.
-  if (value == this->get_setting(id) && !in_flight) {
+  const auto superseded =
+      std::remove_if(this->command_queue_.begin() + (sending ? 1 : 0), this->command_queue_.end(), same_setting);
+  const bool was_queued = superseded != this->command_queue_.end();
+  this->command_queue_.erase(superseded, this->command_queue_.end());
+  // Skip the command only when the scanner already has the value: when a command for this
+  // setting is queued or in flight, the current value is not what the scanner will end up
+  // with (e.g. a YAML value queued at boot, or a change being reverted before its ACK).
+  if (value == this->get_setting(id) && !in_flight && !was_queued) {
     ESP_LOGD(TAG, "%s already set to %s", get_setting_info(id).key, get_setting_info(id).values[value]);
     return;
   }
@@ -501,9 +503,10 @@ void BarcodeScanner::read_buffer_() {
   if (this->rx_buffer_.size() > MAX_RX_BUFFER_SIZE) {
     ESP_LOGW(TAG, "RX buffer overflow (%zu bytes); discarding frame", this->rx_buffer_.size());
     this->rx_buffer_.clear();
-    // Drop the remainder of this frame too, unless a reply is awaited (a garbage burst there
-    // must not cause the next genuine barcode to be dropped).
-    this->discard_frame_ = this->command_state_ != CommandState::COMMAND_SENT;
+    // Drop the rest of the frame too, up to the next idle gap, also when it overflowed while a
+    // reply was awaited: otherwise its tail would be published as a barcode.  (A reply lost
+    // in the dropped bytes is retried after the timeout.)
+    this->discard_frame_ = true;
   }
 }
 
