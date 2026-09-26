@@ -120,7 +120,9 @@ jobs:
         run: uv sync --locked
 
       - name: Run config validation, codegen and consistency tests
-        run: uv run pytest tests/ -v
+        run: >-
+          uv run pytest tests/ -v --cov --cov-fail-under=95
+          --cov-report=term --cov-report=markdown-append:"$GITHUB_STEP_SUMMARY"
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -146,6 +148,14 @@ jobs:
 
       - name: Run host-platform tests against the emulated scanner
         run: uv run pytest tests/integration -m integration -v
+
+      - name: C++ coverage of the integration tests
+        # host_scanner.yaml builds with gcov instrumentation.
+        run: >-
+          uv run gcovr --root tests/integration/.esphome/build/m5stack-barcode-sim
+          --filter '.*/components/m5stack_barcode/'
+          --txt --markdown "$GITHUB_STEP_SUMMARY" --fail-under-line 80
+          tests/integration/.esphome/build/m5stack-barcode-sim
 
   component-compile:
     # Builds the test configs for the real target so every action, condition and

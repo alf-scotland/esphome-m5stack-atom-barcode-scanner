@@ -187,8 +187,13 @@ def run(
 def _stop_all(started: list[tuple[FakeScanner, subprocess.Popen[bytes]]]) -> None:
     while started:
         scanner, proc = started.pop()
-        proc.kill()
-        proc.wait()
+        # SIGTERM: a clean shutdown, which also writes the coverage data
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
         scanner.__exit__()
 
 

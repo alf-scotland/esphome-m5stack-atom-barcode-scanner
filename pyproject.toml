@@ -12,8 +12,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "gcovr>=8.6",
     "pre-commit>=4.6.2",
     "pytest>=8.0.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.8",
     "yamllint>=1.38.0",
 ]
@@ -27,6 +29,16 @@ markers = [
     "integration: host-platform firmware tests (compile ESPHome; run with -m integration)",
 ]
 addopts = "-m 'not integration'"
+
+[tool.coverage.run]
+# __init__.py mostly runs inside the `esphome` subprocesses the codegen tests start.
+source = ["components"]
+patch = ["subprocess"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
 
 [tool.ruff]
 line-length = 88

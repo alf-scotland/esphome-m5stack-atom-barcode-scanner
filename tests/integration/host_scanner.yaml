@@ -3,6 +3,12 @@
 # terminator come from environment variables read at boot.
 esphome:
   name: m5stack-barcode-sim
+  # Coverage instrumentation; the data is written when the firmware exits (the tests stop it
+  # with SIGTERM, which the host platform handles with a clean shutdown).
+  build_flags:
+    - -fprofile-arcs
+    - -ftest-coverage
+    - -lgcov
   on_boot:
     priority: -100
     then:

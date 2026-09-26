@@ -30,6 +30,12 @@ uv run pytest tests/
 uv run pytest -m integration
 ```
 
+**Coverage** (CI reports both in the job summary and fails below 95 % Python / 80 % C++ lines). The host firmware is built with gcov instrumentation; line coverage says what ran, not what was checked, so assert on behaviour, not just on "it didn't crash":
+```bash
+uv run pytest tests/ --cov
+uv run gcovr --root tests/integration/.esphome/build/m5stack-barcode-sim --filter '.*/components/m5stack_barcode/' tests/integration/.esphome/build/m5stack-barcode-sim
+```
+
 **Lint everything (pre-commit):**
 ```bash
 uv run pre-commit run --all-files
