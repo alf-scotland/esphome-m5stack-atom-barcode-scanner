@@ -97,7 +97,8 @@ class Setting(NamedTuple):
 
 
 # Defaults match the scanner's factory defaults except sound_mode, buzzer_volume and
-# boot_sound_mode, which are quieter to suit a Home Assistant installation.
+# boot_sound_mode, which are quieter to suit a Home Assistant installation, and
+# config_code_scan_mode.
 SETTINGS = [
     Setting(
         "operation_mode",
@@ -211,10 +212,13 @@ SETTINGS = [
         "mdi:bell-check",
         "set_cmd_ack_sound_mode",
     ),
+    # Disabled, unlike the scanner's factory default: the scanner then passes
+    # configuration barcodes on and the component applies them, so Home Assistant
+    # stays in sync.
     Setting(
         "config_code_scan_mode",
         _ON_OFF,
-        "enabled",
+        "disabled",
         "config_code_scan_switch",
         "mdi:barcode-off",
         "set_config_code_scan_mode",

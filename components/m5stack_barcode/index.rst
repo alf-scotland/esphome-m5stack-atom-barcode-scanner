@@ -144,12 +144,13 @@ value is edited.
   - ``enabled`` (Default): Beep on configuration commands
   - ``disabled``: Apply configuration commands silently
 
-- **config_code_scan_mode** (*Optional*): Whether scanning a manufacturer configuration
-  barcode may reconfigure the scanner (PDF item 21). Consider ``disabled`` so a scanned
-  code cannot change settings behind the component's back.
+- **config_code_scan_mode** (*Optional*): Who applies a scanned manufacturer configuration
+  barcode (PDF item 21). See :ref:`m5stack_barcode-config_barcodes`.
 
-  - ``enabled`` (Default): Configuration barcodes are applied
-  - ``disabled``: Configuration barcodes are ignored
+  - ``disabled`` (Default): The scanner passes it on and the component applies it, so Home
+    Assistant stays in sync
+  - ``enabled``: The scanner applies it itself; Home Assistant is not told and shows the
+    previous value
 
 - **buzzer_volume** (*Optional*): Buzzer volume level.
 
@@ -542,6 +543,26 @@ implement retry logic in Home Assistant automations.
             id: status_led
             effect: "Fast Blink"
 
+.. _m5stack_barcode-config_barcodes:
+
+Configuration Barcodes
+----------------------
+
+The scanner's hardware guide (``docs/AtomicQR_Reader_EN.pdf``) prints QR codes that change
+its settings; they contain ``^#SC^`` followed by a code. With ``config_code_scan_mode:
+disabled`` (the default) the scanner outputs such a code like any barcode, and the component:
+
+- applies codes for the settings it manages (operation mode, terminator, both lights, sound,
+  buzzer volume, boot, decode and setting-code sounds, configuration code scanning) over
+  UART, so the change is confirmed by the scanner and shows up in Home Assistant;
+- treats the factory default code as the ``factory_reset`` action;
+- logs and ignores every other code (baud rate, symbologies, prefixes, multi-step numeric
+  codes, …), so none of them changes the scanner;
+- never publishes a configuration code as a barcode.
+
+With ``config_code_scan_mode: enabled`` the scanner applies every code itself and does not
+report it, so Home Assistant keeps showing the previous values.
+
 Sub-components
 --------------
 
@@ -804,8 +825,9 @@ acknowledges a configuration command (including every change made from Home Assi
 ``config_code_scan_switch``
 ***************************
 
-Exposes ``config_code_scan_mode`` as a switch. Turn it off to stop scanned manufacturer
-configuration barcodes from changing the scanner's settings.
+Exposes ``config_code_scan_mode`` as a switch: on lets the scanner apply scanned
+configuration barcodes itself, off (the default) lets the component apply them (see
+:ref:`m5stack_barcode-config_barcodes`).
 
 .. code-block:: yaml
 

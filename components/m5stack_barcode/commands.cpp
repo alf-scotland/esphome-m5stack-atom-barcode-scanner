@@ -5,9 +5,10 @@
 namespace esphome {
 namespace m5stack_barcode {
 
-// Per setting: the option keys and, in the same order, the frame the PDF gives for each value.
-// tests/test_setting_tables.py checks the keys against __init__.py and every frame against
-// the PDF.
+// Per setting: the option keys and, in the same order, the frame ATOM_QRCODE_CMD_EN.pdf gives
+// for each value and (where AtomicQR_Reader_EN.pdf has one) the content of its configuration
+// barcode after the "^#SC^" prefix.  tests/test_setting_tables.py checks the keys against
+// __init__.py and every frame and code against the PDFs.
 
 // clang-format off: one frame per line
 static constexpr const char *DISABLED_ENABLED[] = {"disabled", "enabled"};
@@ -23,6 +24,7 @@ static constexpr uint8_t OPERATION_MODE_FRAMES[] = {
     0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x04, 0xFE, 0x99,
     0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x09, 0xFE, 0x94,
 };
+static constexpr const char *OPERATION_MODE_CODES[] = {"2050208", "2050200", "2050202", "2050204", "2050209"};
 
 // PDF item 7
 static constexpr const char *TERMINATOR_VALUES[] = {"none", "crlf", "cr", "tab", "crcr", "crlfcrlf"};
@@ -35,6 +37,7 @@ static constexpr uint8_t TERMINATOR_FRAMES[] = {
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x05, 0x04, 0xFE, 0x2B,
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x05, 0x05, 0xFE, 0x2A,
 };
+static constexpr const char *TERMINATOR_CODES[] = {"3030050", "3030051", "3030052", "3030053", "3030054", "3030055"};
 
 // PDF item 8
 static constexpr uint8_t LIGHT_MODE_FRAMES[] = {
@@ -42,6 +45,7 @@ static constexpr uint8_t LIGHT_MODE_FRAMES[] = {
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x02, 0x01, 0xFE, 0x31,
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x02, 0x02, 0xFE, 0x30,
 };
+static constexpr const char *LIGHT_MODE_CODES[] = {"3030020", "3030021", "3030022"};
 
 // PDF item 9
 static constexpr uint8_t LOCATE_LIGHT_MODE_FRAMES[] = {
@@ -49,12 +53,14 @@ static constexpr uint8_t LOCATE_LIGHT_MODE_FRAMES[] = {
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x03, 0x01, 0xFE, 0x30,
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x03, 0x02, 0xFE, 0x2F,
 };
+static constexpr const char *LOCATE_LIGHT_MODE_CODES[] = {"3030030", "3030031", "3030032"};
 
 // PDF item 11 is a mute switch: its parameter 01 ("enable" muting) turns sound off.
 static constexpr uint8_t SOUND_MODE_FRAMES[] = {
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0C, 0x01, 0xFE, 0x27,
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0C, 0x00, 0xFE, 0x28,
 };
+static constexpr const char *SOUND_MODE_CODES[] = {"30300C1", "30300C0"};
 
 // PDF item 12
 static constexpr const char *BUZZER_VOLUME_VALUES[] = {"high", "medium", "low"};
@@ -63,6 +69,7 @@ static constexpr uint8_t BUZZER_VOLUME_FRAMES[] = {
     0x07, 0xC6, 0x04, 0x08, 0x00, 0x8C, 0x01, 0xFE, 0x9A,
     0x07, 0xC6, 0x04, 0x08, 0x00, 0x8C, 0x02, 0xFE, 0x99,
 };
+static constexpr const char *BUZZER_VOLUME_CODES[] = {"2050800", "2050801", "2050802"};
 
 // PDF item 10
 static constexpr uint8_t DECODING_SUCCESS_LIGHT_MODE_FRAMES[] = {
@@ -75,12 +82,14 @@ static constexpr uint8_t BOOT_SOUND_MODE_FRAMES[] = {
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0D, 0x00, 0xFE, 0x27,
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0D, 0x01, 0xFE, 0x26,
 };
+static constexpr const char *BOOT_SOUND_MODE_CODES[] = {"30300D0", "30300D1"};
 
 // PDF item 15
 static constexpr uint8_t DECODE_SOUND_MODE_FRAMES[] = {
     0x07, 0xC6, 0x04, 0x08, 0x00, 0x38, 0x00, 0xFE, 0xEF,
     0x07, 0xC6, 0x04, 0x08, 0x00, 0x38, 0x01, 0xFE, 0xEE,
 };
+static constexpr const char *DECODE_SOUND_MODE_CODES[] = {"1040020", "1040021"};
 
 // PDF item 16 (unit 100 ms; 0 = unlimited)
 static constexpr const char *SCAN_DURATION_VALUES[] = {"500ms", "1s", "3s", "5s", "10s", "15s", "20s", "unlimited"};
@@ -133,12 +142,14 @@ static constexpr uint8_t CMD_ACK_SOUND_MODE_FRAMES[] = {
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0E, 0x00, 0xFE, 0x26,
     0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0E, 0x01, 0xFE, 0x25,
 };
+static constexpr const char *CMD_ACK_SOUND_MODE_CODES[] = {"30300E0", "30300E1"};
 
 // PDF item 21: whether scanning a configuration barcode may change settings
 static constexpr uint8_t CONFIG_CODE_SCAN_MODE_FRAMES[] = {
     0x07, 0xC6, 0x04, 0x08, 0x00, 0xEC, 0x00, 0xFE, 0x3B,
     0x07, 0xC6, 0x04, 0x08, 0x00, 0xEC, 0x01, 0xFE, 0x3A,
 };
+static constexpr const char *CONFIG_CODE_SCAN_MODE_CODES[] = {"1040600", "1040601"};
 
 // clang-format on
 
@@ -158,7 +169,14 @@ static constexpr bool is_valid_table(const char *const (&values)[N], const uint8
 
 template<size_t N, size_t M>
 static constexpr SettingInfo make_info(const char *key, const char *const (&values)[N], const uint8_t (&frames)[M]) {
-  return SettingInfo{key, values, frames, static_cast<uint8_t>(N), static_cast<uint8_t>(frame_length(frames))};
+  return SettingInfo{key, values, frames, nullptr, static_cast<uint8_t>(N), static_cast<uint8_t>(frame_length(frames))};
+}
+
+template<size_t N, size_t M>
+static constexpr SettingInfo make_info(const char *key, const char *const (&values)[N], const uint8_t (&frames)[M],
+                                       const char *const (&config_codes)[N]) {
+  return SettingInfo{
+      key, values, frames, config_codes, static_cast<uint8_t>(N), static_cast<uint8_t>(frame_length(frames))};
 }
 
 static_assert(is_valid_table(OPERATION_MODE_VALUES, OPERATION_MODE_FRAMES));
@@ -181,21 +199,21 @@ static_assert(std::size(SCAN_DURATION_MS) == std::size(SCAN_DURATION_VALUES));
 
 // Indexed by SettingId.
 static constexpr SettingInfo SETTINGS[] = {
-    make_info("operation_mode", OPERATION_MODE_VALUES, OPERATION_MODE_FRAMES),
-    make_info("terminator", TERMINATOR_VALUES, TERMINATOR_FRAMES),
-    make_info("light_mode", LIGHT_VALUES, LIGHT_MODE_FRAMES),
-    make_info("locate_light_mode", LIGHT_VALUES, LOCATE_LIGHT_MODE_FRAMES),
-    make_info("sound_mode", DISABLED_ENABLED, SOUND_MODE_FRAMES),
-    make_info("buzzer_volume", BUZZER_VOLUME_VALUES, BUZZER_VOLUME_FRAMES),
+    make_info("operation_mode", OPERATION_MODE_VALUES, OPERATION_MODE_FRAMES, OPERATION_MODE_CODES),
+    make_info("terminator", TERMINATOR_VALUES, TERMINATOR_FRAMES, TERMINATOR_CODES),
+    make_info("light_mode", LIGHT_VALUES, LIGHT_MODE_FRAMES, LIGHT_MODE_CODES),
+    make_info("locate_light_mode", LIGHT_VALUES, LOCATE_LIGHT_MODE_FRAMES, LOCATE_LIGHT_MODE_CODES),
+    make_info("sound_mode", DISABLED_ENABLED, SOUND_MODE_FRAMES, SOUND_MODE_CODES),
+    make_info("buzzer_volume", BUZZER_VOLUME_VALUES, BUZZER_VOLUME_FRAMES, BUZZER_VOLUME_CODES),
     make_info("decoding_success_light_mode", DISABLED_ENABLED, DECODING_SUCCESS_LIGHT_MODE_FRAMES),
-    make_info("boot_sound_mode", DISABLED_ENABLED, BOOT_SOUND_MODE_FRAMES),
-    make_info("decode_sound_mode", DISABLED_ENABLED, DECODE_SOUND_MODE_FRAMES),
+    make_info("boot_sound_mode", DISABLED_ENABLED, BOOT_SOUND_MODE_FRAMES, BOOT_SOUND_MODE_CODES),
+    make_info("decode_sound_mode", DISABLED_ENABLED, DECODE_SOUND_MODE_FRAMES, DECODE_SOUND_MODE_CODES),
     make_info("scan_duration", SCAN_DURATION_VALUES, SCAN_DURATION_FRAMES),
     make_info("stable_induction_time", STABLE_INDUCTION_TIME_VALUES, STABLE_INDUCTION_TIME_FRAMES),
     make_info("reading_interval", INTERVAL_VALUES, READING_INTERVAL_FRAMES),
     make_info("same_code_interval", INTERVAL_VALUES, SAME_CODE_INTERVAL_FRAMES),
-    make_info("cmd_ack_sound_mode", DISABLED_ENABLED, CMD_ACK_SOUND_MODE_FRAMES),
-    make_info("config_code_scan_mode", DISABLED_ENABLED, CONFIG_CODE_SCAN_MODE_FRAMES),
+    make_info("cmd_ack_sound_mode", DISABLED_ENABLED, CMD_ACK_SOUND_MODE_FRAMES, CMD_ACK_SOUND_MODE_CODES),
+    make_info("config_code_scan_mode", DISABLED_ENABLED, CONFIG_CODE_SCAN_MODE_FRAMES, CONFIG_CODE_SCAN_MODE_CODES),
 };
 static_assert(std::size(SETTINGS) == NUM_SETTINGS, "one SettingInfo per SettingId");
 
@@ -206,6 +224,22 @@ bool SettingInfo::parse(const std::string &key, uint8_t &value) const {
     if (key == this->values[i]) {
       value = i;
       return true;
+    }
+  }
+  return false;
+}
+
+bool find_config_code(const std::string &code, SettingId &id, uint8_t &value) {
+  for (size_t i = 0; i < NUM_SETTINGS; i++) {
+    const SettingInfo &setting = SETTINGS[i];
+    if (setting.config_codes == nullptr)
+      continue;
+    for (uint8_t v = 0; v < setting.num_values; v++) {
+      if (code == setting.config_codes[v]) {
+        id = static_cast<SettingId>(i);
+        value = v;
+        return true;
+      }
     }
   }
   return false;

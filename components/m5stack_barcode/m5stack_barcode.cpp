@@ -602,6 +602,11 @@ void BarcodeScanner::process_barcode_() {
   this->scan_timer_active_ = false;
   if (this->scan_state_ == ScanState::MANUAL_SCANNING)
     this->set_scan_state_(ScanState::IDLE);
+
+  if (barcode.rfind(CONFIG_CODE_PREFIX, 0) == 0) {
+    this->apply_config_code_(barcode.substr(strlen(CONFIG_CODE_PREFIX)));
+    return;
+  }
   ESP_LOGD(TAG, "Barcode received: %s", barcode.c_str());
 
   if (this->barcode_sensor_ != nullptr)
@@ -609,6 +614,26 @@ void BarcodeScanner::process_barcode_() {
   this->barcode_callback_.call(barcode);
   if (this->scan_event_ != nullptr)
     this->scan_event_->trigger("scan_successful");
+}
+
+void BarcodeScanner::apply_config_code_(const std::string &code) {
+  // The scanner passed a configuration barcode on instead of applying it (config_code_scan_mode
+  // disabled).  Apply it over UART, so the change is confirmed and published like any other.
+  if (code == FACTORY_RESET_CONFIG_CODE) {
+    ESP_LOGI(TAG, "Configuration barcode: factory reset");
+    this->factory_reset();
+    return;
+  }
+  SettingId id;
+  uint8_t value;
+  if (!find_config_code(code, id, value)) {
+    ESP_LOGW(TAG, "Ignoring configuration barcode %s%s: not a setting this component manages", CONFIG_CODE_PREFIX,
+             code.c_str());
+    return;
+  }
+  const SettingInfo &setting = get_setting_info(id);
+  ESP_LOGI(TAG, "Configuration barcode: %s = %s", setting.key, setting.values[value]);
+  this->set_setting(id, value);
 }
 
 void BarcodeScanner::process_version_() {

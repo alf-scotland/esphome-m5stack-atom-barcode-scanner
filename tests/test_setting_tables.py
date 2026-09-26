@@ -115,6 +115,43 @@ PDF_FRAMES = {
 }
 
 
+# The configuration barcodes AtomicQR_Reader_EN.pdf prints for the settings that have
+# one (decoded from the PDF's QR codes), without the "^#SC^" prefix.
+PDF_CONFIG_CODES = {
+    "operation_mode": {
+        "host": "2050208",
+        "level": "2050200",  # "Manual mode - Key Holding"
+        "pulse": "2050202",  # "Manual mode - Single Key Trigger"
+        "continuous": "2050204",
+        "auto_sense": "2050209",  # "Automatic Induction Mode"
+    },
+    "terminator": {
+        "none": "3030050",
+        "crlf": "3030051",
+        "cr": "3030052",
+        "tab": "3030053",
+        "crcr": "3030054",
+        "crlfcrlf": "3030055",
+    },
+    "light_mode": {  # "Floodlight"
+        "on_when_reading": "3030020",
+        "always_on": "3030021",
+        "always_off": "3030022",
+    },
+    "locate_light_mode": {  # "Positioning lights"
+        "on_when_reading": "3030030",
+        "always_on": "3030031",
+        "always_off": "3030032",
+    },
+    "sound_mode": {"disabled": "30300C1", "enabled": "30300C0"},  # "Mute" open/close
+    "buzzer_volume": {"high": "2050800", "medium": "2050801", "low": "2050802"},
+    "boot_sound_mode": {"disabled": "30300D0", "enabled": "30300D1"},
+    "decode_sound_mode": {"disabled": "1040020", "enabled": "1040021"},
+    "cmd_ack_sound_mode": {"disabled": "30300E0", "enabled": "30300E1"},
+    "config_code_scan_mode": {"disabled": "1040600", "enabled": "1040601"},
+}
+
+
 def cpp_enumerators(enum_name: str) -> list[str]:
     """Return the enumerators of a C++ `enum class` in declaration order."""
     match = re.search(
@@ -132,10 +169,12 @@ def cpp_array(name: str) -> str:
     return match.group(1)
 
 
-def cpp_setting_table() -> dict[str, tuple[str, str]]:
-    """Map each setting key to the names of its C++ option-key and frame arrays."""
-    rows = re.findall(r'make_info\("(\w+)", (\w+), (\w+)\)', cpp_array("SETTINGS"))
-    return {key: (values, frames) for key, values, frames in rows}
+def cpp_setting_table() -> dict[str, tuple[str, str, str]]:
+    """Map each setting key to its C++ option-key, frame and config code arrays."""
+    rows = re.findall(
+        r'make_info\("(\w+)", (\w+), (\w+)(?:, (\w+))?\)', cpp_array("SETTINGS")
+    )
+    return {key: (values, frames, codes) for key, values, frames, codes in rows}
 
 
 def cpp_frames(name: str) -> list[str]:
@@ -159,7 +198,7 @@ def test_setting_ids_follow_python_order() -> None:
 @pytest.mark.parametrize("setting", component.SETTINGS, ids=lambda s: s.key)
 def test_cpp_option_keys_match(setting: component.Setting) -> None:
     """C++ parses action values and logs with the same keys, in the same order."""
-    values, _ = cpp_setting_table()[setting.key]
+    values, _, _ = cpp_setting_table()[setting.key]
     assert re.findall(r'"([^"]*)"', cpp_array(values)) == setting.options
     assert setting.default in setting.options
 
@@ -167,10 +206,22 @@ def test_cpp_option_keys_match(setting: component.Setting) -> None:
 @pytest.mark.parametrize("setting", component.SETTINGS, ids=lambda s: s.key)
 def test_frames_match_the_pdf(setting: component.Setting) -> None:
     """Every option sends the frame the PDF documents for it."""
-    _, frames = cpp_setting_table()[setting.key]
+    _, frames, _ = cpp_setting_table()[setting.key]
     expected = PDF_FRAMES[setting.key]
     assert list(expected) == setting.options
     assert cpp_frames(frames) == list(expected.values())
+
+
+@pytest.mark.parametrize("setting", component.SETTINGS, ids=lambda s: s.key)
+def test_config_codes_match_the_pdf(setting: component.Setting) -> None:
+    """Configuration barcodes the component applies set the value the PDF says."""
+    _, _, codes = cpp_setting_table()[setting.key]
+    expected = PDF_CONFIG_CODES.get(setting.key)
+    if expected is None:
+        assert not codes
+        return
+    assert list(expected) == setting.options
+    assert re.findall(r'"([^"]*)"', cpp_array(codes)) == list(expected.values())
 
 
 def test_operation_mode_enum_follows_option_keys() -> None:

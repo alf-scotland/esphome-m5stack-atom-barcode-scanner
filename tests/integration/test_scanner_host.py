@@ -31,6 +31,9 @@ HERE = Path(__file__).parent
 # (/dir/name) that exists at compile time; the tests point it at a pty at runtime.
 PORT = Path("/tmp/m5stack-barcode-sim")  # noqa: S108
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
+# Parameter byte (frame[5]) of the buzzer volume setting command, and its "high" value
+PARAM_VOLUME = 0x8C
+VOLUME_HIGH = 0x00
 
 
 @pytest.fixture(scope="session")
@@ -226,6 +229,20 @@ def test_scan_timeout(run: callable) -> None:
     firmware.wait_for(r"SCAN_TIMEOUT")
 
 
+def test_config_barcode_is_applied_not_published(run: callable) -> None:
+    """A configuration barcode the scanner passes on is applied over UART and synced."""
+    scanner, firmware = run(mode="continuous")
+    firmware.wait_for(r"MODE\[continuous\]")
+    scanner.emit_barcode(b"^#SC^2050801")  # buzzer volume: middle
+    firmware.wait_for(r"VOLUME\[medium\]")
+    assert any(f[5] == PARAM_VOLUME and f[6] == 1 for f in scanner.received)
+    scanner.emit_barcode(b"^#SC^3030010")  # communication mode: serial (not managed)
+    firmware.wait_for(r"Ignoring configuration barcode \^#SC\^3030010")
+    scanner.emit_barcode(b"AFTER")
+    firmware.wait_for(r"BARCODE\[AFTER\]")
+    assert not any("BARCODE[^#SC^" in line for line in firmware.lines)
+
+
 def test_rejected_start_ends_the_scan(run: callable) -> None:
     """A start the scanner NAKs (e.g. its mode was changed by a config barcode)."""
     _, firmware = run(start_scan=True, start_reply="nak")
@@ -282,10 +299,6 @@ def test_long_barcode_is_truncated_to_ha_state_limit(run: callable) -> None:
     scanner.emit_barcode(b"A" * 300)
     match = firmware.wait_for(r"BARCODE\[(A+)\]")
     assert len(match.group(1)) == 255  # noqa: PLR2004
-
-
-PARAM_VOLUME = 0x8C
-VOLUME_HIGH = 0x00
 
 
 def test_setting_reverted_before_ack_ends_at_last_value(run: callable) -> None:

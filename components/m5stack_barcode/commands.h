@@ -86,9 +86,10 @@ enum class OperationMode : uint8_t {
 /// The keys are the YAML / HA select / action values and must match SETTINGS in __init__.py
 /// (tests/test_setting_tables.py checks this).  Two-state settings use "disabled", "enabled".
 struct SettingInfo {
-  const char *key;            ///< YAML key, also used in logs
-  const char *const *values;  ///< option key per value
-  const uint8_t *frames;      ///< num_values frames of frame_size bytes, one per value
+  const char *key;                  ///< YAML key, also used in logs
+  const char *const *values;        ///< option key per value
+  const uint8_t *frames;            ///< num_values frames of frame_size bytes, one per value
+  const char *const *config_codes;  ///< configuration barcode per value (after the prefix), or nullptr
   uint8_t num_values;
   uint8_t frame_size;
 
@@ -98,6 +99,15 @@ struct SettingInfo {
 };
 
 const SettingInfo &get_setting_info(SettingId id);
+
+/// Configuration barcodes (AtomicQR_Reader_EN.pdf) are QR codes "^#SC^<code>".  With the
+/// scanner's config_code_scan_mode enabled it applies them itself, without telling the host;
+/// with it disabled it outputs them like any barcode.
+inline constexpr const char *CONFIG_CODE_PREFIX = "^#SC^";
+/// The configuration barcode that restores the scanner's factory defaults (PDF section 1.1).
+inline constexpr const char *FACTORY_RESET_CONFIG_CODE = "303FFF0";
+/// Find the setting and value a configuration barcode (without the prefix) sets.
+bool find_config_code(const std::string &code, SettingId &id, uint8_t &value);
 
 /// Bytes the scanner appends to each barcode for a terminator value ("" for none).
 const char *terminator_bytes(uint8_t terminator);

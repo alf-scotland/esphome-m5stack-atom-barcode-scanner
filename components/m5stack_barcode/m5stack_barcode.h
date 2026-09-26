@@ -153,6 +153,8 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   /// Whether rx_buffer_ holds a complete barcode frame (terminator received or line idle).
   bool has_complete_frame_() const;
   void process_barcode_();
+  /// Apply a configuration barcode (its content after CONFIG_CODE_PREFIX) the scanner passed on.
+  void apply_config_code_(const std::string &code);
   void process_version_();
 
   ESPPreferenceObject pref_;
