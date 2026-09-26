@@ -31,7 +31,6 @@ This project adheres to the [ESPHome Code of Conduct](https://github.com/esphome
 - `main`: The main development branch, should always be in a stable state.
 - `feat/*`: Feature branches for new features or major changes.
 - `fix/*`: Bugfix branches for bug fixes.
-- `hotfix/*`: Urgent fixes that need to go directly to `main`.
 - `refactor/*`: Refactoring without behaviour change.
 - `ci/*`: CI/CD changes.
 - `docs/*`: Documentation-only changes.
@@ -77,36 +76,9 @@ uv run pre-commit run cppcheck --all-files
 uv run pre-commit run clang-tidy --hook-stage manual
 ```
 
-### Versioning Scheme
+## Releases
 
-We follow CalVer (`YYYY.MM.PATCH`), matching ESPHome's scheme.
-
-Example: `2026.3.0`, `2026.3.1`, etc.
-
-For pre-releases: `YYYY.MM.PATCH-beta.N` or `YYYY.MM.PATCH-rc.N`
-
-Example: `2026.3.0-beta.1`
-
-## Release Process
-
-1. Update `project_version` in the `substitutions:` block of `firmware/atom_lite.yaml`:
-   ```yaml
-   substitutions:
-     project_version: "YYYY.MM.PATCH"
-   ```
-
-2. Commit the version bump to `main`.
-
-3. Tag the release and push the tag:
-   ```bash
-   git tag vYYYY.MM.PATCH
-   git push origin vYYYY.MM.PATCH
-   ```
-
-4. The CI will build the firmware and publish a GitHub Release with binary assets.
-   The tag must match `project_version` exactly — CI validates this before building.
-
-See `.github/BRANCHING_AND_RELEASES.md` for full details.
+See [RELEASING.md](RELEASING.md).
 
 ## Code Style
 

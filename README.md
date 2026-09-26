@@ -76,7 +76,25 @@ are kept across reboots and updates.
 
 **Updating from a release before this change:** releases up to 2026.7.0 used a shared
 built-in key. After updating, remove the device in Home Assistant and add it again within
-15 minutes of it restarting (or power-cycle it first) so it receives its own key.
+15 minutes of it restarting (or power-cycle it first) so it receives its own key. Its
+settings are kept, including **Config Code Scanning** (on in those releases): turn it off
+so the firmware applies scanned configuration barcodes and Home Assistant stays in sync.
+
+### Updates
+
+The device checks for a new stable release every 6 hours and offers it through its
+**Firmware Update** entity in Home Assistant. Other builds are installed by hand:
+
+- **A specific release or pre-release:** flash its `firmware.factory.bin` over USB with
+  [ESPHome Web](https://web.esphome.io/). Pre-releases are never offered automatically.
+- **A pull request's build:** each PR that changes the firmware links its build in a
+  comment.
+- **Your own build:** install `firmware/atom_lite.yaml` from the ESPHome dashboard that
+  adopted the device; it holds the device's key, which OTA uploads need.
+
+To check that a downloaded binary was built by this repository, see
+[SECURITY.md](.github/SECURITY.md#verifying-a-firmware-binary). Maintainers: see
+[RELEASING.md](.github/RELEASING.md).
 
 ## Hardware Connection
 
