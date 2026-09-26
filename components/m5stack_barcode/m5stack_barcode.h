@@ -1,1021 +1,220 @@
 #pragma once
 
-#include <functional>
-#include <memory>
+#include <array>
+#include <string>
 #include <vector>
 
-#include "actions.h"
-#include "command.h"
 #include "commands.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/button/button.h"
+#include "esphome/components/event/event.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/uart/uart.h"
-#include "esphome/components/event/event.h"
-#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/preferences.h"
-#include "types.h"
 
 namespace esphome {
 namespace m5stack_barcode {
 
-/// Version tag for the stored preference struct. Increment when the struct layout changes
-/// to automatically invalidate stale preferences and force a full re-sync.
-static const uint8_t SETTINGS_VERSION = 2;
+/// One value per setting, indexed by SettingId.
+using SettingValues = std::array<uint8_t, NUM_SETTINGS>;
 
-/// Packed representation of all scanner settings stored in ESPHome preferences (NVS flash).
-/// On first boot (or after a factory reset / version bump) all fields are sent to the scanner.
-/// On subsequent boots only settings that differ from what was last ACK'd are re-sent.
+/// Version tag of the stored ScannerPreferences.  Increment when the layout changes.
+static const uint8_t SETTINGS_VERSION = 3;
+/// Version written by firmware before the YAML baseline was stored; migrated once at boot.
+static const uint8_t LEGACY_SETTINGS_VERSION = 2;
+
+/// Settings persisted to NVS.  `applied` holds what the scanner last ACKed (including changes
+/// made from Home Assistant), `yaml` the YAML values the device last booted with.  At boot a
+/// setting is re-sent only if its YAML value was edited since then; otherwise the applied value
+/// is kept, so runtime changes survive reboots and OTA updates.
 struct ScannerPreferences {
   uint8_t version;
-  uint8_t operation_mode;
-  uint8_t terminator;
-  uint8_t light_mode;
-  uint8_t locate_light_mode;
-  uint8_t sound_mode;
-  uint8_t buzzer_volume;
-  uint8_t decoding_success_light_mode;
-  uint8_t boot_sound_mode;
-  uint8_t decode_sound_mode;
-  uint8_t scan_duration;
-  uint8_t stable_induction_time;
-  uint8_t reading_interval;
-  uint8_t same_code_interval;
-  uint8_t cmd_ack_sound_mode;
-  uint8_t config_code_scan_mode;
+  SettingValues applied;
+  SettingValues yaml;
 } __attribute__((packed));
+static_assert(sizeof(ScannerPreferences) == 1 + 2 * NUM_SETTINGS, "layout changed: bump SETTINGS_VERSION");
 
-// Catch struct layout changes (added/removed fields, unexpected padding) at compile time.
-// Increment SETTINGS_VERSION whenever the struct changes so stale NVS data is discarded.
-static_assert(sizeof(ScannerPreferences) == 16, "ScannerPreferences size changed — bump SETTINGS_VERSION");
+/// Layout of LEGACY_SETTINGS_VERSION, stored under a different key.
+struct LegacyScannerPreferences {
+  uint8_t version;
+  SettingValues applied;
+} __attribute__((packed));
+static_assert(sizeof(LegacyScannerPreferences) == 16, "the legacy layout is fixed");
 
-// Forward declarations
-class OperationModeSelect;
-class BuzzerVolumeSelect;
-class LightModeSelect;
-class LocateLightModeSelect;
-class ScanDurationSelect;
-class TerminatorSelect;
-class StableInductionTimeSelect;
-class ReadingIntervalSelect;
-class SameCodeIntervalSelect;
-class SoundSwitch;
-class BootSoundSwitch;
-class DecodeSoundSwitch;
-class DecodingSuccessLightSwitch;
-class CmdAckSoundSwitch;
-class ConfigCodeScanSwitch;
-class FactoryResetButton;
+enum class ScanState : uint8_t {
+  IDLE,                // Not scanning
+  MANUAL_SCANNING,     // HOST-mode scan started by start_scan()
+  CONTINUOUS_SCANNING  // Continuous or auto-sense mode
+};
 
-// Logging tag for this component
-extern const char *const TAG_SCANNER;
-
-/**
- * @brief M5Stack Barcode Scanner component for ESPHome.
- *
- * This component provides an interface to control the M5Stack 2D/QR Barcode Scanner Module.
- * It supports various operation modes, light control, sound settings, and firmware version
- * reporting.
- *
- * Features:
- * - Multiple operation modes (HOST, LEVEL, PULSE, CONTINUOUS, AUTO_SENSE)
- * - Configurable terminator settings
- * - Light control (main and locate lights)
- * - Sound and buzzer volume control
- * - Firmware version reporting
- * - Automatic wake-up handling
- * - Command acknowledgment verification
- * - Barcode scan events
- *
- * Requirements:
- * - UART communication configured in YAML
- * - Optional text sensor for barcode output
- * - Optional text sensor for firmware version
- * - Optional event component for barcode scan events
- *
- * Usage:
- * ```yaml
- * uart:
- *   tx_pin: GPIO1
- *   rx_pin: GPIO2
- *   baud_rate: 115200
- *
- * m5stack_barcode:
- *   text_sensor: barcode_sensor
- *   version_sensor: version_sensor
- *   operation_mode: HOST
- *   terminator: CRLF
- * ```
- */
+/// Driver for the M5Stack Atom QR code scanner (UART, 9600 baud).
+///
+/// Commands go through a non-blocking queue: each is preceded by the wake-up byte, sent once
+/// the scanner has had time to wake, and must be answered before the next one is sent.
+/// Settings take effect in memory, NVS and the HA entities only once the scanner ACKs them.
+/// A setting value is an index into the setting's option keys (see SettingInfo).
 class BarcodeScanner : public Component, public uart::UARTDevice {
  public:
-  /**
-   * @brief Initialize the barcode scanner component.
-   *
-   * Sets up UART communication and configures default settings.
-   * Optionally requests firmware version if version sensor is configured.
-   */
   void setup() override;
-
-  /**
-   * @brief Main loop function for processing commands and responses.
-   *
-   * Handles:
-   * - Command queue processing
-   * - Response acknowledgment
-   * - Barcode data processing
-   * - Version information processing
-   */
   void loop() override;
-
-  /**
-   * @brief Dump the current configuration to the log.
-   *
-   * Logs all current settings and sensor states.
-   */
   void dump_config() override;
-
-  /**
-   * @brief Get the setup priority for this component.
-   * @return float Priority value (DATA)
-   */
   float get_setup_priority() const override { return setup_priority::DATA; }
 
-  // Sensor Configuration
   void set_barcode_sensor(text_sensor::TextSensor *sensor) { this->barcode_sensor_ = sensor; }
   void set_version_sensor(text_sensor::TextSensor *sensor) { this->version_sensor_ = sensor; }
   void set_scan_event(event::Event *ev) { this->scan_event_ = ev; }
+  void set_scanning_binary_sensor(binary_sensor::BinarySensor *bs) { this->scanning_binary_sensor_ = bs; }
+  /// The YAML value of a setting, set before setup().
+  void set_initial_value(SettingId id, uint8_t value) { this->settings_[static_cast<size_t>(id)] = value; }
+  void set_select(SettingId id, select::Select *sel) { this->selects_[static_cast<size_t>(id)] = sel; }
+  void set_switch(SettingId id, switch_::Switch *sw) { this->switches_[static_cast<size_t>(id)] = sw; }
 
-  /**
-   * @brief Register a callback invoked whenever a barcode is successfully decoded.
-   * @param callback Function receiving the decoded barcode string
-   */
-  void add_on_barcode_callback(std::function<void(std::string)> &&callback) {
+  /// Register a callback invoked with every decoded barcode.
+  void add_on_barcode_callback(std::function<void(const std::string &)> &&callback) {
     this->barcode_callback_.add(std::move(callback));
   }
-
-  /**
-   * @brief Register a callback invoked when a HOST-mode scan times out without a result.
-   * @param callback Function called on scan timeout
-   */
+  /// Register a callback invoked when a HOST-mode scan times out without a result.
   void add_on_scan_timeout_callback(std::function<void()> &&callback) {
     this->scan_timeout_callback_.add(std::move(callback));
   }
 
-  // Initial-value setters — called by ESPHome code generation to set desired values
-  // before setup() runs. They update the in-memory state so configure_defaults_() sends
-  // only the settings that differ from NVS, without double-queuing.
-  void set_operation_mode_initial(OperationMode mode) { this->operation_mode_ = mode; }
-  void set_terminator_initial(Terminator term) { this->terminator_ = term; }
-  void set_light_mode_initial(LightMode mode) { this->light_mode_ = mode; }
-  void set_locate_light_mode_initial(LocateLightMode mode) { this->locate_light_mode_ = mode; }
-  void set_sound_mode_initial(SoundMode mode) { this->sound_mode_ = mode; }
-  void set_buzzer_volume_initial(BuzzerVolume volume) { this->buzzer_volume_ = volume; }
-  void set_decoding_success_light_mode_initial(DecodingSuccessLightMode mode) {
-    this->decoding_success_light_mode_ = mode;
-  }
-  void set_boot_sound_mode_initial(BootSoundMode mode) { this->boot_sound_mode_ = mode; }
-  void set_decode_sound_mode_initial(DecodeSoundMode mode) { this->decode_sound_mode_ = mode; }
-  void set_scan_duration_initial(ScanDuration duration) { this->scan_duration_ = duration; }
-  void set_stable_induction_time_initial(StableInductionTime time) { this->stable_induction_time_ = time; }
-  void set_reading_interval_initial(ReadingInterval interval) { this->reading_interval_ = interval; }
-  void set_same_code_interval_initial(SameCodeInterval interval) { this->same_code_interval_ = interval; }
-  void set_cmd_ack_sound_mode_initial(CmdAckSoundMode mode) { this->cmd_ack_sound_mode_ = mode; }
-  void set_config_code_scan_mode_initial(ConfigCodeScanMode mode) { this->config_code_scan_mode_ = mode; }
-
-  /// Attach the optional operation-mode select sub-component.
-  void set_operation_mode_select(OperationModeSelect *select) { this->operation_mode_select_ = select; }
-
-  // Optional HA sub-component attachment — call from codegen to wire up entities.
-  void set_scanning_binary_sensor(binary_sensor::BinarySensor *bs) { this->scanning_binary_sensor_ = bs; }
-  void set_sound_switch(SoundSwitch *sw) { this->sound_switch_ = sw; }
-  void set_boot_sound_switch(BootSoundSwitch *sw) { this->boot_sound_switch_ = sw; }
-  void set_decode_sound_switch(DecodeSoundSwitch *sw) { this->decode_sound_switch_ = sw; }
-  void set_decoding_success_light_switch(DecodingSuccessLightSwitch *sw) { this->decoding_success_light_switch_ = sw; }
-  void set_cmd_ack_sound_switch(CmdAckSoundSwitch *sw) { this->cmd_ack_sound_switch_ = sw; }
-  void set_config_code_scan_switch(ConfigCodeScanSwitch *sw) { this->config_code_scan_switch_ = sw; }
-  void set_buzzer_volume_select(BuzzerVolumeSelect *sel) { this->buzzer_volume_select_ = sel; }
-  void set_light_mode_select(LightModeSelect *sel) { this->light_mode_select_ = sel; }
-  void set_locate_light_mode_select(LocateLightModeSelect *sel) { this->locate_light_mode_select_ = sel; }
-  void set_scan_duration_select(ScanDurationSelect *sel) { this->scan_duration_select_ = sel; }
-  void set_terminator_select(TerminatorSelect *sel) { this->terminator_select_ = sel; }
-  void set_stable_induction_time_select(StableInductionTimeSelect *sel) { this->stable_induction_time_select_ = sel; }
-  void set_reading_interval_select(ReadingIntervalSelect *sel) { this->reading_interval_select_ = sel; }
-  void set_same_code_interval_select(SameCodeIntervalSelect *sel) { this->same_code_interval_select_ = sel; }
-
-  // Scanner Control Methods
-  /**
-   * @brief Start the barcode scanning process.
-   *
-   * Only works in HOST mode. Sets scanning state and queues start command.
-   */
+  /// Start a HOST-mode scan. Ignored outside HOST mode or while a scan is in progress.
   void start_scan();
-
-  /**
-   * @brief Stop the barcode scanning process.
-   *
-   * Only works in HOST mode. Clears scanning state and queues stop command.
-   */
+  /// Stop the current HOST-mode scan.
   void stop_scan();
-
-  // Scanner Settings Methods
-  /**
-   * @brief Set the operation mode of the scanner.
-   * @param mode The desired operation mode
-   * @return bool True if command was queued successfully
-   */
-  void set_operation_mode(OperationMode mode);
-
-  /**
-   * @brief Set the terminator sequence for barcode output.
-   * @param term The desired terminator type
-   * @return bool True if command was queued successfully
-   */
-  void set_terminator(Terminator term);
-
-  /**
-   * @brief Set the main light mode of the scanner.
-   * @param mode The desired light mode
-   * @return bool True if command was queued successfully
-   */
-  void set_light_mode(LightMode mode);
-
-  /**
-   * @brief Set the locate light mode of the scanner.
-   * @param mode The desired locate light mode
-   * @return bool True if command was queued successfully
-   */
-  void set_locate_light_mode(LocateLightMode mode);
-
-  /**
-   * @brief Set the sound mode of the scanner.
-   * @param mode The desired sound mode
-   * @return bool True if command was queued successfully
-   */
-  void set_sound_mode(SoundMode mode);
-
-  /**
-   * @brief Set the buzzer volume level.
-   * @param volume The desired volume level
-   * @return bool True if command was queued successfully
-   */
-  void set_buzzer_volume(BuzzerVolume volume);
-
-  /**
-   * @brief Set the decoding success light mode of the scanner.
-   * @param mode The desired decoding success light mode
-   * @return bool True if command was queued successfully
-   */
-  void set_decoding_success_light_mode(DecodingSuccessLightMode mode);
-
-  /**
-   * @brief Set the boot sound mode of the scanner.
-   * @param mode The desired boot sound mode
-   * @return bool True if command was queued successfully
-   */
-  void set_boot_sound_mode(BootSoundMode mode);
-
-  /**
-   * @brief Set the decode sound mode of the scanner.
-   * @param mode The desired decode sound mode
-   * @return bool True if command was queued successfully
-   */
-  void set_decode_sound_mode(DecodeSoundMode mode);
-
-  /**
-   * @brief Set the scan duration of the scanner.
-   * @param duration The desired scan duration
-   * @return bool True if command was queued successfully
-   */
-  void set_scan_duration(ScanDuration duration);
-
-  /**
-   * @brief Set the stable induction time of the scanner.
-   * @param time The desired stable induction time
-   * @return bool True if command was queued successfully
-   */
-  void set_stable_induction_time(StableInductionTime time);
-
-  /**
-   * @brief Set the reading interval of the scanner.
-   * @param interval The desired reading interval
-   * @return bool True if command was queued successfully
-   */
-  void set_reading_interval(ReadingInterval interval);
-
-  /**
-   * @brief Set the same code interval of the scanner.
-   * @param interval The desired same code interval
-   * @return bool True if command was queued successfully
-   */
-  void set_same_code_interval(SameCodeInterval interval);
-  void set_cmd_ack_sound_mode(CmdAckSoundMode mode);
-  void set_config_code_scan_mode(ConfigCodeScanMode mode);
-
-  /**
-   * @brief Reset the scanner to factory defaults and reboot the ESP.
-   *
-   * Sends the factory-reset command (PDF item 1) to the scanner.  On ACK the
-   * component invalidates its NVS preferences (version set to 0) so the next
-   * boot treats all settings as changed and re-sends every YAML-configured
-   * value to the scanner.  The ESP then reboots via App.safe_reboot().
-   *
-   * Note: scanner factory defaults differ from the component defaults for three
-   * settings (sound_mode, buzzer_volume, boot_sound_mode).  These are corrected
-   * automatically on the next boot when the component re-applies YAML values.
-   */
+  /// Reset the scanner to factory defaults, then reboot the ESP so every YAML-configured
+  /// setting is re-applied (NVS preferences are invalidated once the scanner ACKs).
   void factory_reset();
-
-  /**
-   * @brief Process the current buffer as a barcode.
-   * This is useful for continuous mode where we want to process intermediate results.
-   */
+  /// Publish whatever is buffered as a barcode immediately, without waiting for the frame to
+  /// end.  Normally unnecessary: loop() frames barcodes by terminator or idle gap in every mode.
   void process_current_buffer();
 
-  /**
-   * @brief Check if the scanner is in continuous mode.
-   * @return bool True if in continuous mode or auto sense mode
-   */
+  /// Change a setting.  The value is applied (and published to HA) once the scanner ACKs it.
+  void set_setting(SettingId id, uint8_t value);
+  /// Change a setting given its option key (e.g. "medium"); invalid keys are logged and ignored.
+  void set_setting(SettingId id, const std::string &key);
+  /// The setting's current value: the one the scanner last ACKed, or the YAML value before that.
+  uint8_t get_setting(SettingId id) const { return this->settings_[static_cast<size_t>(id)]; }
+
+  OperationMode get_operation_mode() const {
+    return static_cast<OperationMode>(this->get_setting(SettingId::OPERATION_MODE));
+  }
+  /// Scan duration in milliseconds (0 for unlimited).
+  uint32_t get_scan_duration_ms() const { return scan_duration_ms(this->get_setting(SettingId::SCAN_DURATION)); }
+  /// True in continuous and auto-sense mode, where the scanner scans on its own.
   bool is_continuous_mode() const;
-
-  // State Accessors
-  /**
-   * @brief Check if the scanner is currently scanning.
-   * @return bool True if scanning is active
-   */
-  bool is_scanning() const;
-
-  /**
-   * @brief Get the current scan state
-   * @return ScanState enum value
-   */
-  ScanState get_scan_state() const;
-
-  /**
-   * @brief Set the scan state
-   * @param state The new scan state
-   */
-  void set_scan_state(ScanState state);
-
-  /**
-   * @brief Get the current operation mode.
-   * @return OperationMode Current operation mode
-   */
-  OperationMode get_operation_mode() const { return this->operation_mode_; }
-
-  /**
-   * @brief Get the current terminator setting.
-   * @return Terminator Current terminator type
-   */
-  Terminator get_terminator() const { return this->terminator_; }
-
-  /**
-   * @brief Get the current light mode.
-   * @return LightMode Current light mode
-   */
-  LightMode get_light_mode() const { return this->light_mode_; }
-
-  /**
-   * @brief Get the current locate light mode.
-   * @return LocateLightMode Current locate light mode
-   */
-  LocateLightMode get_locate_light_mode() const { return this->locate_light_mode_; }
-
-  /**
-   * @brief Get the current sound mode.
-   * @return SoundMode Current sound mode
-   */
-  SoundMode get_sound_mode() const { return this->sound_mode_; }
-
-  /**
-   * @brief Get the current buzzer volume.
-   * @return BuzzerVolume Current volume level
-   */
-  BuzzerVolume get_buzzer_volume() const { return this->buzzer_volume_; }
-
-  /**
-   * @brief Get the current decoding success light mode.
-   * @return DecodingSuccessLightMode Current decoding success light mode
-   */
-  DecodingSuccessLightMode get_decoding_success_light_mode() const { return this->decoding_success_light_mode_; }
-
-  /**
-   * @brief Get the current boot sound mode.
-   * @return BootSoundMode Current boot sound mode
-   */
-  BootSoundMode get_boot_sound_mode() const { return this->boot_sound_mode_; }
-
-  /**
-   * @brief Get the current decode sound mode.
-   * @return DecodeSoundMode Current decode sound mode
-   */
-  DecodeSoundMode get_decode_sound_mode() const { return this->decode_sound_mode_; }
-
-  /**
-   * @brief Get the current scan duration.
-   * @return ScanDuration Current scan duration
-   */
-  ScanDuration get_scan_duration() const { return this->scan_duration_; }
-
-  /**
-   * @brief Get the current stable induction time.
-   * @return StableInductionTime Current stable induction time
-   */
-  StableInductionTime get_stable_induction_time() const { return this->stable_induction_time_; }
-
-  /**
-   * @brief Get the current reading interval.
-   * @return ReadingInterval Current reading interval
-   */
-  ReadingInterval get_reading_interval() const { return this->reading_interval_; }
-
-  /**
-   * @brief Get the current same code interval.
-   * @return SameCodeInterval Current same code interval
-   */
-  SameCodeInterval get_same_code_interval() const { return this->same_code_interval_; }
-
-  /**
-   * @brief Get the current scan duration in milliseconds
-   * @return uint32_t Duration in milliseconds (0 for unlimited)
-   */
-  uint32_t get_scan_duration_ms() const;
+  bool is_scanning() const { return this->scan_state_ != ScanState::IDLE; }
+  ScanState get_scan_state() const { return this->scan_state_; }
 
  protected:
-  // CommandFactory lambdas call set_*_state() on ACK — the only external access needed.
-  friend class CommandFactory;
+  enum class CommandType : uint8_t { SETTING, START_SCAN, STOP_SCAN, GET_VERSION, FACTORY_RESET };
+  struct Command {
+    CommandType type;
+    SettingId setting{SettingId::OPERATION_MODE};  ///< SETTING only
+    uint8_t value{0};                              ///< SETTING only
+  };
+  enum class CommandState : uint8_t {
+    IDLE,         // Nothing sent for the command at the front of the queue
+    WAKEUP_SENT,  // Wake-up byte sent, waiting WAKEUP_DELAY_MS before sending the command
+    COMMAND_SENT  // Command sent, waiting for its reply
+  };
 
-  // Protected state setter methods — called by CommandFactory lambdas after ACK
-  void set_terminator_state(Terminator term);
-  void set_light_mode_state(LightMode mode);
-  void set_locate_light_mode_state(LocateLightMode mode);
-  void set_sound_mode_state(SoundMode mode);
-  void set_buzzer_volume_state(BuzzerVolume volume);
-  void set_decoding_success_light_mode_state(DecodingSuccessLightMode mode);
-  void set_boot_sound_mode_state(BootSoundMode mode);
-  void set_decode_sound_mode_state(DecodeSoundMode mode);
-  void set_scan_duration_state(ScanDuration duration);
-  void set_stable_induction_time_state(StableInductionTime time);
-  void set_reading_interval_state(ReadingInterval interval);
-  void set_same_code_interval_state(SameCodeInterval interval);
-  void set_cmd_ack_sound_mode_state(CmdAckSoundMode mode);
-  void set_config_code_scan_mode_state(ConfigCodeScanMode mode);
-  void set_operation_mode_state(OperationMode mode);
+  /// Restore the persisted settings, then queue commands for settings that must be (re)sent:
+  /// all of them without valid preferences, otherwise those whose YAML value was edited.
+  void restore_settings_();
+  /// Persist the applied settings and the YAML baseline to NVS.
+  void save_settings_();
+  /// Publish a setting's current value to its HA entity, if any.
+  void publish_setting_(SettingId id);
+  /// Apply a setting the scanner ACKed: update memory, persist to NVS and publish to HA.
+  void apply_setting_(SettingId id, uint8_t value);
 
-  // Command Processing Methods
-  /**
-   * @brief Process the command queue and send commands to the scanner.
-   */
+  void queue_command_(const Command &command);
+  /// Queue a setting command, superseding any queued command for the same setting.
+  void queue_setting_(SettingId id, uint8_t value);
   void process_command_queue_();
+  const uint8_t *command_frame_(const Command &command) const;
+  void log_command_(const char *action, const Command &command) const;
+  /// Consume the ACK or NAK for the in-flight command, or retry / drop it on timeout.
+  void handle_ack_or_timeout_();
+  /// Collect the unframed GET_VERSION response once the line has gone idle.
+  void handle_version_response_();
+  /// Pop the in-flight command off the queue and run its success or failure handling.
+  void finish_command_(bool success);
+  void set_scan_state_(ScanState state);
 
-  /**
-   * @brief Invalidate NVS preferences and trigger a safe reboot.
-   *
-   * Called by CommandFactory::create_factory_reset_command()'s on_success lambda
-   * after the scanner ACKs the factory-reset command.  Saves a zeroed
-   * ScannerPreferences struct (version=0) so configure_defaults_() on the next
-   * boot re-sends all settings unconditionally, then calls App.safe_reboot().
-   */
-  void do_factory_reset_();
-
-  /**
-   * @brief Add a command to the processing queue.
-   * @param command Unique pointer to the command to queue
-   */
-  void queue_command(std::unique_ptr<Command> command);
-
-  /**
-   * @brief Wake up the scanner before sending a command.
-   */
-  void wake_up_();
-
-  /**
-   * @brief Check if the given data contains an acknowledgment sequence.
-   * @param data Pointer to the data to check
-   * @param len Length of the data
-   * @param offset Offset into the data to start checking
-   * @return bool True if an ACK sequence is found
-   */
-  bool is_ack_sequence_(const uint8_t *data, size_t len, size_t offset = 0) const;
-
-  // Response Processing Methods
-  /**
-   * @brief Check whether the configured terminator sequence is present at the end of rx_buffer_.
-   * Used to gate barcode processing so partial UART data is not fired as an event.
-   */
-  bool has_terminator_in_buffer_() const;
-
-  /**
-   * @brief Process received barcode data.
-   */
+  void read_buffer_();
+  /// Length of the configured terminator if rx_buffer_ currently ends with it, else 0.
+  size_t terminator_length_in_buffer_() const;
+  /// Whether rx_buffer_ holds a complete barcode frame (terminator received or line idle).
+  bool has_complete_frame_() const;
   void process_barcode_();
-
-  /**
-   * @brief Request firmware version information.
-   */
-  void request_version_();
-
-  /**
-   * @brief Process received version information.
-   */
+  /// Apply a configuration barcode (its content after CONFIG_CODE_PREFIX) the scanner passed on.
+  void apply_config_code_(const std::string &code);
   void process_version_();
 
-  /**
-   * @brief Configure default scanner settings.
-   *
-   * Compares each setting against the last-saved preferences and only queues
-   * commands for values that have changed. On first boot (or after a version
-   * bump) all settings are sent so the scanner state is fully initialised.
-   */
-  void configure_defaults_();
+  ESPPreferenceObject pref_;
+  /// Current values: the YAML values until restore_settings_(), then the ones the scanner has
+  /// (restored from NVS or ACKed since)
+  SettingValues settings_{};
+  /// YAML values this firmware was built with (the baseline saved to NVS)
+  SettingValues yaml_settings_{};
+  /// Bit per setting: restored from NVS at boot (the scanner already has the value)
+  uint16_t confirmed_at_boot_{0};
+  static_assert(NUM_SETTINGS <= 16, "confirmed_at_boot_ has a bit per setting");
 
-  /**
-   * @brief Publish the current in-memory values to every registered sub-component.
-   *
-   * Called once from setup() after configure_defaults_() so that HA entities always
-   * reflect the scanner's intended state immediately on boot, even for settings whose
-   * NVS value already matches the target and therefore never trigger an ACK.
-   */
-  void publish_initial_states_();
+  CallbackManager<void(const std::string &)> barcode_callback_;
+  CallbackManager<void()> scan_timeout_callback_;
 
-  /**
-   * @brief Persist all current scanner settings to ESPHome preferences (NVS flash).
-   *
-   * Called after each successful command ACK so that subsequent boots can skip
-   * re-sending settings that are already applied.
-   */
-  void save_settings_();
+  text_sensor::TextSensor *barcode_sensor_{nullptr};
+  text_sensor::TextSensor *version_sensor_{nullptr};
+  event::Event *scan_event_{nullptr};
+  binary_sensor::BinarySensor *scanning_binary_sensor_{nullptr};
+  std::array<select::Select *, NUM_SETTINGS> selects_{};
+  std::array<switch_::Switch *, NUM_SETTINGS> switches_{};
 
-  // Buffer Management
-  /**
-   * @brief Clear the receive buffer.
-   */
-  void clear_buffer_();
+  std::vector<uint8_t> rx_buffer_;
+  std::vector<Command> command_queue_;
 
-  /**
-   * @brief Reads available data from UART and adds it to the rx_buffer_
-   */
-  void read_buffer_();
-
-  /**
-   * @brief Set the expected response type for the current command.
-   * @param type The expected response type
-   */
-  void set_expected_response_(ResponseType type);
-
-  /**
-   * @brief Write a command to the scanner and update state.
-   * @param command Reference to the command to write
-   */
-  void write_command_(const std::unique_ptr<Command> &command);
-
-  // Preferences
-  ESPPreferenceObject pref_;  ///< NVS storage for persisting scanner settings across reboots
-
-  // Callbacks
-  CallbackManager<void(std::string)> barcode_callback_;  ///< on_barcode automation triggers
-  CallbackManager<void()> scan_timeout_callback_;        ///< on_scan_timeout automation triggers
-
-  // Component State
-  text_sensor::TextSensor *barcode_sensor_{nullptr};                  ///< Sub-component: last scanned barcode
-  text_sensor::TextSensor *version_sensor_{nullptr};                  ///< Sub-component: scanner firmware version
-  event::Event *scan_event_{nullptr};                                 ///< Sub-component: fired on every successful scan
-  OperationModeSelect *operation_mode_select_{nullptr};               ///< Optional HA select for operation mode
-  BuzzerVolumeSelect *buzzer_volume_select_{nullptr};                 ///< Optional HA select for buzzer volume
-  LightModeSelect *light_mode_select_{nullptr};                       ///< Optional HA select for light mode
-  LocateLightModeSelect *locate_light_mode_select_{nullptr};          ///< Optional HA select for locate light mode
-  ScanDurationSelect *scan_duration_select_{nullptr};                 ///< Optional HA select for scan duration
-  TerminatorSelect *terminator_select_{nullptr};                      ///< Optional HA select for terminator
-  StableInductionTimeSelect *stable_induction_time_select_{nullptr};  ///< Optional HA select for stable induction time
-  ReadingIntervalSelect *reading_interval_select_{nullptr};           ///< Optional HA select for reading interval
-  SameCodeIntervalSelect *same_code_interval_select_{nullptr};        ///< Optional HA select for same code interval
-  SoundSwitch *sound_switch_{nullptr};                                ///< Optional HA switch for sound mode
-  BootSoundSwitch *boot_sound_switch_{nullptr};                       ///< Optional HA switch for boot sound mode
-  DecodeSoundSwitch *decode_sound_switch_{nullptr};                   ///< Optional HA switch for decode sound mode
-  DecodingSuccessLightSwitch *decoding_success_light_switch_{nullptr};  ///< Optional HA switch for success light
-  CmdAckSoundSwitch *cmd_ack_sound_switch_{nullptr};                    ///< Optional HA switch for cmd ACK sound
-  ConfigCodeScanSwitch *config_code_scan_switch_{nullptr};              ///< Optional HA switch for config code scanning
-  binary_sensor::BinarySensor *scanning_binary_sensor_{nullptr};        ///< Optional HA binary sensor for scan state
-
-  std::vector<uint8_t> rx_buffer_;                       ///< Buffer for received data
-  std::vector<std::unique_ptr<Command>> command_queue_;  ///< Queue of pending commands
-
-  ScanState scan_state_{ScanState::IDLE};               ///< Current detailed scan state
-  bool waiting_for_ack_{false};                         ///< Whether waiting for command acknowledgment
-  bool initial_states_published_{false};                ///< Guard for one-shot publish_initial_states_() in loop()
-  uint32_t last_command_time_{0};                       ///< Timestamp of last command sent
-  uint32_t last_rx_time_{0};                            ///< millis() of the last byte received into rx_buffer_
-  uint32_t scan_started_at_{0};                         ///< millis() when start_scan() was called; 0 = idle
-  CommandState command_state_{CommandState::IDLE};      ///< Current command processing state
-  ResponseType expected_response_{ResponseType::NONE};  ///< Expected response type
-  uint8_t command_attempts_{0};  ///< Send attempts for the current front-of-queue command; reset on success or drop
-
-  // Scanner Settings
-  OperationMode operation_mode_{OperationMode::HOST};                                 ///< Current operation mode
-  Terminator terminator_{Terminator::NONE};                                           ///< Current terminator setting
-  LightMode light_mode_{LightMode::LIGHT_ON_WHEN_READING};                            ///< Current light mode
-  LocateLightMode locate_light_mode_{LocateLightMode::LOCATE_LIGHT_ON_WHEN_READING};  ///< Current locate light mode
-  SoundMode sound_mode_{SoundMode::SOUND_DISABLED};                                   ///< Current sound mode
-  BuzzerVolume buzzer_volume_{BuzzerVolume::BUZZER_VOLUME_LOW};                       ///< Current buzzer volume
-  DecodingSuccessLightMode decoding_success_light_mode_{
-      DecodingSuccessLightMode::DECODING_LIGHT_ENABLED};                        ///< Current decoding success light mode
-  BootSoundMode boot_sound_mode_{BootSoundMode::BOOT_SOUND_DISABLED};           ///< Current boot sound mode
-  DecodeSoundMode decode_sound_mode_{DecodeSoundMode::DECODE_SOUND_ENABLED};    ///< Current decode sound mode
-  ScanDuration scan_duration_{ScanDuration::MS_3000};                           ///< Current scan duration
-  StableInductionTime stable_induction_time_{StableInductionTime::MS_500};      ///< Current stable induction time
-  ReadingInterval reading_interval_{ReadingInterval::MS_500};                   ///< Current reading interval
-  SameCodeInterval same_code_interval_{SameCodeInterval::MS_500};               ///< Current same code interval
-  CmdAckSoundMode cmd_ack_sound_mode_{CmdAckSoundMode::CMD_ACK_SOUND_ENABLED};  ///< Current cmd ACK sound mode
-  ConfigCodeScanMode config_code_scan_mode_{
-      ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED};  ///< Current config code scan mode
+  ScanState scan_state_{ScanState::IDLE};
+  CommandState command_state_{CommandState::IDLE};
+  bool initial_states_published_{false};  ///< Guard for the one-shot publish in loop()
+  bool discard_frame_{false};             ///< Drop the rest of the current frame after an RX buffer overflow
+  bool scan_timer_active_{false};         ///< A HOST-mode scan is running and may time out
+  uint8_t command_attempts_{0};           ///< Send attempts for the front-of-queue command
+  uint32_t last_command_time_{0};         ///< millis() of the last wake-up or command sent
+  uint32_t last_rx_time_{0};              ///< millis() of the last byte received into rx_buffer_
+  uint32_t scan_started_at_{0};           ///< millis() when the scanner ACKed start
 };
 
-/// Trigger fired whenever a barcode is successfully decoded.
-/// Use via `on_barcode:` in YAML to run automations with the scanned code as `x`.
-class BarcodeTrigger : public Trigger<std::string> {
- public:
-  explicit BarcodeTrigger(BarcodeScanner *parent) {
-    parent->add_on_barcode_callback([this](std::string barcode) { this->trigger(std::move(barcode)); });
-  }
-};
-
-/// Trigger fired when a HOST-mode scan times out (scan_duration elapsed without a result).
-/// Use via `on_scan_timeout:` in YAML for error handling and user feedback automations.
-class ScanTimeoutTrigger : public Trigger<> {
- public:
-  explicit ScanTimeoutTrigger(BarcodeScanner *parent) {
-    parent->add_on_scan_timeout_callback([this]() { this->trigger(); });
-  }
-};
-
-/// Select sub-component that exposes the scanner's operation mode as a Home Assistant
-/// select entity. Changing the select in HA sends the appropriate UART command and waits
-/// for the scanner ACK before publishing the new confirmed state.
-class OperationModeSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  /// Returns the YAML key string for an OperationMode enum value (used when publishing state).
-  static const char *to_key(OperationMode mode) {
-    switch (mode) {
-      case OperationMode::LEVEL:
-        return "level";
-      case OperationMode::PULSE:
-        return "pulse";
-      case OperationMode::CONTINUOUS:
-        return "continuous";
-      case OperationMode::AUTO_SENSE:
-        return "auto_sense";
-      default:
-        return "host";
-    }
-  }
-
+/// HA select for a scanner setting: the option index is the setting value.
+/// The displayed state only changes once the scanner ACKs the new value.
+template<SettingId S> class SettingSelect : public select::Select, public Parented<BarcodeScanner> {
  protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
+  void control(size_t index) override { this->parent_->set_setting(S, static_cast<uint8_t>(index)); }
 };
 
-/// Select sub-component for buzzer_volume. Exposes the three volume levels as a HA select.
-class BuzzerVolumeSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  static const char *to_key(BuzzerVolume volume) {
-    switch (volume) {
-      case BuzzerVolume::BUZZER_VOLUME_HIGH:
-        return "high";
-      case BuzzerVolume::BUZZER_VOLUME_MEDIUM:
-        return "medium";
-      default:
-        return "low";
-    }
-  }
-
+/// HA switch for a two-state scanner setting (options "disabled", "enabled").
+/// The displayed state only changes once the scanner ACKs the new value.
+template<SettingId S> class SettingSwitch : public switch_::Switch, public Parented<BarcodeScanner> {
  protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
+  void write_state(bool state) override { this->parent_->set_setting(S, static_cast<uint8_t>(state)); }
 };
 
-/// Select sub-component for light_mode (main illumination light).
-class LightModeSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  static const char *to_key(LightMode mode) {
-    switch (mode) {
-      case LightMode::LIGHT_ALWAYS_ON:
-        return "always_on";
-      case LightMode::LIGHT_ALWAYS_OFF:
-        return "always_off";
-      default:
-        return "on_when_reading";
-    }
-  }
-
+/// HA button that invokes a scanner operation.
+template<void (BarcodeScanner::*Method)()>
+class ScannerButton : public button::Button, public Parented<BarcodeScanner> {
  protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
+  void press_action() override { (this->parent_->*Method)(); }
 };
 
-/// Select sub-component for locate_light_mode (aiming pattern light).
-class LocateLightModeSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  static const char *to_key(LocateLightMode mode) {
-    switch (mode) {
-      case LocateLightMode::LOCATE_LIGHT_ALWAYS_ON:
-        return "always_on";
-      case LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF:
-        return "always_off";
-      default:
-        return "on_when_reading";
-    }
-  }
-
- protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Select sub-component for scan_duration (how long the scanner tries before giving up).
-class ScanDurationSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  static const char *to_key(ScanDuration duration) {
-    switch (duration) {
-      case ScanDuration::MS_500:
-        return "500ms";
-      case ScanDuration::MS_1000:
-        return "1s";
-      case ScanDuration::MS_3000:
-        return "3s";
-      case ScanDuration::MS_5000:
-        return "5s";
-      case ScanDuration::MS_10000:
-        return "10s";
-      case ScanDuration::MS_15000:
-        return "15s";
-      case ScanDuration::MS_20000:
-        return "20s";
-      case ScanDuration::UNLIMITED:
-        return "unlimited";
-    }
-    return nullptr;  // Unreachable: all enum values handled above
-  }
-
- protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Select sub-component for terminator (suffix appended to each barcode output).
-class TerminatorSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  static const char *to_key(Terminator term) {
-    switch (term) {
-      case Terminator::CRLF:
-        return "crlf";
-      case Terminator::CR:
-        return "cr";
-      case Terminator::TAB:
-        return "tab";
-      case Terminator::CRCR:
-        return "crcr";
-      case Terminator::CRLFCRLF:
-        return "crlfcrlf";
-      default:
-        return "none";
-    }
-  }
-
- protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Select sub-component for stable_induction_time (how long the scanner waits before triggering).
-class StableInductionTimeSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  static const char *to_key(StableInductionTime time) {
-    switch (time) {
-      case StableInductionTime::MS_0:
-        return "0ms";
-      case StableInductionTime::MS_100:
-        return "100ms";
-      case StableInductionTime::MS_300:
-        return "300ms";
-      case StableInductionTime::MS_1000:
-        return "1s";
-      default:
-        return "500ms";
-    }
-  }
-
- protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Select sub-component for reading_interval (minimum time between scans in continuous mode).
-class ReadingIntervalSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  static const char *to_key(ReadingInterval interval) {
-    switch (interval) {
-      case ReadingInterval::MS_0:
-        return "0ms";
-      case ReadingInterval::MS_100:
-        return "100ms";
-      case ReadingInterval::MS_300:
-        return "300ms";
-      case ReadingInterval::MS_1000:
-        return "1s";
-      case ReadingInterval::MS_1500:
-        return "1.5s";
-      case ReadingInterval::MS_2000:
-        return "2s";
-      default:
-        return "500ms";
-    }
-  }
-
- protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Select sub-component for same_code_interval (minimum time before the same barcode is re-reported).
-class SameCodeIntervalSelect : public select::Select, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
-  static const char *to_key(SameCodeInterval interval) {
-    switch (interval) {
-      case SameCodeInterval::MS_0:
-        return "0ms";
-      case SameCodeInterval::MS_100:
-        return "100ms";
-      case SameCodeInterval::MS_300:
-        return "300ms";
-      case SameCodeInterval::MS_1000:
-        return "1s";
-      case SameCodeInterval::MS_1500:
-        return "1.5s";
-      case SameCodeInterval::MS_2000:
-        return "2s";
-      default:
-        return "500ms";
-    }
-  }
-
- protected:
-  void control(const std::string &value) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Switch sub-component for sound_mode — maps the HA toggle to SOUND_ENABLED / SOUND_DISABLED.
-class SoundSwitch : public switch_::Switch, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void write_state(bool state) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Switch sub-component for boot_sound_mode — controls whether the scanner beeps on power-up.
-class BootSoundSwitch : public switch_::Switch, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void write_state(bool state) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Switch sub-component for decode_sound_mode — controls whether the scanner beeps on decode.
-class DecodeSoundSwitch : public switch_::Switch, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void write_state(bool state) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Switch sub-component for decoding_success_light_mode — controls the success flash.
-class DecodingSuccessLightSwitch : public switch_::Switch, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void write_state(bool state) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Switch sub-component for cmd_ack_sound_mode — controls whether the scanner beeps on config ACK.
-class CmdAckSoundSwitch : public switch_::Switch, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void write_state(bool state) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Switch sub-component for config_code_scan_mode — controls whether config barcodes are accepted.
-class ConfigCodeScanSwitch : public switch_::Switch, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void write_state(bool state) override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Button sub-component that starts a HOST-mode scan when pressed in Home Assistant.
-class StartButton : public button::Button, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void press_action() override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Button sub-component that stops the current HOST-mode scan when pressed in Home Assistant.
-class StopButton : public button::Button, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void press_action() override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
-
-/// Button sub-component that resets the scanner to factory defaults and reboots the ESP.
-/// After ACK the component invalidates its NVS preferences and calls App.safe_reboot() so
-/// all YAML-configured settings are re-applied on the next boot.
-class FactoryResetButton : public button::Button, public Component {
- public:
-  void set_scanner(BarcodeScanner *scanner) { scanner_ = scanner; }
-
- protected:
-  void press_action() override;
-
- private:
-  BarcodeScanner *scanner_{nullptr};
-};
+using StartButton = ScannerButton<&BarcodeScanner::start_scan>;
+using StopButton = ScannerButton<&BarcodeScanner::stop_scan>;
+using FactoryResetButton = ScannerButton<&BarcodeScanner::factory_reset>;
 
 }  // namespace m5stack_barcode
 }  // namespace esphome
-
-// Include action/condition template bodies now that BarcodeScanner is fully defined.
-// Must be at end-of-file so BarcodeScanner is complete when the bodies are compiled.
-#include "actions_impl.h"

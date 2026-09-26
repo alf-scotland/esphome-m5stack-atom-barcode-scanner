@@ -1,0 +1,414 @@
+<title>Atom Scanner Field Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+:root {
+  --paper: #f3f4f1;
+  --surface: #ffffff;
+  --ink: #1a1f28;
+  --muted: #5a6371;
+  --line: #d8dcd4;
+  --accent: #0b6b87;
+  --accent-soft: #e2eff3;
+  --pass: #1e7b43;
+  --pass-soft: #e3f2e8;
+  --fail: #b42318;
+  --fail-soft: #fbe6e4;
+  --skip: #6b7280;
+  --skip-soft: #eceef1;
+  --shadow: 0 1px 2px rgb(26 31 40 / 0.06);
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --cond: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #111419;
+    --surface: #181c23;
+    --ink: #e7eaef;
+    --muted: #9aa4b2;
+    --line: #2a313c;
+    --accent: #5ab4d4;
+    --accent-soft: #16303a;
+    --pass: #52c07a;
+    --pass-soft: #15301f;
+    --fail: #f06a5f;
+    --fail-soft: #3a1a18;
+    --skip: #9aa4b2;
+    --skip-soft: #23282f;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #111419;
+  --surface: #181c23;
+  --ink: #e7eaef;
+  --muted: #9aa4b2;
+  --line: #2a313c;
+  --accent: #5ab4d4;
+  --accent-soft: #16303a;
+  --pass: #52c07a;
+  --pass-soft: #15301f;
+  --fail: #f06a5f;
+  --fail-soft: #3a1a18;
+  --skip: #9aa4b2;
+  --skip-soft: #23282f;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+  padding-inline: 16px;
+}
+.bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  margin-inline: -16px;
+  padding: 10px 16px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.bar-inner, main { max-width: 46rem; margin-inline: auto; }
+.bar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.name { font: 600 1.05rem/1.2 var(--cond); letter-spacing: 0.01em; margin: 0; flex: 1 1 auto; }
+.counts { font: 500 0.8rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.counts b { font-weight: 500; }
+.counts .c-pass { color: var(--pass); }
+.counts .c-fail { color: var(--fail); }
+.meter { flex-basis: 100%; display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--line); }
+.meter span { display: block; height: 100%; }
+.meter .m-pass { background: var(--pass); }
+.meter .m-fail { background: var(--fail); }
+.meter .m-skip { background: var(--skip); }
+.bar-actions { display: flex; gap: 8px; }
+.btn {
+  font: 500 0.82rem var(--cond);
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn:hover { background: var(--accent-soft); }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { padding-block: 20px 64px; }
+.run { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 8px; color: var(--muted); font-size: 0.85rem; }
+.run label { font: 500 0.78rem var(--cond); letter-spacing: 0.06em; text-transform: uppercase; }
+.run input { font: 0.85rem var(--mono); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; width: 14rem; max-width: 100%; }
+.storage { flex-basis: 100%; }
+h2 {
+  font: 600 1.25rem/1.25 var(--cond);
+  text-wrap: balance;
+  margin: 36px 0 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.pnum { font: 500 0.8rem var(--mono); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; }
+main p, main li { max-width: 65ch; }
+main code { font: 0.86em var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
+main a { color: var(--accent); }
+ul { padding-left: 1.2rem; }
+ul:has(> .step) { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.step {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+  max-width: none;
+  display: grid;
+  gap: 6px;
+}
+.step[data-status="pass"] { background: var(--pass-soft); border-color: color-mix(in srgb, var(--pass) 35%, var(--line)); }
+.step[data-status="fail"] { background: var(--fail-soft); border-color: color-mix(in srgb, var(--fail) 45%, var(--line)); }
+.step[data-status="skip"] { background: var(--skip-soft); }
+.step-head { display: flex; gap: 8px; align-items: center; }
+.sid { font: 500 0.82rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.gate { font: 600 0.68rem var(--cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fail); border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; }
+.step-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mark {
+  font: 500 0.8rem var(--cond);
+  letter-spacing: 0.03em;
+  min-width: 4.2rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+.mark[aria-pressed="true"][data-status="pass"] { background: var(--pass); border-color: var(--pass); color: var(--surface); }
+.mark[aria-pressed="true"][data-status="fail"] { background: var(--fail); border-color: var(--fail); color: var(--surface); }
+.mark[aria-pressed="true"][data-status="skip"] { background: var(--skip); border-color: var(--skip); color: var(--surface); }
+.note { flex: 1 1 10rem; min-width: 0; font: 0.85rem var(--sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.chip {
+  font: 500 0.8rem var(--mono);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); }
+.led { display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%; margin-right: 0.3em; vertical-align: -0.02em; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.2); }
+.led-blue { background: #1f5eff; }
+.led-purple { background: #b01cc8; }
+.led-green { background: #1cc84a; }
+.led-orange { background: #ff8a14; }
+.led-white { background: #f4f4f4; }
+.led-red { background: #f0231a; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 0.88rem; }
+th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 4px 10px 4px 0; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 12px; }
+.card {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+}
+.card:hover { border-color: var(--accent); }
+.card-code { display: grid; place-items: center; background: #fff; border-radius: 4px; aspect-ratio: 1; max-width: 100%; padding: 6px; }
+.card-code svg { width: 100%; height: 100%; }
+.card-label { font: 600 1rem var(--cond); }
+.card-kind { font-size: 0.78rem; color: var(--muted); }
+.card-content { font: 0.75rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: #fff;
+  color: #111;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+}
+.overlay-code { display: grid; place-items: center; min-height: 0; }
+.overlay-code svg { width: min(88vw, 70vh); height: auto; max-height: 70vh; }
+.overlay-code.linear svg { width: min(94vw, 40rem); }
+.overlay-foot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; font: 0.9rem var(--sans); }
+.overlay-foot b { font: 600 1.3rem var(--cond); margin-right: 8px; }
+.overlay-foot .content { font: 0.8rem var(--mono); color: #444; overflow-wrap: anywhere; flex: 1 1 12rem; }
+.overlay .close { font: 600 0.95rem var(--cond); border: 1px solid #111; background: #fff; color: #111; border-radius: 6px; padding: 8px 18px; cursor: pointer; }
+.copy-box { width: 100%; min-height: 8rem; font: 0.8rem var(--mono); margin-top: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .step { transition: background-color 0.15s, border-color 0.15s; }
+}
+</style>
+
+<div class="bar">
+  <div class="bar-inner">
+    <p class="name">Atom Scanner Field Test</p>
+    <span class="counts" id="counts"></span>
+    <div class="bar-actions">
+      <a class="btn" href="#barcodes">Barcodes</a>
+      <button type="button" class="btn" id="copy">Copy results</button>
+    </div>
+    <div class="meter" id="meter" aria-hidden="true"></div>
+  </div>
+</div>
+
+<main>
+  <div class="run">
+    <label for="build">Firmware under test</label>
+    <input id="build" type="text" placeholder="e.g. PR #105 @ abc1234" autocomplete="off">
+    <span class="storage" id="storage">Results are kept in this browser.</span>
+  </div>
+  <textarea class="copy-box" id="copy-box" hidden readonly aria-label="Results as text"></textarea>
+
+  {{PLAN}}
+
+  <h2 id="barcodes">Barcodes</h2>
+  <p>Tap a barcode to show it full-screen, then hold the scanner 10–20 cm from the screen at full brightness.</p>
+  <div class="gallery">
+  {{GALLERY}}
+  </div>
+</main>
+
+<div class="overlay" id="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="ov-label">
+  <div class="overlay-code" id="ov-code"></div>
+  <div class="overlay-foot">
+    <span><b id="ov-label"></b><span id="ov-purpose"></span></span>
+    <span class="content" id="ov-content"></span>
+    <button type="button" class="close" id="ov-close">Close</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STEPS = {{STEPS}};
+  const CODES = {{CODES}};
+  const LOCAL_KEY = "atom-field-test-results";
+  const results = {};
+  let build = "";
+  let db = null;
+
+  // ── Rendering ──
+  function render() {
+    let pass = 0, fail = 0, skip = 0;
+    for (const id of STEPS) {
+      const r = results[id] || {};
+      const el = document.querySelector(`[data-step="${CSS.escape(id)}"]`);
+      if (!el) continue;
+      if (r.status) el.dataset.status = r.status; else delete el.dataset.status;
+      for (const b of el.querySelectorAll(".mark")) b.setAttribute("aria-pressed", String(b.dataset.status === r.status));
+      const note = el.querySelector(".note");
+      if (document.activeElement !== note) note.value = r.note || "";
+      if (r.status === "pass") pass++; else if (r.status === "fail") fail++; else if (r.status === "skip") skip++;
+    }
+    const done = pass + fail + skip;
+    document.getElementById("counts").innerHTML =
+      `${done}/${STEPS.length} recorded · <b class="c-pass">${pass} pass</b> · <b class="c-fail">${fail} fail</b> · ${skip} skipped`;
+    const pct = (n) => (100 * n / STEPS.length).toFixed(2) + "%";
+    document.getElementById("meter").innerHTML =
+      `<span class="m-pass" style="width:${pct(pass)}"></span><span class="m-fail" style="width:${pct(fail)}"></span><span class="m-skip" style="width:${pct(skip)}"></span>`;
+    const buildInput = document.getElementById("build");
+    if (document.activeElement !== buildInput) buildInput.value = build;
+  }
+
+  // ── Storage: the artifact's database when available, else this browser ──
+  function loadLocal() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}");
+      Object.assign(results, saved.results || {});
+      build = saved.build || "";
+    } catch (e) { /* storage unavailable: start empty */ }
+  }
+  function saveLocal() {
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ results, build })); } catch (e) { /* ignore */ }
+  }
+  const pending = new Map();  // doc path -> promise chain, one write at a time per document
+  function write(path, body) {
+    if (!db) { saveLocal(); return; }
+    const prev = pending.get(path) || Promise.resolve();
+    const next = prev.then(() => (body ? db.doc(path).set(body) : db.doc(path).delete())).catch((e) => {
+      document.getElementById("storage").textContent = "Could not save to the shared results (" + (e && e.code || "error") + "); keep this page open and copy the results.";
+    });
+    pending.set(path, next);
+  }
+  function record(id) {
+    // The note comes from its input: a snapshot may have replaced results[id] meanwhile.
+    const input = document.getElementById("note-" + id.replace(".", "-"));
+    const r = results[id] || (results[id] = {});
+    r.note = input ? input.value : r.note || "";
+    const body = r.status || r.note ? { step: id, status: r.status || null, note: r.note, at: new Date().toISOString() } : null;
+    write("results/" + id.replace(".", "-"), body);
+  }
+
+  // ── Interaction ──
+  document.addEventListener("click", (ev) => {
+    const mark = ev.target.closest(".mark");
+    if (mark) {
+      const id = mark.closest(".step").dataset.step;
+      const r = results[id] || (results[id] = {});
+      r.status = r.status === mark.dataset.status ? null : mark.dataset.status;
+      render();
+      record(id);
+      return;
+    }
+    const code = ev.target.closest("[data-code]");
+    if (code) openCode(code.dataset.code);
+  });
+  const timers = {};
+  document.addEventListener("input", (ev) => {
+    if (ev.target.classList.contains("note")) {
+      const id = ev.target.closest(".step").dataset.step;
+      (results[id] || (results[id] = {})).note = ev.target.value;
+      clearTimeout(timers[id]);
+      timers[id] = setTimeout(() => { render(); record(id); }, 700);
+    } else if (ev.target.id === "build") {
+      build = ev.target.value;
+      clearTimeout(timers.build);
+      timers.build = setTimeout(() => write("meta/run", { build, at: new Date().toISOString() }), 700);
+    }
+  });
+
+  // ── Barcode overlay ──
+  let wakeLock = null;
+  function openCode(label) {
+    const c = CODES[label];
+    if (!c) return;
+    const box = document.getElementById("ov-code");
+    box.innerHTML = c.svg;
+    box.classList.toggle("linear", c.kind !== "QR");
+    document.getElementById("ov-label").textContent = label;
+    document.getElementById("ov-purpose").textContent = c.kind + " · " + c.purpose;
+    document.getElementById("ov-content").textContent = c.content;
+    document.getElementById("overlay").hidden = false;
+    document.getElementById("ov-close").focus();
+    if (navigator.wakeLock) navigator.wakeLock.request("screen").then((l) => { wakeLock = l; }).catch(() => {});
+  }
+  function closeCode() {
+    document.getElementById("overlay").hidden = true;
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+  document.getElementById("ov-close").addEventListener("click", closeCode);
+  document.getElementById("overlay").addEventListener("click", (ev) => { if (ev.target.id === "overlay") closeCode(); });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeCode(); });
+
+  // ── Copy results ──
+  document.getElementById("copy").addEventListener("click", () => {
+    const lines = ["Atom Scanner Field Test" + (build ? " — " + build : "")];
+    for (const id of STEPS) {
+      const r = results[id];
+      if (r && (r.status || r.note)) lines.push(`${id} ${(r.status || "note").toUpperCase()}${r.note ? " — " + r.note : ""}`);
+    }
+    const text = lines.join("\n");
+    const box = document.getElementById("copy-box");
+    const showBox = () => { box.hidden = false; box.value = text; box.select(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        const b = document.getElementById("copy");
+        b.textContent = "Copied";
+        setTimeout(() => { b.textContent = "Copy results"; }, 1500);
+      }, showBox);
+    } else {
+      showBox();
+    }
+  });
+
+  // ── Start ──
+  loadLocal();
+  render();
+  if (window.claude && window.claude.use) {
+    window.claude.use("db").then((d) => {
+      if (!d) return;
+      db = d;
+      document.getElementById("storage").textContent = "Results are saved with this page, so they can be read back after the test.";
+      db.collection("results").onSnapshot((snap) => {
+        // The snapshot is the whole stored set: rebuild from it.
+        for (const id of Object.keys(results)) delete results[id];
+        for (const doc of snap.docs) {
+          const data = doc.data();
+          if (data && data.step) results[data.step] = { status: data.status || null, note: data.note || "" };
+        }
+        render();
+      }, () => {
+        document.getElementById("storage").textContent = "Shared results are unavailable; results are kept in this browser.";
+        db = null;
+      });
+      db.doc("meta/run").onSnapshot((snap) => {
+        if (snap.exists) { build = (snap.data() || {}).build || ""; render(); }
+      });
+    }).catch(() => {});
+  }
+})();
+</script>

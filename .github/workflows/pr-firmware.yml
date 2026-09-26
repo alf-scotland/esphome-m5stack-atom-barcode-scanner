@@ -9,7 +9,9 @@ on:
       - 'firmware/**'
       - 'firmware.yaml'
       - 'components/**'
-      - '.github/workflows/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/pr-firmware.yml'
   workflow_dispatch:
     inputs:
       ref:
@@ -17,12 +19,14 @@ on:
         required: true
         default: 'main'
 
-# Define required permissions explicitly
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
-  actions: read
+  pull-requests: write  # post the artifact link comment
+  actions: read         # look up the uploaded artifact
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-pr-firmware:
@@ -32,73 +36,54 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version-file: 'pyproject.toml'
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
         with:
           enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
-          version: "0.6.10"
 
       - name: Install dependencies
-        # No --dev: PR firmware builds only need esphome, not lint/format tools.
-        run: uv sync --all-extras
+        # No dev group: firmware builds only need esphome, not lint/format tools.
+        run: uv sync --locked --no-dev
 
-      - name: Get PR number
-        id: get_pr
-        if: github.event_name == 'pull_request'
-        run: |
-          echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          echo "pr_branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
-
-      - name: Set reference info
+      - name: Set build name
         id: set_ref
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          INPUT_REF: ${{ github.event.inputs.ref }}
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "ref_name=pr-${{ steps.get_pr.outputs.pr_number }}" >> $GITHUB_OUTPUT
+          if [ -n "$PR_NUMBER" ]; then
+            echo "ref_name=pr-$PR_NUMBER" >> "$GITHUB_OUTPUT"
           else
-            echo "ref_name=${{ github.event.inputs.ref || github.ref_name }}" >> $GITHUB_OUTPUT
+            # Branch names may contain '/', which artifact names and versions cannot.
+            echo "ref_name=${INPUT_REF//\//-}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Update version in firmware
+      - name: Stamp the build name as the firmware version
+        env:
+          BUILD_NAME: ${{ steps.set_ref.outputs.ref_name }}
         run: |
-          # Stamp a PR-specific version so the built binary is identifiable
-          PR_VERSION="${{ steps.set_ref.outputs.ref_name }}"
-          sed -i "s/project_version: \".*\"/project_version: \"$PR_VERSION\"/" firmware/atom_lite.yaml
+          sed -i "s|project_version: \".*\"|project_version: \"$BUILD_NAME\"|" firmware/atom_lite.yaml
 
-      - name: Create secrets for CI build
-        run: |
-          # Dummy values — valid format, not used on real hardware.
-          # The base64 key is 32 bytes encoded (required by ESPHome noise_psk).
-          cat > firmware/secrets.yaml << 'EOF'
-          api_encryption_key: "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
-          ota_password: "ci_ota_password_not_for_real_use"
-          EOF
+      - name: Cache ESPHome toolchains
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/.esphome
+            ~/.platformio
+          key: esphome-esp32-${{ hashFiles('uv.lock') }}
 
       - name: Compile firmware
-        run: |
-          uv run esphome compile firmware/atom_lite.yaml
+        run: uv run esphome compile firmware/atom_lite.yaml
 
-      - name: Find and copy firmware files
-        id: find_firmware
+      - name: Collect firmware files
         run: |
-          # Create a directory for the firmware files
           mkdir -p firmware-files
-
-          # Copy all firmware files to the firmware-files directory
-          find . -path '*/.esphome/*' -type f -name "*.bin" -exec cp {} firmware-files/ \;
-
-          # List the firmware files and log them
-          echo "Available firmware files:"
+          find firmware/.esphome -type f -name "*.bin" -exec cp {} firmware-files/ \;
           ls -la firmware-files/
 
       - name: Upload firmware artifacts
-        id: upload_artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: pr-firmware-${{ steps.set_ref.outputs.ref_name }}
@@ -107,94 +92,45 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
-      - name: Delete previous workflow comments
-        if: github.event_name == 'pull_request'
+      - name: Comment with firmware download link
+        # Fork PRs get a read-only token, so they cannot be commented on.
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        env:
+          ARTIFACT_NAME: pr-firmware-${{ steps.set_ref.outputs.ref_name }}
         with:
           script: |
-            // Get all comments on the PR
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number
-            });
+            const {owner, repo} = context.repo;
+            const issue_number = context.issue.number;
 
-            // Find and delete previous workflow comments that start with "## Firmware Build"
-            for (const comment of comments.data) {
-              if (comment.body.trim().startsWith('## Firmware Build') &&
-                  comment.user.login === 'github-actions[bot]') {
-                await github.rest.issues.deleteComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: comment.id
-                });
-                console.log(`Deleted comment ${comment.id}`);
+            // Replace the previous build comment instead of accumulating them.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            for (const comment of comments) {
+              if (comment.user.login === 'github-actions[bot]' &&
+                  comment.body.trim().startsWith('## Firmware Build')) {
+                await github.rest.issues.deleteComment({owner, repo, comment_id: comment.id});
               }
             }
 
-      - name: Add PR comment with firmware link
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
-        with:
-          script: |
-            const artifactName = `pr-firmware-pr-${{ steps.get_pr.outputs.pr_number }}`;
-            const runId = context.runId;
-            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
-
-            // Direct download URL for the artifacts page
-            const downloadUrl = `${repoUrl}/actions/runs/${runId}/artifacts`;
-
-            // Get artifacts info to provide the exact artifact URL if possible
-            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: runId
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              owner, repo, run_id: context.runId,
             });
+            const artifact = artifacts.find(a => a.name === process.env.ARTIFACT_NAME);
+            const artifactUrl = artifact ? `${runUrl}/artifacts/${artifact.id}` : runUrl;
 
-            // Try to find our specific artifact
-            const artifact = artifacts.data.artifacts.find(a => a.name === artifactName);
-
-            // If we found the artifact, use its direct URL, otherwise use the artifacts page
-            const artifactUrl = artifact
-              ? `${downloadUrl}/${artifact.id}`
-              : downloadUrl;
-
-            // Generate description of firmware files
-            const firmwareFiles = [
-              {name: "firmware.bin", description: "Main firmware - For standard flashing via ESPHome dashboard"},
-              {name: "firmware.factory.bin", description: "Factory firmware - For first-time flashing or complete reset"},
-              {name: "firmware.ota.bin", description: "OTA firmware - For OTA updates"}
-            ];
-
-            let firmwareFilesHtml = firmwareFiles.map(file =>
-              `- **${file.name}** - ${file.description}`
-            ).join('\n');
-
-            const comment = `## Firmware Build
-
-            ✅ Firmware has been built for this PR for testing.
-
-            ### Download Firmware Files
-
-            [📥 **Download Firmware Artifacts**](${artifactUrl})
-
-            The download includes:
-            ${firmwareFilesHtml}
-
-            ### How to flash
-
-            1. Download and extract the firmware zip from the link above
-            2. Select the appropriate firmware file based on your needs
-            3. Flash it using one of these methods:
-               - ESPHome dashboard in Home Assistant
-               - Web flasher at [web.esphome.io](https://web.esphome.io/)
-               - ESPHome command line tool
-
-            This allows for easy testing of changes without rebuilding firmware.`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
+            const body = [
+              '## Firmware Build',
+              '',
+              `Firmware for commit ${context.payload.pull_request.head.sha.slice(0, 7)} is ready for testing.`,
+              '',
+              `[📥 **Download firmware artifacts**](${artifactUrl})`,
+              '',
+              '- **firmware.factory.bin** — first-time flashing or complete reset (e.g. via https://web.esphome.io/)',
+              '- **firmware.ota.bin** — OTA update from the ESPHome dashboard or CLI',
+            ].join('\n');
+            await github.rest.issues.createComment({owner, repo, issue_number, body});

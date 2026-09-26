@@ -18,7 +18,7 @@ This project adheres to the [ESPHome Code of Conduct](https://github.com/esphome
 
 2. Install all dependencies (including dev tools):
    ```bash
-   uv sync --all-extras --dev
+   uv sync
    ```
 
 3. Install pre-commit hooks:
@@ -31,7 +31,6 @@ This project adheres to the [ESPHome Code of Conduct](https://github.com/esphome
 - `main`: The main development branch, should always be in a stable state.
 - `feat/*`: Feature branches for new features or major changes.
 - `fix/*`: Bugfix branches for bug fixes.
-- `hotfix/*`: Urgent fixes that need to go directly to `main`.
 - `refactor/*`: Refactoring without behaviour change.
 - `ci/*`: CI/CD changes.
 - `docs/*`: Documentation-only changes.
@@ -52,8 +51,10 @@ This project adheres to the [ESPHome Code of Conduct](https://github.com/esphome
    uv run pre-commit run --all-files
    ```
 
-4. Verify the firmware compiles:
+4. Run the tests and verify the firmware compiles:
    ```bash
+   uv run pytest tests/                 # config, codegen and consistency tests
+   uv run pytest -m integration         # host build against an emulated scanner
    uv run esphome compile firmware/atom_lite.yaml
    ```
 
@@ -75,47 +76,28 @@ uv run pre-commit run cppcheck --all-files
 uv run pre-commit run clang-tidy --hook-stage manual
 ```
 
-### Versioning Scheme
+## Releases
 
-We follow CalVer (`YYYY.MM.PATCH`), matching ESPHome's scheme.
-
-Example: `2026.3.0`, `2026.3.1`, etc.
-
-For pre-releases: `YYYY.MM.PATCH-beta.N` or `YYYY.MM.PATCH-rc.N`
-
-Example: `2026.3.0-beta.1`
-
-## Release Process
-
-1. Update `project_version` in the `substitutions:` block of `firmware/atom_lite.yaml`:
-   ```yaml
-   substitutions:
-     project_version: "YYYY.MM.PATCH"
-   ```
-
-2. Commit the version bump to `main`.
-
-3. Tag the release and push the tag:
-   ```bash
-   git tag vYYYY.MM.PATCH
-   git push origin vYYYY.MM.PATCH
-   ```
-
-4. The CI will build the firmware and publish a GitHub Release with binary assets.
-   The tag must match `project_version` exactly — CI validates this before building.
-
-See `.github/BRANCHING_AND_RELEASES.md` for full details.
+See [RELEASING.md](RELEASING.md).
 
 ## Code Style
 
 - Python: We follow the [ESPHome Python style guide](https://github.com/esphome/esphome/blob/dev/CONTRIBUTING.md#python-style); enforced by `ruff`
-- C++: C++17, column limit 120; enforced by `clang-format` v17 (`.clang-format`)
+- C++: C++17, column limit 120; enforced by `clang-format` (`.clang-format`, version pinned in `.pre-commit-config.yaml`)
 - YAML: enforced by `yamllint` (`.yamllint.yaml`)
 
 ## Testing
 
-- Test your changes with actual hardware whenever possible
+- Test your changes on hardware with the PR's firmware artifact, following
+  [`tests/hardware/TEST_PLAN.md`](../tests/hardware/TEST_PLAN.md): the steps your change
+  touches, or the whole plan before a release
 - Ensure your code works with the pinned ESPHome release (`pyproject.toml`)
+- Protocol behaviour (ACKs, framing, timeouts) is covered by `tests/integration/`, which
+  runs the component on ESPHome's host platform against `fake_scanner.py`; extend the
+  emulator when you rely on new scanner behaviour
+- When adding a setting, append its `SettingId`, add its option keys and PDF frames to
+  `commands.cpp` and a `Setting` row to `__init__.py` (`tests/test_setting_tables.py`
+  checks that they agree and that every frame matches the PDF)
 
 ## Documentation
 

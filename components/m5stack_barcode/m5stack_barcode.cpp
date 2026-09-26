@@ -1,676 +1,654 @@
 #include "m5stack_barcode.h"
 
-#include "command.h"
-#include "commands.h"
+#include <algorithm>
+#include <cinttypes>
+#include <cstring>
+#include <iterator>
+
 #include "esphome/core/application.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
-#include "types.h"
 
 namespace esphome {
 namespace m5stack_barcode {
 
-// Logging tag for this component
-const char *const TAG_SCANNER = "m5stack_barcode";
+static const char *const TAG = "m5stack_barcode";
 
 // Time constants (in milliseconds)
 static const uint32_t WAKEUP_DELAY_MS = 50;       // Delay between wake-up and command send
-static const uint32_t COMMAND_TIMEOUT_MS = 2000;  // Timeout for command acknowledgment
+static const uint32_t COMMAND_TIMEOUT_MS = 2000;  // Timeout for a command's reply
 // At 9600 baud the scanner's full version response (~150 bytes) takes ~160 ms to transmit.
 // The scanner also takes ~70 ms before it starts sending.  Use 300 ms from command-send
 // so all bytes have arrived before we parse, avoiding the tail being misrouted as barcode data.
 static const uint32_t VERSION_SETTLE_MS = 300;
 
-// Command queue size
 static const size_t MAX_QUEUE_SIZE = 20;        // Maximum number of commands queued at once
 static const uint8_t MAX_COMMAND_ATTEMPTS = 2;  // Send attempts before dropping a command (1 retry)
 
-// Data size limits
-static const size_t MAX_BARCODE_LENGTH = 128;  // Maximum barcode data length
-static const size_t MAX_VERSION_LENGTH =
-    256;  // Maximum version response length (binary header + full product info string)
-// Safety cap for the raw RX accumulation buffer. Sized to fit the largest legitimate
-// response (128-byte barcode + 4-byte CRLFCRLF terminator) with comfortable margin.
-// If this is exceeded the data is corrupt or from an unexpected source; discard and recover.
-static const size_t MAX_RX_BUFFER_SIZE = 256;
-// Idle gap used to detect end-of-barcode when terminator: none is configured.
-// At 9600 baud the inter-byte gap is ~1 ms; 20 ms is well above that while still
-// being short enough that the barcode is processed promptly after the last byte.
+// Home Assistant rejects entity states longer than 255 characters, so longer codes are
+// truncated to 255 bytes (on a character boundary).
+static const size_t MAX_BARCODE_LENGTH = 255;
+// Maximum version response length (binary header + full product info string)
+static const size_t MAX_VERSION_LENGTH = 256;
+// Safety cap for the raw RX accumulation buffer: the longest publishable barcode plus the
+// 4-byte CRLFCRLF terminator, with margin. Anything longer is an oversized QR code or noise;
+// the rest of that frame is discarded so no truncated fragment is published as a barcode.
+static const size_t MAX_RX_BUFFER_SIZE = 512;
+// Idle gap that marks the end of a response frame. At 9600 baud the inter-byte gap is ~1 ms;
+// 20 ms is well above that while still being short enough that data is processed promptly.
+// Used for barcodes without a terminator and to detect the end of the version response.
 static const uint32_t RX_IDLE_WINDOW_MS = 20;
+// Longest frame logged in full (every command frame fits)
+static const size_t MAX_LOGGED_FRAME = 32;
 
-// Methods moved from header file
-bool BarcodeScanner::is_continuous_mode() const {
-  return this->operation_mode_ == OperationMode::CONTINUOUS || this->operation_mode_ == OperationMode::AUTO_SENSE;
-}
+// NVS keys for the current and the legacy (LEGACY_SETTINGS_VERSION) preference layouts
+static const char *const PREFERENCES_KEY = "m5stack_barcode_settings";
+static const char *const LEGACY_PREFERENCES_KEY = "m5stack_barcode";
 
-bool BarcodeScanner::is_scanning() const { return this->scan_state_ != ScanState::IDLE; }
+static const SettingInfo &info(size_t index) { return get_setting_info(static_cast<SettingId>(index)); }
 
-ScanState BarcodeScanner::get_scan_state() const { return this->scan_state_; }
+// Component lifecycle
 
-void BarcodeScanner::set_scan_state(ScanState state) {
-  if (this->scan_state_ != state) {
-    ESP_LOGD(TAG_SCANNER, "Scan state changed from %d to %d", (int) this->scan_state_, (int) state);
-    this->scan_state_ = state;
-    if (this->scanning_binary_sensor_ != nullptr)
-      this->scanning_binary_sensor_->publish_state(state != ScanState::IDLE);
-  }
-}
-
-uint32_t BarcodeScanner::get_scan_duration_ms() const {
-  return esphome::m5stack_barcode::scan_duration_to_ms(this->scan_duration_);
-}
-
-// Component Lifecycle Methods
 void BarcodeScanner::setup() {
-  ESP_LOGCONFIG(TAG_SCANNER, "Setting up M5Stack Barcode Scanner");
-
-  // Drain any bytes that accumulated in the UART hardware FIFO before our firmware
-  // started.  After an OTA software reset the scanner stays powered and may be
-  // transmitting; stale bytes left in the buffer corrupt ACK detection and version
-  // parsing for the first commands we send.
+  // Drain bytes that reached the UART before we started: after an OTA reboot the scanner
+  // stays powered and may be mid-output, which would corrupt the first replies.
   while (this->available()) {
     this->read();
   }
+  // Allocate the buffers once so a long-running device does not fragment the heap.
+  this->rx_buffer_.reserve(MAX_RX_BUFFER_SIZE + 64);
+  this->command_queue_.reserve(MAX_QUEUE_SIZE);
 
-  // Initialise preference storage keyed to this component instance
-  this->pref_ = global_preferences->make_preference<ScannerPreferences>(fnv1_hash("m5stack_barcode"));
+  this->pref_ = global_preferences->make_preference<ScannerPreferences>(fnv1_hash(PREFERENCES_KEY));
+  this->restore_settings_();
 
-  // Configure settings, skipping any that the scanner already has from a previous boot
-  this->configure_defaults_();
-
+  // Continuous and auto-sense modes scan on their own from power-up.
+  if (this->is_continuous_mode())
+    this->scan_state_ = ScanState::CONTINUOUS_SCANNING;
   if (this->scanning_binary_sensor_ != nullptr)
     this->scanning_binary_sensor_->publish_state(this->scan_state_ != ScanState::IDLE);
 
-  // Request firmware version if a version sensor is wired
-  if (this->version_sensor_ != nullptr) {
-    this->request_version_();
+  if (this->version_sensor_ != nullptr)
+    this->queue_command_({CommandType::GET_VERSION});
+}
+
+void BarcodeScanner::loop() {
+  // Publish the restored settings on the first loop() rather than in setup(): publishing
+  // during setup races with the API handshake and makes HA reconnect repeatedly at boot.
+  if (!this->initial_states_published_) {
+    this->initial_states_published_ = true;
+    // Settings sent at boot are published when the scanner ACKs them, so HA never shows a
+    // value the scanner has not confirmed.
+    for (size_t i = 0; i < NUM_SETTINGS; i++) {
+      if (this->confirmed_at_boot_ & (1u << i))
+        this->publish_setting_(static_cast<SettingId>(i));
+    }
   }
+
+  this->read_buffer_();
+
+  if (this->command_state_ == CommandState::COMMAND_SENT) {
+    if (this->command_queue_.front().type == CommandType::GET_VERSION) {
+      this->handle_version_response_();
+    } else {
+      this->handle_ack_or_timeout_();
+    }
+  } else {
+    // Barcode output has the same framing in every operation mode: the decoded data followed
+    // by the configured terminator (or nothing), sent without any protocol header.
+    if (this->discard_frame_) {
+      // Drop everything up to the end of the oversized frame, then resume normal framing.
+      if (millis() - this->last_rx_time_ >= RX_IDLE_WINDOW_MS) {
+        ESP_LOGW(TAG, "Dropped oversized frame");
+        this->discard_frame_ = false;
+        this->rx_buffer_.clear();
+      }
+    } else if (this->has_complete_frame_()) {
+      this->process_barcode_();
+    }
+
+    // HOST-mode scan timeout: the scanner stops after scan_duration without sending anything.
+    if (this->scan_timer_active_) {
+      const uint32_t duration_ms = this->get_scan_duration_ms();
+      if (duration_ms > 0 && millis() - this->scan_started_at_ > duration_ms) {
+        ESP_LOGD(TAG, "Scan timed out after %" PRIu32 " ms", duration_ms);
+        this->scan_timer_active_ = false;
+        this->set_scan_state_(ScanState::IDLE);
+        this->scan_timeout_callback_.call();
+      }
+    }
+  }
+
+  this->process_command_queue_();
 }
 
-// Returns true only if every stored enum field falls within its declared range.
-// An out-of-range value means the struct was written by a different firmware version
-// or the NVS slot is corrupt — treat the whole entry as invalid rather than casting
-// a garbage byte into a C++ enum.
-static bool prefs_in_range(const ScannerPreferences &p) {
-  return p.operation_mode <= static_cast<uint8_t>(OperationMode::AUTO_SENSE) &&
-         p.terminator <= static_cast<uint8_t>(Terminator::CRLFCRLF) &&
-         p.light_mode <= static_cast<uint8_t>(LightMode::LIGHT_ALWAYS_OFF) &&
-         p.locate_light_mode <= static_cast<uint8_t>(LocateLightMode::LOCATE_LIGHT_ALWAYS_OFF) &&
-         p.sound_mode <= static_cast<uint8_t>(SoundMode::SOUND_ENABLED) &&
-         p.buzzer_volume <= static_cast<uint8_t>(BuzzerVolume::BUZZER_VOLUME_LOW) &&
-         p.decoding_success_light_mode <= static_cast<uint8_t>(DecodingSuccessLightMode::DECODING_LIGHT_ENABLED) &&
-         p.boot_sound_mode <= static_cast<uint8_t>(BootSoundMode::BOOT_SOUND_ENABLED) &&
-         p.decode_sound_mode <= static_cast<uint8_t>(DecodeSoundMode::DECODE_SOUND_ENABLED) &&
-         p.scan_duration <= static_cast<uint8_t>(ScanDuration::UNLIMITED) &&
-         p.stable_induction_time <= static_cast<uint8_t>(StableInductionTime::MS_1000) &&
-         p.reading_interval <= static_cast<uint8_t>(ReadingInterval::MS_2000) &&
-         p.same_code_interval <= static_cast<uint8_t>(SameCodeInterval::MS_2000) &&
-         p.cmd_ack_sound_mode <= static_cast<uint8_t>(CmdAckSoundMode::CMD_ACK_SOUND_ENABLED) &&
-         p.config_code_scan_mode <= static_cast<uint8_t>(ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED);
+void BarcodeScanner::dump_config() {
+  ESP_LOGCONFIG(TAG, "M5Stack Barcode Scanner:");
+  for (size_t i = 0; i < NUM_SETTINGS; i++) {
+    ESP_LOGCONFIG(TAG, "  %s: %s", info(i).key, info(i).values[this->settings_[i]]);
+  }
+  if (this->version_sensor_ != nullptr && this->version_sensor_->has_state()) {
+    ESP_LOGCONFIG(TAG, "  Scanner firmware version: %s", this->version_sensor_->get_state().c_str());
+  }
+  LOG_TEXT_SENSOR("  ", "Barcode", this->barcode_sensor_);
+  LOG_TEXT_SENSOR("  ", "Version", this->version_sensor_);
+  LOG_BINARY_SENSOR("  ", "Scanning", this->scanning_binary_sensor_);
 }
 
-void BarcodeScanner::configure_defaults_() {
-  // Load previously-saved settings from NVS flash.  A valid entry means the
-  // scanner was already programmed with those values and does not need them
-  // resent unless they have changed in the YAML configuration.
+// Settings
+
+// Every stored value must be an option of its setting: anything else was written by other
+// firmware or is corrupt, and the whole entry is ignored.
+static bool settings_in_range(const SettingValues &values) {
+  for (size_t i = 0; i < NUM_SETTINGS; i++) {
+    if (values[i] >= info(i).num_values)
+      return false;
+  }
+  return true;
+}
+
+void BarcodeScanner::restore_settings_() {
   ScannerPreferences stored{};
-  const bool has_valid_prefs =
-      this->pref_.load(&stored) && stored.version == SETTINGS_VERSION && prefs_in_range(stored);
-
-  ESP_LOGD(TAG_SCANNER, "Configuring scanner defaults (cached prefs valid=%s)", has_valid_prefs ? "yes" : "no");
-
-// Helper macro: queue a command only when the stored value differs from the
-// desired value (or when there are no valid stored preferences at all).
-#define QUEUE_IF_CHANGED(field, create_fn, value) \
-  if (!has_valid_prefs || stored.field != static_cast<uint8_t>(value)) { \
-    this->queue_command(create_fn(value)); \
+  LegacyScannerPreferences legacy{};
+  ESPPreferenceObject legacy_pref =
+      global_preferences->make_preference<LegacyScannerPreferences>(fnv1_hash(LEGACY_PREFERENCES_KEY));
+  // restore: the settings the scanner already has; baseline: the YAML values they were
+  // resolved against (nullptr = the current YAML values).
+  const SettingValues *restore = nullptr;
+  const SettingValues *baseline = nullptr;
+  bool migrated = false;
+  if (this->pref_.load(&stored) && stored.version == SETTINGS_VERSION && settings_in_range(stored.applied) &&
+      settings_in_range(stored.yaml)) {
+    restore = &stored.applied;
+    baseline = &stored.yaml;
+    ESP_LOGD(TAG, "Restoring scanner settings from flash");
+  } else if (legacy_pref.load(&legacy) && legacy.version == LEGACY_SETTINGS_VERSION &&
+             settings_in_range(legacy.applied)) {
+    // Older firmware re-applied every YAML value at boot, so its stored values differ from
+    // the YAML ones only where they were changed at runtime since: keep those changes.
+    restore = &legacy.applied;
+    migrated = true;
+    ESP_LOGI(TAG, "Migrating scanner settings from the previous preferences format");
+  } else {
+    ESP_LOGD(TAG, "No stored scanner settings; applying all configured values");
   }
 
-  QUEUE_IF_CHANGED(operation_mode, CommandFactory::create_mode_command, this->operation_mode_)
-  QUEUE_IF_CHANGED(terminator, CommandFactory::create_terminator_command, this->terminator_)
-  QUEUE_IF_CHANGED(light_mode, CommandFactory::create_light_command, this->light_mode_)
-  QUEUE_IF_CHANGED(locate_light_mode, CommandFactory::create_locate_light_command, this->locate_light_mode_)
-  QUEUE_IF_CHANGED(sound_mode, CommandFactory::create_sound_command, this->sound_mode_)
-  QUEUE_IF_CHANGED(buzzer_volume, CommandFactory::create_volume_command, this->buzzer_volume_)
-  QUEUE_IF_CHANGED(decoding_success_light_mode, CommandFactory::create_decoding_success_light_command,
-                   this->decoding_success_light_mode_)
-  QUEUE_IF_CHANGED(boot_sound_mode, CommandFactory::create_boot_sound_command, this->boot_sound_mode_)
-  QUEUE_IF_CHANGED(decode_sound_mode, CommandFactory::create_decode_sound_command, this->decode_sound_mode_)
-  QUEUE_IF_CHANGED(scan_duration, CommandFactory::create_scan_duration_command, this->scan_duration_)
-  QUEUE_IF_CHANGED(stable_induction_time, CommandFactory::create_stable_induction_time_command,
-                   this->stable_induction_time_)
-  QUEUE_IF_CHANGED(reading_interval, CommandFactory::create_reading_interval_command, this->reading_interval_)
-  QUEUE_IF_CHANGED(same_code_interval, CommandFactory::create_same_code_interval_command, this->same_code_interval_)
-  QUEUE_IF_CHANGED(cmd_ack_sound_mode, CommandFactory::create_cmd_ack_sound_command, this->cmd_ack_sound_mode_)
-  QUEUE_IF_CHANGED(config_code_scan_mode, CommandFactory::create_config_code_scan_command, this->config_code_scan_mode_)
+  this->yaml_settings_ = this->settings_;
+  for (size_t i = 0; i < NUM_SETTINGS; i++) {
+    // Keep the stored value unless the YAML value was edited since it was stored (or nothing
+    // is stored), in which case the YAML value is sent to the scanner.
+    if (restore != nullptr && (baseline == nullptr || (*baseline)[i] == this->yaml_settings_[i])) {
+      this->settings_[i] = (*restore)[i];
+      this->confirmed_at_boot_ |= 1u << i;
+    } else {
+      this->queue_command_({CommandType::SETTING, static_cast<SettingId>(i), this->settings_[i]});
+    }
+  }
 
-#undef QUEUE_IF_CHANGED
-}
-
-void BarcodeScanner::publish_initial_states_() {
-  if (this->operation_mode_select_ != nullptr)
-    this->operation_mode_select_->publish_state(OperationModeSelect::to_key(this->operation_mode_));
-  if (this->terminator_select_ != nullptr)
-    this->terminator_select_->publish_state(TerminatorSelect::to_key(this->terminator_));
-  if (this->light_mode_select_ != nullptr)
-    this->light_mode_select_->publish_state(LightModeSelect::to_key(this->light_mode_));
-  if (this->locate_light_mode_select_ != nullptr)
-    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::to_key(this->locate_light_mode_));
-  if (this->buzzer_volume_select_ != nullptr)
-    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::to_key(this->buzzer_volume_));
-  if (this->scan_duration_select_ != nullptr)
-    this->scan_duration_select_->publish_state(ScanDurationSelect::to_key(this->scan_duration_));
-  if (this->stable_induction_time_select_ != nullptr)
-    this->stable_induction_time_select_->publish_state(StableInductionTimeSelect::to_key(this->stable_induction_time_));
-  if (this->reading_interval_select_ != nullptr)
-    this->reading_interval_select_->publish_state(ReadingIntervalSelect::to_key(this->reading_interval_));
-  if (this->same_code_interval_select_ != nullptr)
-    this->same_code_interval_select_->publish_state(SameCodeIntervalSelect::to_key(this->same_code_interval_));
-  if (this->sound_switch_ != nullptr)
-    this->sound_switch_->publish_state(this->sound_mode_ == SoundMode::SOUND_ENABLED);
-  if (this->boot_sound_switch_ != nullptr)
-    this->boot_sound_switch_->publish_state(this->boot_sound_mode_ == BootSoundMode::BOOT_SOUND_ENABLED);
-  if (this->decode_sound_switch_ != nullptr)
-    this->decode_sound_switch_->publish_state(this->decode_sound_mode_ == DecodeSoundMode::DECODE_SOUND_ENABLED);
-  if (this->decoding_success_light_switch_ != nullptr)
-    this->decoding_success_light_switch_->publish_state(this->decoding_success_light_mode_ ==
-                                                        DecodingSuccessLightMode::DECODING_LIGHT_ENABLED);
-  if (this->cmd_ack_sound_switch_ != nullptr)
-    this->cmd_ack_sound_switch_->publish_state(this->cmd_ack_sound_mode_ == CmdAckSoundMode::CMD_ACK_SOUND_ENABLED);
-  if (this->config_code_scan_switch_ != nullptr)
-    this->config_code_scan_switch_->publish_state(this->config_code_scan_mode_ ==
-                                                  ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED);
+  // Persist the new YAML baseline (and the migrated values); unchanged data is not rewritten.
+  this->save_settings_();
+  if (migrated) {
+    LegacyScannerPreferences empty{};
+    legacy_pref.save(&empty);
+  }
 }
 
 void BarcodeScanner::save_settings_() {
   ScannerPreferences prefs{};
   prefs.version = SETTINGS_VERSION;
-  prefs.operation_mode = static_cast<uint8_t>(this->operation_mode_);
-  prefs.terminator = static_cast<uint8_t>(this->terminator_);
-  prefs.light_mode = static_cast<uint8_t>(this->light_mode_);
-  prefs.locate_light_mode = static_cast<uint8_t>(this->locate_light_mode_);
-  prefs.sound_mode = static_cast<uint8_t>(this->sound_mode_);
-  prefs.buzzer_volume = static_cast<uint8_t>(this->buzzer_volume_);
-  prefs.decoding_success_light_mode = static_cast<uint8_t>(this->decoding_success_light_mode_);
-  prefs.boot_sound_mode = static_cast<uint8_t>(this->boot_sound_mode_);
-  prefs.decode_sound_mode = static_cast<uint8_t>(this->decode_sound_mode_);
-  prefs.scan_duration = static_cast<uint8_t>(this->scan_duration_);
-  prefs.stable_induction_time = static_cast<uint8_t>(this->stable_induction_time_);
-  prefs.reading_interval = static_cast<uint8_t>(this->reading_interval_);
-  prefs.same_code_interval = static_cast<uint8_t>(this->same_code_interval_);
-  prefs.cmd_ack_sound_mode = static_cast<uint8_t>(this->cmd_ack_sound_mode_);
-  prefs.config_code_scan_mode = static_cast<uint8_t>(this->config_code_scan_mode_);
+  prefs.applied = this->settings_;
+  prefs.yaml = this->yaml_settings_;
   if (!this->pref_.save(&prefs)) {
-    ESP_LOGW(TAG_SCANNER, "Failed to save scanner preferences to NVS");
+    ESP_LOGW(TAG, "Failed to save scanner preferences to NVS");
   }
 }
 
-void BarcodeScanner::loop() {
-  // Publish initial sub-component states on the first loop() tick, after HA has had time
-  // to complete the entity list exchange.  Doing this in setup() races with the API
-  // connection handshake and causes HA to repeatedly reconnect during boot.
-  if (!this->initial_states_published_) {
-    this->publish_initial_states_();
-    this->initial_states_published_ = true;
+void BarcodeScanner::publish_setting_(SettingId id) {
+  const size_t i = static_cast<size_t>(id);
+  if (this->selects_[i] != nullptr)
+    this->selects_[i]->publish_state(static_cast<size_t>(this->settings_[i]));
+  if (this->switches_[i] != nullptr)
+    this->switches_[i]->publish_state(this->settings_[i] != 0);
+}
+
+void BarcodeScanner::apply_setting_(SettingId id, uint8_t value) {
+  const size_t i = static_cast<size_t>(id);
+  ESP_LOGD(TAG, "%s set to %s", info(i).key, info(i).values[value]);
+  const bool changed = this->settings_[i] != value;
+  this->settings_[i] = value;
+  this->save_settings_();
+  if (id == SettingId::OPERATION_MODE && changed) {
+    // Continuous/auto-sense scan on their own; leaving them (or host mode mid-scan) ends any
+    // scan.  Re-applying the same mode (e.g. at boot) leaves a scan that was just started alone.
+    this->scan_timer_active_ = false;
+    this->set_scan_state_(this->is_continuous_mode() ? ScanState::CONTINUOUS_SCANNING : ScanState::IDLE);
+  }
+  this->publish_setting_(id);
+}
+
+void BarcodeScanner::set_setting(SettingId id, uint8_t value) {
+  const size_t i = static_cast<size_t>(id);
+  if (i >= NUM_SETTINGS || value >= info(i).num_values) {
+    ESP_LOGW(TAG, "Ignoring invalid value %u for setting %u", value, static_cast<unsigned>(i));
+    return;
+  }
+  this->queue_setting_(id, value);
+}
+
+void BarcodeScanner::set_setting(SettingId id, const std::string &key) {
+  const SettingInfo &setting = get_setting_info(id);
+  uint8_t value;
+  if (!setting.parse(key, value)) {
+    ESP_LOGW(TAG, "Ignoring invalid %s value '%s'", setting.key, key.c_str());
+    return;
+  }
+  this->queue_setting_(id, value);
+}
+
+void BarcodeScanner::queue_setting_(SettingId id, uint8_t value) {
+  const auto same_setting = [id](const Command &command) {
+    return command.type == CommandType::SETTING && command.setting == id;
+  };
+  // A newer value replaces one for the same setting that has not been sent yet.
+  const bool sending = this->command_state_ != CommandState::IDLE;
+  const bool in_flight = sending && same_setting(this->command_queue_.front());
+  const auto superseded =
+      std::remove_if(this->command_queue_.begin() + (sending ? 1 : 0), this->command_queue_.end(), same_setting);
+  const bool was_queued = superseded != this->command_queue_.end();
+  this->command_queue_.erase(superseded, this->command_queue_.end());
+  // Skip the command only when the scanner already has the value: when a command for this
+  // setting is queued or in flight, the current value is not what the scanner will end up
+  // with (e.g. a YAML value queued at boot, or a change being reverted before its ACK).
+  if (value == this->get_setting(id) && !in_flight && !was_queued) {
+    ESP_LOGD(TAG, "%s already set to %s", get_setting_info(id).key, get_setting_info(id).values[value]);
+    return;
+  }
+  this->queue_command_({CommandType::SETTING, id, value});
+}
+
+// Commands
+
+const uint8_t *BarcodeScanner::command_frame_(const Command &command) const {
+  switch (command.type) {
+    case CommandType::SETTING:
+      return get_setting_info(command.setting).frame(command.value);
+    case CommandType::START_SCAN:
+      return frames::START_SCAN;
+    case CommandType::STOP_SCAN:
+      return frames::STOP_SCAN;
+    case CommandType::GET_VERSION:
+      return frames::GET_VERSION;
+    case CommandType::FACTORY_RESET:
+    default:
+      return frames::FACTORY_RESET;
+  }
+}
+
+void BarcodeScanner::log_command_(const char *action, const Command &command) const {
+  static const char *const NAMES[] = {"", "start scan", "stop scan", "get version", "factory reset"};
+  const uint8_t *frame = this->command_frame_(command);
+  char hex[format_hex_pretty_size(MAX_LOGGED_FRAME)];
+  format_hex_pretty_to(hex, frame, std::min(frame_length(frame), MAX_LOGGED_FRAME), ' ');
+  if (command.type == CommandType::SETTING) {
+    const SettingInfo &setting = get_setting_info(command.setting);
+    ESP_LOGD(TAG, "%s %s=%s: %s", action, setting.key, setting.values[command.value], hex);
+  } else {
+    ESP_LOGD(TAG, "%s %s: %s", action, NAMES[static_cast<size_t>(command.type)], hex);
+  }
+}
+
+void BarcodeScanner::queue_command_(const Command &command) {
+  if (this->command_queue_.size() >= MAX_QUEUE_SIZE) {
+    ESP_LOGW(TAG, "Command queue full, dropping a command");
+    return;
+  }
+  this->log_command_("Queuing", command);
+  this->command_queue_.push_back(command);
+}
+
+void BarcodeScanner::process_command_queue_() {
+  if (this->command_queue_.empty() || this->command_state_ == CommandState::COMMAND_SENT)
+    return;
+  // Never interleave commands with a scanner that is mid-output: the reply would be mixed
+  // into barcode data.  The frame is processed by loop() within RX_IDLE_WINDOW_MS.
+  if (this->command_state_ == CommandState::IDLE && !this->rx_buffer_.empty())
+    return;
+
+  if (this->command_state_ == CommandState::IDLE) {
+    this->write_byte(frames::WAKEUP);
+    this->last_command_time_ = millis();
+    this->command_state_ = CommandState::WAKEUP_SENT;
+  } else if (millis() - this->last_command_time_ >= WAKEUP_DELAY_MS) {
+    const Command &command = this->command_queue_.front();
+    const uint8_t *frame = this->command_frame_(command);
+    this->command_attempts_++;
+    this->log_command_("Sending", command);
+    this->write_array(frame, frame_length(frame));
+    this->last_command_time_ = millis();
+    this->command_state_ = CommandState::COMMAND_SENT;
+  }
+}
+
+void BarcodeScanner::handle_ack_or_timeout_() {
+  // Setting commands are ACKed in every operation mode.  Search the whole buffer: barcode
+  // bytes from a continuous-mode scan may precede the ACK, and a HOST-mode start ACK may be
+  // followed by the barcode in the same read.  Only the reply is consumed; surrounding data
+  // stays for barcode framing.
+  auto ack =
+      std::search(this->rx_buffer_.begin(), this->rx_buffer_.end(), std::begin(frames::ACK), std::end(frames::ACK));
+  if (ack != this->rx_buffer_.end()) {
+    this->rx_buffer_.erase(ack, ack + std::size(frames::ACK));
+    ESP_LOGD(TAG, "Command acknowledged");
+    this->status_clear_warning();
+    this->finish_command_(true);
+    return;
   }
 
-  // Process any pending commands first
-  this->process_command_queue_();
+  auto nak = std::search(this->rx_buffer_.begin(), this->rx_buffer_.end(), std::begin(frames::NAK_PREFIX),
+                         std::end(frames::NAK_PREFIX));
+  if (nak != this->rx_buffer_.end() && this->rx_buffer_.end() - nak >= static_cast<ptrdiff_t>(frames::NAK_LENGTH)) {
+    // The scanner rejected the command; resending it would be rejected again.
+    const uint8_t cause = nak[frames::NAK_CAUSE_INDEX];
+    this->rx_buffer_.erase(nak, nak + frames::NAK_LENGTH);
+    this->log_command_("Scanner rejected", this->command_queue_.front());
+    ESP_LOGW(TAG, "Command rejected (cause 0x%02X)", cause);
+    this->status_clear_warning();
+    this->finish_command_(false);
+    return;
+  }
 
-  // Read available data
+  if (millis() - this->last_command_time_ <= COMMAND_TIMEOUT_MS)
+    return;
+
+  if (this->command_attempts_ < MAX_COMMAND_ATTEMPTS) {
+    ESP_LOGD(TAG, "No reply (attempt %u/%u), retrying", this->command_attempts_, MAX_COMMAND_ATTEMPTS);
+    this->command_state_ = CommandState::IDLE;  // resend with a fresh wake-up
+    return;
+  }
+  this->log_command_("No reply to", this->command_queue_.front());
+  ESP_LOGW(TAG, "Scanner not responding; command dropped after %u attempts", this->command_attempts_);
+  this->status_set_warning(LOG_STR("Scanner not responding"));
+  this->finish_command_(false);
+}
+
+void BarcodeScanner::handle_version_response_() {
+  // The version response is an unframed burst of ~150 bytes (~160 ms at 9600 baud) that the
+  // scanner starts sending ~70 ms after the request.  Wait at least VERSION_SETTLE_MS and until
+  // the line has been idle, so the tail is never misrouted as barcode data.  If nothing arrives
+  // at all, give up after COMMAND_TIMEOUT_MS so the queue is not blocked indefinitely.
+  const uint32_t now = millis();
+  if (this->rx_buffer_.empty()) {
+    if (now - this->last_command_time_ <= COMMAND_TIMEOUT_MS)
+      return;
+    ESP_LOGW(TAG, "Version request timed out with no response");
+    this->status_set_warning(LOG_STR("Scanner not responding"));
+    this->finish_command_(false);
+    return;
+  }
+  if (now - this->last_command_time_ < VERSION_SETTLE_MS || now - this->last_rx_time_ < RX_IDLE_WINDOW_MS)
+    return;
+  this->process_version_();
+  this->status_clear_warning();
+  this->finish_command_(true);
+}
+
+void BarcodeScanner::finish_command_(bool success) {
+  const Command command = this->command_queue_.front();
+  this->command_queue_.erase(this->command_queue_.begin());
+  this->command_state_ = CommandState::IDLE;
+  this->command_attempts_ = 0;
+
+  switch (command.type) {
+    case CommandType::SETTING:
+      if (success)
+        this->apply_setting_(command.setting, command.value);
+      break;
+    case CommandType::START_SCAN:
+      if (!success) {
+        this->set_scan_state_(ScanState::IDLE);
+      } else if (this->scan_state_ == ScanState::MANUAL_SCANNING) {
+        // The scanner runs its scan_duration timer from now.  (A barcode that arrived together
+        // with the ACK has already ended the scan.)
+        this->scan_started_at_ = millis();
+        this->scan_timer_active_ = true;
+      }
+      break;
+    case CommandType::FACTORY_RESET:
+      if (success) {
+        // Invalidate the stored settings, so the next boot re-sends every YAML value.
+        ScannerPreferences empty{};
+        if (!this->pref_.save(&empty))
+          ESP_LOGW(TAG, "Failed to invalidate NVS preferences; settings may not fully re-sync after reboot");
+        ESP_LOGW(TAG, "Scanner factory reset acknowledged, rebooting to re-apply YAML settings");
+        App.safe_reboot();
+      }
+      break;
+    case CommandType::STOP_SCAN:
+    case CommandType::GET_VERSION:
+      break;
+  }
+}
+
+// Scanning
+
+bool BarcodeScanner::is_continuous_mode() const {
+  const OperationMode mode = this->get_operation_mode();
+  return mode == OperationMode::CONTINUOUS || mode == OperationMode::AUTO_SENSE;
+}
+
+void BarcodeScanner::set_scan_state_(ScanState state) {
+  if (this->scan_state_ == state)
+    return;
+  static const char *const NAMES[] = {"idle", "manual scanning", "continuous scanning"};
+  ESP_LOGD(TAG, "Scan state: %s", NAMES[static_cast<size_t>(state)]);
+  this->scan_state_ = state;
+  if (this->scanning_binary_sensor_ != nullptr)
+    this->scanning_binary_sensor_->publish_state(state != ScanState::IDLE);
+}
+
+void BarcodeScanner::start_scan() {
+  if (this->get_operation_mode() != OperationMode::HOST) {
+    ESP_LOGW(TAG, "Cannot start a scan outside host mode");
+    return;
+  }
+  if (this->is_scanning()) {
+    ESP_LOGD(TAG, "Scan already in progress");
+    return;
+  }
+  this->queue_command_({CommandType::START_SCAN});
+  // Mark the scan as active now so repeated start requests are rejected.  The timeout starts
+  // once the scanner ACKs (see finish_command_()).
+  this->set_scan_state_(ScanState::MANUAL_SCANNING);
+}
+
+void BarcodeScanner::stop_scan() {
+  if (this->get_operation_mode() != OperationMode::HOST) {
+    ESP_LOGW(TAG, "Cannot stop a scan outside host mode");
+    return;
+  }
+  if (!this->is_scanning()) {
+    ESP_LOGD(TAG, "No scan in progress");
+    return;
+  }
+  this->queue_command_({CommandType::STOP_SCAN});
+  this->scan_timer_active_ = false;
+  this->set_scan_state_(ScanState::IDLE);
+}
+
+void BarcodeScanner::factory_reset() {
+  ESP_LOGW(TAG, "Factory reset requested: the scanner reverts to its defaults and the ESP reboots");
+  this->queue_command_({CommandType::FACTORY_RESET});
+}
+
+void BarcodeScanner::process_current_buffer() {
+  // Never treat a pending reply as barcode data.
+  if (this->command_state_ == CommandState::COMMAND_SENT || this->discard_frame_)
+    return;
   this->read_buffer_();
-
-  // Handle command acknowledgments
-  if (this->waiting_for_ack_) {
-    // Configuration commands always elicit the 6-byte HOST ACK regardless of the
-    // current operation mode (is_ack_sequence_ uses the mode to select the format,
-    // which is wrong here — mode may not have changed yet when checking the ACK for
-    // a mode-change command).
-    const bool got_ack = this->rx_buffer_.size() >= Commands::Responses::ACK_SIZE &&
-                         memcmp(this->rx_buffer_.data(), Commands::Responses::ACK, Commands::Responses::ACK_SIZE) == 0;
-    if (got_ack) {
-      ESP_LOGD(TAG_SCANNER, "Command acknowledged");
-
-      // Get the current command
-      auto &command = this->command_queue_.front();
-
-      // Mark as successful and invoke callback
-      command->on_success(this);
-
-      // Remove from queue
-      this->command_queue_.erase(this->command_queue_.begin());
-
-      // Reset state
-      this->waiting_for_ack_ = false;
-      this->command_state_ = CommandState::IDLE;
-      this->command_attempts_ = 0;
-
-      // Clear the buffer except for version responses
-      if (this->expected_response_ != ResponseType::VERSION) {
-        this->clear_buffer_();
-      }
-    }
-    // Check for command timeout (COMMAND_TIMEOUT_MS)
-    else if (millis() - this->last_command_time_ > COMMAND_TIMEOUT_MS) {
-      auto &command = this->command_queue_.front();
-
-      if (this->command_attempts_ < MAX_COMMAND_ATTEMPTS) {
-        // First timeout: reset to IDLE so process_command_queue_() retries with a fresh
-        // wake-up + send cycle on the next loop() iteration.
-        ESP_LOGD(TAG_SCANNER, "Command '%s' timed out (attempt %u/%u), retrying", command->get_description(),
-                 this->command_attempts_, MAX_COMMAND_ATTEMPTS);
-        this->waiting_for_ack_ = false;
-        this->command_state_ = CommandState::IDLE;
-        this->expected_response_ = ResponseType::NONE;
-        this->clear_buffer_();
-      } else {
-        // All attempts exhausted: log at WARN so the failure is visible in normal log output,
-        // invoke the failure callback, then drop the command.
-        ESP_LOGW(TAG_SCANNER, "Command '%s' failed after %u attempts — scanner not responding",
-                 command->get_description(), this->command_attempts_);
-        command->on_failure(this);
-        this->command_queue_.erase(this->command_queue_.begin());
-        this->waiting_for_ack_ = false;
-        this->command_state_ = CommandState::IDLE;
-        this->expected_response_ = ResponseType::NONE;
-        this->command_attempts_ = 0;
-        this->clear_buffer_();
-      }
-    }
-
-    // Skip other processing while waiting for acknowledgment
-    return;
-  }
-
-  // Process version information if requested
-  if (this->expected_response_ == ResponseType::VERSION) {
-    // Once the first byte arrives, allow VERSION_SETTLE_MS for trailing bytes before
-    // processing.  If nothing arrives at all, fall back to COMMAND_TIMEOUT_MS so the
-    // queue is not blocked indefinitely when the scanner fails to respond.
-    const uint32_t version_wait = this->rx_buffer_.empty() ? COMMAND_TIMEOUT_MS : VERSION_SETTLE_MS;
-    if (millis() - this->last_command_time_ > version_wait) {
-      if (!this->rx_buffer_.empty()) {
-        this->process_version_();
-      } else {
-        ESP_LOGW(TAG_SCANNER, "Version request timed out with no response");
-        this->clear_buffer_();
-      }
-      this->expected_response_ = ResponseType::NONE;
-      // Remove from queue so it is not re-sent on the next iteration
-      if (!this->command_queue_.empty()) {
-        this->command_queue_.erase(this->command_queue_.begin());
-      }
-    }
-    return;
-  }
-
-  // Process barcode data if available
-  if (this->expected_response_ == ResponseType::BARCODE || this->expected_response_ == ResponseType::NONE) {
-    bool should_process = false;
-
-    // In HOST mode, wait until the configured terminator arrives so we don't fire
-    // on partial data (UART bytes trickle in across multiple loop() iterations).
-    if (this->operation_mode_ == OperationMode::HOST) {
-      should_process = this->has_terminator_in_buffer_();
-    } else {
-      // In non-host modes, we look for the acknowledgment sequence at the end
-      if (!this->rx_buffer_.empty() && this->is_ack_sequence_(this->rx_buffer_.data(), this->rx_buffer_.size())) {
-        should_process = true;
-      }
-    }
-
-    if (should_process && !this->rx_buffer_.empty()) {
-      this->process_barcode_();
-
-      // Reset scanning state after barcode is processed in HOST mode
-      if (this->operation_mode_ == OperationMode::HOST) {
-        this->set_scan_state(ScanState::IDLE);
-      }
-
-      // Set expected response type to NONE
-      this->expected_response_ = ResponseType::NONE;
-    }
-  }
-
-  // HOST-mode scan timeout: fire on_scan_timeout if scan_duration has elapsed without a result.
-  // scan_duration_to_ms() returns 0 for UNLIMITED, in which case we never time out.
-  if (this->scan_state_ == ScanState::MANUAL_SCANNING && this->scan_started_at_ != 0) {
-    const uint32_t duration_ms = this->get_scan_duration_ms();
-    if (duration_ms > 0 && (millis() - this->scan_started_at_) > duration_ms) {
-      ESP_LOGD(TAG_SCANNER, "Scan timed out after %u ms", duration_ms);
-      this->scan_started_at_ = 0;
-      this->set_scan_state(ScanState::IDLE);
-      this->expected_response_ = ResponseType::NONE;
-      this->scan_timeout_callback_();
-    }
-  }
+  this->process_barcode_();
 }
 
-void BarcodeScanner::dump_config() {
-  ESP_LOGCONFIG(TAG_SCANNER, "M5Stack Barcode Scanner:");
-  ESP_LOGCONFIG(TAG_SCANNER, "  Operation Mode: %s", operation_mode_to_string(this->operation_mode_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Terminator: %s", terminator_to_string(this->terminator_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Light Mode: %s", light_mode_to_string(this->light_mode_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Locate Light Mode: %s", locate_light_mode_to_string(this->locate_light_mode_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Sound Mode: %s", sound_mode_to_string(this->sound_mode_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Buzzer Volume: %s", buzzer_volume_to_string(this->buzzer_volume_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Decoding Success Light: %s",
-                decoding_success_light_mode_to_string(this->decoding_success_light_mode_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Boot Sound: %s", boot_sound_mode_to_string(this->boot_sound_mode_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Decode Sound: %s", decode_sound_mode_to_string(this->decode_sound_mode_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Scan Duration: %s", scan_duration_to_string(this->scan_duration_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Stable Induction Time: %s",
-                stable_induction_time_to_string(this->stable_induction_time_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Reading Interval: %s", reading_interval_to_string(this->reading_interval_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Same Code Interval: %s", same_code_interval_to_string(this->same_code_interval_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Cmd ACK Sound: %s", cmd_ack_sound_mode_to_string(this->cmd_ack_sound_mode_));
-  ESP_LOGCONFIG(TAG_SCANNER, "  Config Code Scan: %s", config_code_scan_mode_to_string(this->config_code_scan_mode_));
-
-  if (this->version_sensor_ != nullptr && this->version_sensor_->has_state()) {
-    ESP_LOGCONFIG(TAG_SCANNER, "  Firmware Version: %s", this->version_sensor_->get_state().c_str());
-  }
-}
-
-// Buffer Management Methods
-void BarcodeScanner::clear_buffer_() { this->rx_buffer_.clear(); }
+// Receiving
 
 void BarcodeScanner::read_buffer_() {
   bool got_bytes = false;
-  while (this->available()) {
-    uint8_t byte = this->read();
+  uint8_t byte;
+  while (this->available() && this->read_byte(&byte)) {
     this->rx_buffer_.push_back(byte);
     got_bytes = true;
   }
-  if (got_bytes) {
+  if (got_bytes)
     this->last_rx_time_ = millis();
-  }
   if (this->rx_buffer_.size() > MAX_RX_BUFFER_SIZE) {
-    ESP_LOGW(TAG_SCANNER, "RX buffer overflow (%u bytes); discarding — check for UART noise or scanner malfunction",
-             this->rx_buffer_.size());
-    this->clear_buffer_();
+    ESP_LOGW(TAG, "RX buffer overflow (%zu bytes); discarding frame", this->rx_buffer_.size());
+    this->rx_buffer_.clear();
+    // Drop the rest of the frame too, up to the next idle gap, also when it overflowed while a
+    // reply was awaited: otherwise its tail would be published as a barcode.  (A reply lost
+    // in the dropped bytes is retried after the timeout.)
+    this->discard_frame_ = true;
   }
 }
 
-void BarcodeScanner::set_expected_response_(ResponseType type) { this->expected_response_ = type; }
-
-// Command Processing Methods
-void BarcodeScanner::process_command_queue_() {
-  // Only process commands if we're not waiting for an acknowledgment or a version response
-  if (this->waiting_for_ack_ || this->command_queue_.empty()) {
-    return;
-  }
-  if (this->expected_response_ == ResponseType::VERSION) {
-    return;  // Block queue while waiting for version data to arrive
-  }
-
-  // Get the current command
-  auto &command = this->command_queue_.front();
-
-  // Check current state to determine actions
-  switch (this->command_state_) {
-    case CommandState::IDLE: {
-      // Wake up the scanner
-      this->wake_up_();
-      break;
-    }
-
-    case CommandState::WAKEUP_SENT: {
-      // Check if we've waited at least WAKEUP_DELAY_MS since wake-up was sent
-      if (millis() - this->last_command_time_ >= WAKEUP_DELAY_MS) {
-        this->write_command_(command);
-      }
-      break;
-    }
-
-    case CommandState::COMMAND_SENT:
-      // Should not reach here — this state is handled in the ACK/timeout path in loop().
-      this->command_state_ = CommandState::IDLE;
-      this->command_attempts_ = 0;
-      break;
-  }
-}
-
-// Add new method implementation before wake_up_
-void BarcodeScanner::write_command_(const std::unique_ptr<Command> &command) {
-  this->command_attempts_++;
-  command->log_command_data(TAG_SCANNER, "Sending");
-
-  // Set the expected response type based on the command
-  this->set_expected_response_(command->get_expected_response());
-
-  this->write_array(command->get_data(), command->get_length());
-
-  // Update state tracking.  VERSION commands are special: the scanner responds
-  // with raw version data (not an ACK byte sequence), so we must not block on
-  // the ACK path.  The VERSION response is handled by the dedicated branch in
-  // loop() once COMMAND_TIMEOUT_MS has elapsed to let all data arrive.
-  this->waiting_for_ack_ = (this->expected_response_ != ResponseType::VERSION);
-  this->last_command_time_ = millis();
-  this->command_state_ = CommandState::COMMAND_SENT;
-}
-
-void BarcodeScanner::wake_up_() {
-  // First, send wake-up command to wake up the scanner from sleep state
-  ESP_LOGD(TAG_SCANNER, "Sending wake-up command");
-
-  // Send the wakeup command
-  this->write_array(Commands::WAKEUP, Commands::WAKEUP_SIZE);
-
-  // Record when we sent the wake-up command
-  this->last_command_time_ = millis();
-
-  // Move to WAKEUP_SENT state
-  this->command_state_ = CommandState::WAKEUP_SENT;
-}
-
-void BarcodeScanner::queue_command(std::unique_ptr<Command> command) {
-  if (command == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "Attempted to queue null command");
-    return;
-  }
-
-  // Check if queue is full
-  if (this->command_queue_.size() >= MAX_QUEUE_SIZE) {
-    ESP_LOGW(TAG_SCANNER, "Command queue full (size=%u), dropping command: %s", this->command_queue_.size(),
-             command->get_description());
-    return;
-  }
-
-  command->log_command_data(TAG_SCANNER, "Queuing");
-  this->command_queue_.push_back(std::move(command));
-}
-
-bool BarcodeScanner::has_terminator_in_buffer_() const {
+size_t BarcodeScanner::terminator_length_in_buffer_() const {
+  const char *term = terminator_bytes(this->get_setting(SettingId::TERMINATOR));
+  const size_t term_len = strlen(term);
   const size_t len = this->rx_buffer_.size();
-  switch (this->terminator_) {
-    case Terminator::NONE:
-      // No terminator byte — treat end-of-barcode as a quiet gap after the last byte.
-      return len > 0 && (millis() - this->last_rx_time_) >= RX_IDLE_WINDOW_MS;
-    case Terminator::CR:
-      return len >= 1 && this->rx_buffer_[len - 1] == '\r';
-    case Terminator::CRLF:
-      return len >= 2 && this->rx_buffer_[len - 2] == '\r' && this->rx_buffer_[len - 1] == '\n';
-    case Terminator::TAB:
-      return len >= 1 && this->rx_buffer_[len - 1] == '\t';
-    case Terminator::CRCR:
-      return len >= 2 && this->rx_buffer_[len - 2] == '\r' && this->rx_buffer_[len - 1] == '\r';
-    case Terminator::CRLFCRLF:
-      return len >= 4 && this->rx_buffer_[len - 4] == '\r' && this->rx_buffer_[len - 3] == '\n' &&
-             this->rx_buffer_[len - 2] == '\r' && this->rx_buffer_[len - 1] == '\n';
-    default:
-      return len > 0 && (millis() - this->last_rx_time_) >= RX_IDLE_WINDOW_MS;
-  }
+  if (term_len == 0 || len < term_len)
+    return 0;
+  return memcmp(this->rx_buffer_.data() + len - term_len, term, term_len) == 0 ? term_len : 0;
 }
 
-bool BarcodeScanner::is_ack_sequence_(const uint8_t *data, size_t len, size_t offset) const {
-  // Enhanced input validation
-  if (data == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "Null data pointer passed to is_ack_sequence_");
+bool BarcodeScanner::has_complete_frame_() const {
+  if (this->rx_buffer_.empty())
     return false;
-  }
-
-  // Check if there's enough data to contain an ACK sequence
-  if (this->operation_mode_ == OperationMode::HOST) {
-    // Host mode uses 6-byte ACK
-    if (len < Commands::Responses::ACK_SIZE + offset) {
-      return false;
-    }
-
-    // Check against standard ACK
-    const uint8_t *ack = Commands::Responses::ACK;
-    return memcmp(data + offset, ack, Commands::Responses::ACK_SIZE) == 0;
-  } else {
-    // Non-host mode uses 7-byte ACK
-    if (len < Commands::Responses::NON_HOST_ACK_SIZE + offset) {
-      return false;
-    }
-
-    const uint8_t *ack = Commands::Responses::NON_HOST_ACK;
-    return memcmp(data + offset, ack, Commands::Responses::NON_HOST_ACK_SIZE) == 0;
-  }
+  // A frame ends with the configured terminator.  The idle gap also ends it, which covers
+  // terminator: none and a scanner whose terminator was changed behind our back (e.g. by
+  // scanning a configuration barcode).
+  return this->terminator_length_in_buffer_() > 0 || (millis() - this->last_rx_time_) >= RX_IDLE_WINDOW_MS;
 }
 
-// Response Processing Methods
-
-// Returns true if s is valid UTF-8.  aioesphomeapi deserialises TextSensorStateResponse
-// with google.protobuf, which rejects strings containing invalid UTF-8 sequences and
-// closes the API connection — causing HA to reconnect every ~160 ms.
-static bool is_valid_utf8(const std::string &s) {
-  const auto *bytes = reinterpret_cast<const uint8_t *>(s.data());
-  const size_t len = s.size();
-  for (size_t i = 0; i < len;) {
-    uint8_t b = bytes[i];
-    size_t seqlen;
-    if (b <= 0x7F) {
-      seqlen = 1;
-    } else if (b >= 0xC2 && b <= 0xDF) {
-      seqlen = 2;
-    } else if (b >= 0xE0 && b <= 0xEF) {
-      seqlen = 3;
-    } else if (b >= 0xF0 && b <= 0xF4) {
-      seqlen = 4;
+// Copy data into a string, replacing each invalid UTF-8 sequence (maximal subpart) with U+FFFD.
+// aioesphomeapi decodes states with google.protobuf, which rejects invalid UTF-8 — including
+// overlong encodings and UTF-16 surrogates — and drops the API connection (HA reconnect loop).
+// Barcodes are often Latin-1 or GBK, so replacing keeps the rest of the code usable.
+static std::string sanitize_utf8(const uint8_t *data, size_t len, size_t &replaced) {
+  static const char REPLACEMENT[] = "\xEF\xBF\xBD";
+  std::string out;
+  out.reserve(len);
+  replaced = 0;
+  size_t i = 0;
+  while (i < len) {
+    const uint8_t lead = data[i];
+    if (lead < 0x80) {
+      out += static_cast<char>(lead);
+      i++;
+      continue;
+    }
+    size_t continuation;
+    uint8_t lo = 0x80, hi = 0xBF;  // allowed range of the first continuation byte
+    if (lead >= 0xC2 && lead <= 0xDF) {
+      continuation = 1;
+    } else if (lead >= 0xE0 && lead <= 0xEF) {
+      continuation = 2;
+      lo = lead == 0xE0 ? 0xA0 : 0x80;  // no overlong forms
+      hi = lead == 0xED ? 0x9F : 0xBF;  // no surrogates
+    } else if (lead >= 0xF0 && lead <= 0xF4) {
+      continuation = 3;
+      lo = lead == 0xF0 ? 0x90 : 0x80;  // no overlong forms
+      hi = lead == 0xF4 ? 0x8F : 0xBF;  // nothing above U+10FFFF
     } else {
-      return false;  // invalid lead byte
+      out += REPLACEMENT;
+      replaced++;
+      i++;
+      continue;
     }
-    if (i + seqlen > len)
-      return false;  // truncated sequence
-    for (size_t j = 1; j < seqlen; j++) {
-      if ((bytes[i + j] & 0xC0) != 0x80)
-        return false;  // invalid continuation byte
+    size_t n = 1;
+    while (n <= continuation && i + n < len) {
+      const uint8_t byte = data[i + n];
+      if (byte < (n == 1 ? lo : 0x80) || byte > (n == 1 ? hi : 0xBF))
+        break;
+      n++;
     }
-    i += seqlen;
+    if (n == continuation + 1) {
+      out.append(reinterpret_cast<const char *>(data + i), n);
+    } else {
+      out += REPLACEMENT;
+      replaced++;
+    }
+    i += n;
   }
-  return true;
+  return out;
 }
 
 void BarcodeScanner::process_barcode_() {
-  if (this->rx_buffer_.empty()) {
+  if (this->rx_buffer_.empty())
+    return;
+  const size_t data_length = this->rx_buffer_.size() - this->terminator_length_in_buffer_();
+  size_t replaced;
+  std::string barcode = sanitize_utf8(this->rx_buffer_.data(), data_length, replaced);
+  this->rx_buffer_.clear();
+  if (barcode.empty())
+    return;
+  if (replaced > 0) {
+    ESP_LOGW(TAG, "Barcode is not valid UTF-8; replaced %zu invalid sequence(s) with U+FFFD", replaced);
+  }
+  if (barcode.size() > MAX_BARCODE_LENGTH) {
+    ESP_LOGW(TAG, "Barcode too long (%zu bytes), truncating to %zu bytes", barcode.size(), MAX_BARCODE_LENGTH);
+    size_t cut = MAX_BARCODE_LENGTH;
+    while (cut > 0 && (static_cast<uint8_t>(barcode[cut]) & 0xC0) == 0x80)
+      cut--;  // never split a multi-byte character
+    barcode.resize(cut);
+  }
+
+  // A HOST-mode scan is complete once its barcode arrives.
+  this->scan_timer_active_ = false;
+  if (this->scan_state_ == ScanState::MANUAL_SCANNING)
+    this->set_scan_state_(ScanState::IDLE);
+
+  if (barcode.rfind(CONFIG_CODE_PREFIX, 0) == 0) {
+    this->apply_config_code_(barcode.substr(strlen(CONFIG_CODE_PREFIX)));
     return;
   }
+  ESP_LOGD(TAG, "Barcode received: %s", barcode.c_str());
 
-  // Strip the configured terminator from the end of the barcode data.
-  size_t data_length = this->rx_buffer_.size();
-  if (this->terminator_ != Terminator::NONE) {
-    // Find the terminator sequence
-    size_t term_pos = 0;
-    switch (this->terminator_) {
-      case Terminator::CRLF:
-        term_pos = data_length - 2;
-        if (data_length >= 2 && this->rx_buffer_[term_pos] == '\r' && this->rx_buffer_[term_pos + 1] == '\n') {
-          data_length = term_pos;
-        }
-        break;
-      case Terminator::CR:
-        term_pos = data_length - 1;
-        if (data_length >= 1 && this->rx_buffer_[term_pos] == '\r') {
-          data_length = term_pos;
-        }
-        break;
-      case Terminator::TAB:
-        term_pos = data_length - 1;
-        if (data_length >= 1 && this->rx_buffer_[term_pos] == '\t') {
-          data_length = term_pos;
-        }
-        break;
-      case Terminator::CRCR:
-        term_pos = data_length - 2;
-        if (data_length >= 2 && this->rx_buffer_[term_pos] == '\r' && this->rx_buffer_[term_pos + 1] == '\r') {
-          data_length = term_pos;
-        }
-        break;
-      case Terminator::CRLFCRLF:
-        term_pos = data_length - 4;
-        if (data_length >= 4 && this->rx_buffer_[term_pos] == '\r' && this->rx_buffer_[term_pos + 1] == '\n' &&
-            this->rx_buffer_[term_pos + 2] == '\r' && this->rx_buffer_[term_pos + 3] == '\n') {
-          data_length = term_pos;
-        }
-        break;
-      default:
-        break;
-    }
+  if (this->barcode_sensor_ != nullptr)
+    this->barcode_sensor_->publish_state(barcode);
+  this->barcode_callback_.call(barcode);
+  if (this->scan_event_ != nullptr)
+    this->scan_event_->trigger("scan_successful");
+}
+
+void BarcodeScanner::apply_config_code_(const std::string &code) {
+  // The scanner passed a configuration barcode on instead of applying it (config_code_scan_mode
+  // disabled).  Apply it over UART, so the change is confirmed and published like any other.
+  if (code == FACTORY_RESET_CONFIG_CODE) {
+    ESP_LOGI(TAG, "Configuration barcode: factory reset");
+    this->factory_reset();
+    return;
   }
-
-  // Add bounds checking to prevent buffer overflows
-  if (data_length > MAX_BARCODE_LENGTH) {
-    ESP_LOGW(TAG_SCANNER, "Barcode too long (%u bytes), truncating to %u bytes", data_length, MAX_BARCODE_LENGTH);
-    data_length = MAX_BARCODE_LENGTH;
+  SettingId id;
+  uint8_t value;
+  if (!find_config_code(code, id, value)) {
+    ESP_LOGW(TAG, "Ignoring configuration barcode %s%s: not a setting this component manages", CONFIG_CODE_PREFIX,
+             code.c_str());
+    return;
   }
-
-  // Create a string from the received data with explicit size limit
-  std::string barcode;
-  if (data_length > 0) {
-    barcode.assign(reinterpret_cast<char *>(this->rx_buffer_.data()), data_length);
-
-    // Barcode received — cancel any pending scan timeout
-    this->scan_started_at_ = 0;
-
-    ESP_LOGD(TAG_SCANNER, "Barcode received: %s", barcode.c_str());
-
-    // Guard against publishing invalid UTF-8: aioesphomeapi uses google.protobuf which
-    // rejects malformed strings and closes the API connection (HA reconnect loop).
-    if (!is_valid_utf8(barcode)) {
-      ESP_LOGW(TAG_SCANNER, "Barcode contains invalid UTF-8 — discarding to protect HA API connection");
-      this->clear_buffer_();
-      return;
-    }
-
-    if (this->barcode_sensor_ != nullptr)
-      this->barcode_sensor_->publish_state(barcode);
-
-    // Fire on_barcode automation trigger (runs homeassistant.event etc.)
-    this->barcode_callback_(barcode);
-
-    if (this->scan_event_ != nullptr)
-      this->scan_event_->trigger("scan_successful");
-  }
-
-  // Clear the buffer for the next barcode
-  this->clear_buffer_();
+  const SettingInfo &setting = get_setting_info(id);
+  ESP_LOGI(TAG, "Configuration barcode: %s = %s", setting.key, setting.values[value]);
+  this->set_setting(id, value);
 }
 
 void BarcodeScanner::process_version_() {
-  if (this->rx_buffer_.empty()) {
-    return;
-  }
-
   if (this->rx_buffer_.size() > MAX_VERSION_LENGTH) {
-    ESP_LOGW(TAG_SCANNER, "Version response too long (%u bytes), truncating to %u bytes", this->rx_buffer_.size(),
+    ESP_LOGW(TAG, "Version response too long (%zu bytes), truncating to %zu bytes", this->rx_buffer_.size(),
              MAX_VERSION_LENGTH);
     this->rx_buffer_.resize(MAX_VERSION_LENGTH);
   }
-
-  // Raw hex dump for debugging the scanner's undocumented response format.
-  {
-    const size_t log_len = std::min(this->rx_buffer_.size(), static_cast<size_t>(32));
-    char hex_buf[3 * 32 + 1];
-    char *p = hex_buf;
-    for (size_t i = 0; i < log_len; i++) {
-      p += snprintf(p, 4, "%02X ", this->rx_buffer_[i]);
-    }
-    ESP_LOGD(TAG_SCANNER, "Version raw (%u bytes)%s: %s", this->rx_buffer_.size(),
-             this->rx_buffer_.size() > 32 ? " (truncated)" : "", hex_buf);
-  }
+  char hex[format_hex_pretty_size(MAX_LOGGED_FRAME)];
+  format_hex_pretty_to(hex, this->rx_buffer_.data(), std::min(this->rx_buffer_.size(), MAX_LOGGED_FRAME), ' ');
+  ESP_LOGD(TAG, "Version response (%zu bytes): %s%s", this->rx_buffer_.size(), hex,
+           this->rx_buffer_.size() > MAX_LOGGED_FRAME ? " ..." : "");
 
   // The scanner response is a binary-framed product info string, e.g.:
   //   \x58\xA4\x00\x00Product Name:SE630 Product ID:... Hardware version:1.0 Firmware version:2.2.18\xe4D
@@ -739,589 +717,16 @@ void BarcodeScanner::process_version_() {
     }
   }
 
-  // Reject if not valid UTF-8 — same protection applied to barcodes.
-  if (!version.empty() && !is_valid_utf8(version)) {
-    ESP_LOGW(TAG_SCANNER, "Version string contains invalid UTF-8 — discarding to protect HA API connection");
-    version.clear();
-  }
-
   if (this->version_sensor_ != nullptr) {
     if (!version.empty()) {
-      ESP_LOGD(TAG_SCANNER, "Publishing version: '%s'", version.c_str());
+      ESP_LOGD(TAG, "Publishing version: '%s'", version.c_str());
       this->version_sensor_->publish_state(version);
     } else {
-      ESP_LOGW(TAG_SCANNER, "Version response yielded no publishable string (%u raw bytes)", this->rx_buffer_.size());
+      ESP_LOGW(TAG, "Version response yielded no publishable string (%zu raw bytes)", this->rx_buffer_.size());
     }
   }
 
-  this->clear_buffer_();
-}
-
-void BarcodeScanner::request_version_() { this->queue_command(CommandFactory::create_version_command()); }
-
-// Scanner Control Methods
-void BarcodeScanner::start_scan() {
-  if (this->operation_mode_ != OperationMode::HOST) {
-    ESP_LOGW(TAG_SCANNER, "Cannot start scan in non-HOST mode");
-    return;
-  }
-
-  if (this->is_scanning()) {
-    ESP_LOGD(TAG_SCANNER, "Scan already in progress");
-    return;
-  }
-
-  ESP_LOGD(TAG_SCANNER, "Starting scan in HOST mode");
-
-  // Create and queue the start command
-  auto command = CommandFactory::create_start_command();
-  this->queue_command(std::move(command));
-
-  // Record when scanning started so we can fire on_scan_timeout after scan_duration elapses
-  this->scan_started_at_ = millis();
-
-  // Update state
-  this->set_scan_state(ScanState::MANUAL_SCANNING);
-
-  // Set expected response type to BARCODE
-  this->set_expected_response_(ResponseType::BARCODE);
-}
-
-void BarcodeScanner::stop_scan() {
-  if (this->operation_mode_ != OperationMode::HOST) {
-    ESP_LOGW(TAG_SCANNER, "Cannot stop scan in non-HOST mode");
-    return;
-  }
-
-  if (!this->is_scanning()) {
-    ESP_LOGD(TAG_SCANNER, "No scan in progress");
-    return;
-  }
-
-  ESP_LOGD(TAG_SCANNER, "Stopping scan in HOST mode");
-
-  // Create and queue the stop command
-  auto command = CommandFactory::create_stop_command();
-  this->queue_command(std::move(command));
-
-  // Cancel any pending scan timeout
-  this->scan_started_at_ = 0;
-
-  // Update state
-  this->set_scan_state(ScanState::IDLE);
-}
-
-// Scanner Settings Methods
-void BarcodeScanner::set_operation_mode(OperationMode mode) {
-  if (mode == this->operation_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Operation mode already set to %s", operation_mode_to_string(mode));
-    return;
-  }
-
-  // Create and queue the mode command
-  auto command = CommandFactory::create_mode_command(mode);
-  this->queue_command(std::move(command));
-
-  // Update scan state based on new mode (this needs to happen immediately for proper operation)
-  if (mode == OperationMode::CONTINUOUS || mode == OperationMode::AUTO_SENSE) {
-    this->set_scan_state(ScanState::CONTINUOUS_SCANNING);
-  } else if (this->get_scan_state() == ScanState::CONTINUOUS_SCANNING) {
-    // If we're leaving continuous mode, reset the scan state
-    this->set_scan_state(ScanState::IDLE);
-  }
-}
-
-void BarcodeScanner::set_terminator(Terminator term) {
-  if (term == this->terminator_) {
-    ESP_LOGD(TAG_SCANNER, "Terminator already set to %s", terminator_to_string(term));
-    return;
-  }
-
-  // Create and queue the terminator command
-  auto command = CommandFactory::create_terminator_command(term);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_light_mode(LightMode mode) {
-  if (mode == this->light_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Light mode already set to %s", light_mode_to_string(mode));
-    return;
-  }
-
-  // Create and queue the light mode command
-  auto command = CommandFactory::create_light_command(mode);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_locate_light_mode(LocateLightMode mode) {
-  if (mode == this->locate_light_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Locate light mode already set to %s", locate_light_mode_to_string(mode));
-    return;
-  }
-
-  // Create and queue the locate light mode command
-  auto command = CommandFactory::create_locate_light_command(mode);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_sound_mode(SoundMode mode) {
-  if (mode == this->sound_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Sound mode already set to %s", sound_mode_to_string(mode));
-    return;
-  }
-
-  // Create and queue the sound mode command
-  auto command = CommandFactory::create_sound_command(mode);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_buzzer_volume(BuzzerVolume volume) {
-  if (volume == this->buzzer_volume_) {
-    ESP_LOGD(TAG_SCANNER, "Buzzer volume already set to %s", buzzer_volume_to_string(volume));
-    return;
-  }
-
-  // Create and queue the volume command
-  auto command = CommandFactory::create_volume_command(volume);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_decoding_success_light_mode(DecodingSuccessLightMode mode) {
-  if (mode == this->decoding_success_light_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Decoding success light mode already set to %s", decoding_success_light_mode_to_string(mode));
-    return;
-  }
-
-  // Create and queue the command
-  auto command = CommandFactory::create_decoding_success_light_command(mode);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_boot_sound_mode(BootSoundMode mode) {
-  if (mode == this->boot_sound_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Boot sound mode already set to %s", boot_sound_mode_to_string(mode));
-    return;
-  }
-
-  // Create and queue the command
-  auto command = CommandFactory::create_boot_sound_command(mode);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_decode_sound_mode(DecodeSoundMode mode) {
-  if (mode == this->decode_sound_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Decode sound mode already set to %s", decode_sound_mode_to_string(mode));
-    return;
-  }
-
-  // Create and queue the command
-  auto command = CommandFactory::create_decode_sound_command(mode);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_cmd_ack_sound_mode(CmdAckSoundMode mode) {
-  if (mode == this->cmd_ack_sound_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Cmd ACK sound mode already set to %s", cmd_ack_sound_mode_to_string(mode));
-    return;
-  }
-  auto command = CommandFactory::create_cmd_ack_sound_command(mode);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_config_code_scan_mode(ConfigCodeScanMode mode) {
-  if (mode == this->config_code_scan_mode_) {
-    ESP_LOGD(TAG_SCANNER, "Config code scan mode already set to %s", config_code_scan_mode_to_string(mode));
-    return;
-  }
-  auto command = CommandFactory::create_config_code_scan_command(mode);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_scan_duration(ScanDuration duration) {
-  if (duration == this->scan_duration_) {
-    ESP_LOGD(TAG_SCANNER, "Scan duration already set to %s", scan_duration_to_string(duration));
-    return;
-  }
-
-  // Create and queue the command
-  auto command = CommandFactory::create_scan_duration_command(duration);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_stable_induction_time(StableInductionTime time) {
-  if (time == this->stable_induction_time_) {
-    ESP_LOGD(TAG_SCANNER, "Stable induction time already set to %s", stable_induction_time_to_string(time));
-    return;
-  }
-
-  // Create and queue the command
-  auto command = CommandFactory::create_stable_induction_time_command(time);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_reading_interval(ReadingInterval interval) {
-  if (interval == this->reading_interval_) {
-    ESP_LOGD(TAG_SCANNER, "Reading interval already set to %s", reading_interval_to_string(interval));
-    return;
-  }
-
-  // Create and queue the command
-  auto command = CommandFactory::create_reading_interval_command(interval);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::set_same_code_interval(SameCodeInterval interval) {
-  if (interval == this->same_code_interval_) {
-    ESP_LOGD(TAG_SCANNER, "Same code interval already set to %s", same_code_interval_to_string(interval));
-    return;
-  }
-
-  // Create and queue the command
-  auto command = CommandFactory::create_same_code_interval_command(interval);
-  this->queue_command(std::move(command));
-}
-
-void BarcodeScanner::process_current_buffer() {
-  // First ensure we have the latest data
-  this->read_buffer_();
-
-  // Then process the barcode using existing logic
-  this->process_barcode_();
-
-  // In HOST mode, we should set the scanner back to IDLE state after processing
-  if (this->operation_mode_ == OperationMode::HOST && this->get_scan_state() != ScanState::IDLE) {
-    this->set_scan_state(ScanState::IDLE);
-  }
-}
-
-// Protected state setter implementations.
-// Each setter is called from a CommandFactory lambda after the scanner ACKs the command.
-// After updating the in-memory state, save_settings_() persists all settings to NVS so that
-// the next boot can skip re-sending settings that are already applied.
-
-void BarcodeScanner::set_terminator_state(Terminator term) {
-  ESP_LOGD(TAG_SCANNER, "Setting terminator to %s", terminator_to_string(term));
-  this->terminator_ = term;
-  this->save_settings_();
-  if (this->terminator_select_ != nullptr)
-    this->terminator_select_->publish_state(TerminatorSelect::to_key(term));
-}
-
-void BarcodeScanner::set_light_mode_state(LightMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting light mode to %s", light_mode_to_string(mode));
-  this->light_mode_ = mode;
-  this->save_settings_();
-  if (this->light_mode_select_ != nullptr)
-    this->light_mode_select_->publish_state(LightModeSelect::to_key(mode));
-}
-
-void BarcodeScanner::set_locate_light_mode_state(LocateLightMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting locate light mode to %s", locate_light_mode_to_string(mode));
-  this->locate_light_mode_ = mode;
-  this->save_settings_();
-  if (this->locate_light_mode_select_ != nullptr)
-    this->locate_light_mode_select_->publish_state(LocateLightModeSelect::to_key(mode));
-}
-
-void BarcodeScanner::set_sound_mode_state(SoundMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting sound mode to %s", sound_mode_to_string(mode));
-  this->sound_mode_ = mode;
-  this->save_settings_();
-  if (this->sound_switch_ != nullptr)
-    this->sound_switch_->publish_state(mode == SoundMode::SOUND_ENABLED);
-}
-
-void BarcodeScanner::set_buzzer_volume_state(BuzzerVolume volume) {
-  ESP_LOGD(TAG_SCANNER, "Setting buzzer volume to %s", buzzer_volume_to_string(volume));
-  this->buzzer_volume_ = volume;
-  this->save_settings_();
-  if (this->buzzer_volume_select_ != nullptr)
-    this->buzzer_volume_select_->publish_state(BuzzerVolumeSelect::to_key(volume));
-}
-
-void BarcodeScanner::set_decoding_success_light_mode_state(DecodingSuccessLightMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting decoding success light mode to %s", decoding_success_light_mode_to_string(mode));
-  this->decoding_success_light_mode_ = mode;
-  this->save_settings_();
-  if (this->decoding_success_light_switch_ != nullptr)
-    this->decoding_success_light_switch_->publish_state(mode == DecodingSuccessLightMode::DECODING_LIGHT_ENABLED);
-}
-
-void BarcodeScanner::set_boot_sound_mode_state(BootSoundMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting boot sound mode to %s", boot_sound_mode_to_string(mode));
-  this->boot_sound_mode_ = mode;
-  this->save_settings_();
-  if (this->boot_sound_switch_ != nullptr)
-    this->boot_sound_switch_->publish_state(mode == BootSoundMode::BOOT_SOUND_ENABLED);
-}
-
-void BarcodeScanner::set_decode_sound_mode_state(DecodeSoundMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting decode sound mode to %s", decode_sound_mode_to_string(mode));
-  this->decode_sound_mode_ = mode;
-  this->save_settings_();
-  if (this->decode_sound_switch_ != nullptr)
-    this->decode_sound_switch_->publish_state(mode == DecodeSoundMode::DECODE_SOUND_ENABLED);
-}
-
-void BarcodeScanner::set_cmd_ack_sound_mode_state(CmdAckSoundMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting cmd ACK sound mode to %s", cmd_ack_sound_mode_to_string(mode));
-  this->cmd_ack_sound_mode_ = mode;
-  this->save_settings_();
-  if (this->cmd_ack_sound_switch_ != nullptr)
-    this->cmd_ack_sound_switch_->publish_state(mode == CmdAckSoundMode::CMD_ACK_SOUND_ENABLED);
-}
-
-void BarcodeScanner::set_config_code_scan_mode_state(ConfigCodeScanMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting config code scan mode to %s", config_code_scan_mode_to_string(mode));
-  this->config_code_scan_mode_ = mode;
-  this->save_settings_();
-  if (this->config_code_scan_switch_ != nullptr)
-    this->config_code_scan_switch_->publish_state(mode == ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED);
-}
-
-void BarcodeScanner::set_scan_duration_state(ScanDuration duration) {
-  ESP_LOGD(TAG_SCANNER, "Setting scan duration to %s", scan_duration_to_string(duration));
-  this->scan_duration_ = duration;
-  this->save_settings_();
-  if (this->scan_duration_select_ != nullptr)
-    this->scan_duration_select_->publish_state(ScanDurationSelect::to_key(duration));
-}
-
-void BarcodeScanner::set_stable_induction_time_state(StableInductionTime time) {
-  ESP_LOGD(TAG_SCANNER, "Setting stable induction time to %s", stable_induction_time_to_string(time));
-  this->stable_induction_time_ = time;
-  this->save_settings_();
-  if (this->stable_induction_time_select_ != nullptr)
-    this->stable_induction_time_select_->publish_state(StableInductionTimeSelect::to_key(time));
-}
-
-void BarcodeScanner::set_reading_interval_state(ReadingInterval interval) {
-  ESP_LOGD(TAG_SCANNER, "Setting reading interval to %s", reading_interval_to_string(interval));
-  this->reading_interval_ = interval;
-  this->save_settings_();
-  if (this->reading_interval_select_ != nullptr)
-    this->reading_interval_select_->publish_state(ReadingIntervalSelect::to_key(interval));
-}
-
-void BarcodeScanner::set_same_code_interval_state(SameCodeInterval interval) {
-  ESP_LOGD(TAG_SCANNER, "Setting same code interval to %s", same_code_interval_to_string(interval));
-  this->same_code_interval_ = interval;
-  this->save_settings_();
-  if (this->same_code_interval_select_ != nullptr)
-    this->same_code_interval_select_->publish_state(SameCodeIntervalSelect::to_key(interval));
-}
-
-void BarcodeScanner::set_operation_mode_state(OperationMode mode) {
-  ESP_LOGD(TAG_SCANNER, "Setting operation mode to %s", operation_mode_to_string(mode));
-  this->operation_mode_ = mode;
-  this->save_settings_();
-  // Keep the HA select entity in sync after the scanner ACKs the command
-  if (this->operation_mode_select_ != nullptr) {
-    this->operation_mode_select_->publish_state(OperationModeSelect::to_key(mode));
-  }
-}
-
-// OperationModeSelect — routes HA select changes to the scanner command queue
-void OperationModeSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "OperationModeSelect: no scanner attached");
-    return;
-  }
-  OperationMode mode;
-  if (!parse_operation_mode(value, mode)) {
-    ESP_LOGW(TAG_SCANNER, "OperationModeSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_operation_mode(mode);
-  // publish_state is deferred until set_operation_mode_state() fires after the scanner ACKs
-}
-
-void BuzzerVolumeSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "BuzzerVolumeSelect: no scanner attached");
-    return;
-  }
-  BuzzerVolume vol;
-  if (!parse_buzzer_volume(value, vol)) {
-    ESP_LOGW(TAG_SCANNER, "BuzzerVolumeSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_buzzer_volume(vol);
-}
-
-void LightModeSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "LightModeSelect: no scanner attached");
-    return;
-  }
-  LightMode mode;
-  if (!parse_light_mode(value, mode)) {
-    ESP_LOGW(TAG_SCANNER, "LightModeSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_light_mode(mode);
-}
-
-void LocateLightModeSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "LocateLightModeSelect: no scanner attached");
-    return;
-  }
-  LocateLightMode mode;
-  if (!parse_locate_light_mode(value, mode)) {
-    ESP_LOGW(TAG_SCANNER, "LocateLightModeSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_locate_light_mode(mode);
-}
-
-void ScanDurationSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "ScanDurationSelect: no scanner attached");
-    return;
-  }
-  ScanDuration dur;
-  if (!parse_scan_duration(value, dur)) {
-    ESP_LOGW(TAG_SCANNER, "ScanDurationSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_scan_duration(dur);
-}
-
-void TerminatorSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "TerminatorSelect: no scanner attached");
-    return;
-  }
-  Terminator term;
-  if (!parse_terminator(value, term)) {
-    ESP_LOGW(TAG_SCANNER, "TerminatorSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_terminator(term);
-}
-
-void StableInductionTimeSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "StableInductionTimeSelect: no scanner attached");
-    return;
-  }
-  StableInductionTime time;
-  if (!parse_stable_induction_time(value, time)) {
-    ESP_LOGW(TAG_SCANNER, "StableInductionTimeSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_stable_induction_time(time);
-}
-
-void ReadingIntervalSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "ReadingIntervalSelect: no scanner attached");
-    return;
-  }
-  ReadingInterval interval;
-  if (!parse_reading_interval(value, interval)) {
-    ESP_LOGW(TAG_SCANNER, "ReadingIntervalSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_reading_interval(interval);
-}
-
-void SameCodeIntervalSelect::control(const std::string &value) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "SameCodeIntervalSelect: no scanner attached");
-    return;
-  }
-  SameCodeInterval interval;
-  if (!parse_same_code_interval(value, interval)) {
-    ESP_LOGW(TAG_SCANNER, "SameCodeIntervalSelect: unknown value '%s'", value.c_str());
-    return;
-  }
-  scanner_->set_same_code_interval(interval);
-}
-
-void SoundSwitch::write_state(bool state) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "SoundSwitch: no scanner attached");
-    return;
-  }
-  scanner_->set_sound_mode(state ? SoundMode::SOUND_ENABLED : SoundMode::SOUND_DISABLED);
-  // publish_state deferred until set_sound_mode_state() fires after the scanner ACKs
-}
-
-void BootSoundSwitch::write_state(bool state) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "BootSoundSwitch: no scanner attached");
-    return;
-  }
-  scanner_->set_boot_sound_mode(state ? BootSoundMode::BOOT_SOUND_ENABLED : BootSoundMode::BOOT_SOUND_DISABLED);
-}
-
-void DecodeSoundSwitch::write_state(bool state) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "DecodeSoundSwitch: no scanner attached");
-    return;
-  }
-  scanner_->set_decode_sound_mode(state ? DecodeSoundMode::DECODE_SOUND_ENABLED
-                                        : DecodeSoundMode::DECODE_SOUND_DISABLED);
-}
-
-void DecodingSuccessLightSwitch::write_state(bool state) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "DecodingSuccessLightSwitch: no scanner attached");
-    return;
-  }
-  scanner_->set_decoding_success_light_mode(state ? DecodingSuccessLightMode::DECODING_LIGHT_ENABLED
-                                                  : DecodingSuccessLightMode::DECODING_LIGHT_DISABLED);
-}
-
-void CmdAckSoundSwitch::write_state(bool state) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "CmdAckSoundSwitch: no scanner attached");
-    return;
-  }
-  scanner_->set_cmd_ack_sound_mode(state ? CmdAckSoundMode::CMD_ACK_SOUND_ENABLED
-                                         : CmdAckSoundMode::CMD_ACK_SOUND_DISABLED);
-}
-
-void ConfigCodeScanSwitch::write_state(bool state) {
-  if (scanner_ == nullptr) {
-    ESP_LOGW(TAG_SCANNER, "ConfigCodeScanSwitch: no scanner attached");
-    return;
-  }
-  scanner_->set_config_code_scan_mode(state ? ConfigCodeScanMode::CONFIG_CODE_SCAN_ENABLED
-                                            : ConfigCodeScanMode::CONFIG_CODE_SCAN_DISABLED);
-}
-
-void BarcodeScanner::factory_reset() {
-  ESP_LOGW(TAG_SCANNER, "Factory reset requested — scanner will revert to hardware defaults and ESP will reboot");
-  this->queue_command(CommandFactory::create_factory_reset_command());
-}
-
-void BarcodeScanner::do_factory_reset_() {
-  // Invalidate NVS by saving a zeroed struct (version=0).  On next boot
-  // configure_defaults_() will see a version mismatch and re-send every setting.
-  ScannerPreferences empty{};
-  if (!this->pref_.save(&empty)) {
-    ESP_LOGW(TAG_SCANNER, "Failed to invalidate NVS preferences; settings may not fully re-sync after reboot");
-  }
-  ESP_LOGW(TAG_SCANNER, "Scanner factory reset acknowledged — rebooting to re-apply YAML settings");
-  App.safe_reboot();
-}
-
-void StartButton::press_action() {
-  if (scanner_ != nullptr)
-    scanner_->start_scan();
-}
-
-void StopButton::press_action() {
-  if (scanner_ != nullptr)
-    scanner_->stop_scan();
-}
-
-void FactoryResetButton::press_action() {
-  if (scanner_ != nullptr)
-    scanner_->factory_reset();
+  this->rx_buffer_.clear();
 }
 
 }  // namespace m5stack_barcode

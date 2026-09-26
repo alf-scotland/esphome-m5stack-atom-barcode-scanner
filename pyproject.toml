@@ -5,23 +5,44 @@ description = "ESPHome external component for the M5Stack Atom QR Code Scanner"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "esphome==2026.7.2",
+    "esphome==2026.9.0",
     "fatfs-ng>=0.1.15",
     "littlefs-python>=0.17.1",
-    "pip>=26.1",
 ]
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.6.0",
+    "gcovr>=8.6",
+    "pre-commit>=4.6.2",
     "pytest>=8.0.0",
-    "ruff>=0.15.15",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.8",
     "yamllint>=1.38.0",
 ]
 
+[tool.uv]
+# CI installs the newest uv satisfying this (astral-sh/setup-uv reads it).
+required-version = ">=0.8"
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: host-platform firmware tests (compile ESPHome; run with -m integration)",
+]
+addopts = "-m 'not integration'"
+
+[tool.coverage.run]
+# __init__.py mostly runs inside the `esphome` subprocesses the codegen tests start.
+source = ["components"]
+patch = ["subprocess"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -29,8 +50,8 @@ ignore = [
     # Docstring style conflicts — pick D211/D213 variants
     "D203",   # one-blank-line-before-class (conflicts with D211)
     "D213",   # multi-line-summary-second-line (conflicts with D212)
-    # Annotation flexibility — Any is used extensively in ESPHome codegen helpers
-    "ANN401",
+    # Conflicts with the formatter (ruff's documented recommendation)
+    "COM812",
     # subprocess with a fixed list is not untrusted input (test runner only)
     "S603",
     # No copyright headers in this project
@@ -38,6 +59,6 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"components/m5stack_barcode/__init__.py" = [
-    "ANN401",
-]
+# Any is used extensively in ESPHome codegen helpers
+"components/m5stack_barcode/__init__.py" = ["ANN401"]
+"tests/**" = ["S101"]  # assert is how pytest checks
