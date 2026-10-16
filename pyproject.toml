@@ -5,7 +5,7 @@ description = "ESPHome external component for the M5Stack Atom QR Code Scanner"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "esphome==2026.9.0",
+    "esphome==2026.9.1",
     "fatfs-ng>=0.1.15",
     "littlefs-python>=0.17.1",
 ]
@@ -13,16 +13,20 @@ dependencies = [
 [dependency-groups]
 dev = [
     "gcovr>=8.6",
-    "pre-commit>=4.6.2",
+    "pre-commit>=4.7.0",
     "pytest>=8.0.0",
     "pytest-cov>=7.1.0",
-    "ruff>=0.16.8",
+    "ruff>=0.17.1",
     "yamllint>=1.38.0",
 ]
 
 [tool.uv]
 # CI installs the newest uv satisfying this (astral-sh/setup-uv reads it).
 required-version = ">=0.8"
+# esptool 5.3.1 (pinned by esphome) requires bitstring without an upper bound, but its
+# espefuse imports bitstring.BitStream, which bitstring 5 removed. Drop this once esphome
+# pins an esptool that no longer depends on bitstring (5.6.0 does not).
+constraint-dependencies = ["bitstring<5"]
 
 [tool.pytest.ini_options]
 markers = [
