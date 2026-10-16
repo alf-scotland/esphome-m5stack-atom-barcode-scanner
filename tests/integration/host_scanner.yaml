@@ -1,0 +1,168 @@
+# Host-platform firmware for the integration tests: the scanner UART is a pty served
+# by fake_scanner.py.  One build serves every scenario — the operation mode and
+# terminator come from environment variables read at boot.
+esphome:
+  name: m5stack-barcode-sim
+  # Coverage instrumentation; the data is written when the firmware exits (the tests stop it
+  # with SIGTERM, which the host platform handles with a clean shutdown).
+  build_flags:
+    - -fprofile-arcs
+    - -ftest-coverage
+    - -lgcov
+  on_boot:
+    priority: -100
+    then:
+      - m5stack_barcode.set_mode:
+          id: scanner
+          operation_mode: !lambda 'const char *v = getenv("SIM_MODE"); return std::string(v ? v : "host");'
+      - m5stack_barcode.set_terminator:
+          id: scanner
+          terminator: !lambda 'const char *v = getenv("SIM_TERMINATOR"); return std::string(v ? v : "crlf");'
+      - m5stack_barcode.set_scan_duration:
+          id: scanner
+          scan_duration: !lambda 'const char *v = getenv("SIM_DURATION"); return std::string(v ? v : "1s");'
+      - wait_until:
+          condition:
+            lambda: 'return id(version).has_state();'
+          timeout: 5s
+      - logger.log: "READY"
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_START") != nullptr;'
+          then:
+            - m5stack_barcode.start: scanner
+      - if:
+          # Change a setting and change it back before the scanner has ACKed the first
+          # change (the default buzzer_volume is low).
+          condition:
+            lambda: 'return getenv("SIM_TOGGLE") != nullptr;'
+          then:
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: high
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: low
+            - logger.log: "TOGGLED"
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_SET_VOLUME") != nullptr;'
+          then:
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: high
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_STOP") != nullptr;'
+          then:
+            - delay: 300ms
+            - m5stack_barcode.stop: scanner
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_BAD_VALUE") != nullptr;'
+          then:
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: !lambda 'return std::string("loud");'
+            - lambda: 'id(scanner).set_setting(m5stack_barcode::SettingId::BUZZER_VOLUME, 7);'
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_SOUND") != nullptr;'
+          then:
+            - m5stack_barcode.set_sound_mode:
+                id: scanner
+                sound_mode: enabled
+      - if:
+          # Leave host mode while a scan started above is still running.
+          condition:
+            lambda: 'return getenv("SIM_CONTINUOUS_DURING_SCAN") != nullptr;'
+          then:
+            - delay: 200ms
+            - m5stack_barcode.set_mode:
+                id: scanner
+                operation_mode: continuous
+      - if:
+          # A command well after boot (e.g. once an unresponsive scanner answers again).
+          condition:
+            lambda: 'return getenv("SIM_LATE_VOLUME") != nullptr;'
+          then:
+            - delay: 7s
+            - m5stack_barcode.set_buzzer_volume:
+                id: scanner
+                buzzer_volume: high
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_FACTORY_RESET") != nullptr;'
+          then:
+            - m5stack_barcode.factory_reset: scanner
+
+host:
+
+# Write preferences immediately so a restarted firmware sees them.
+preferences:
+  flash_write_interval: 0s
+
+external_components:
+  - source: ../../components
+    components: [m5stack_barcode]
+
+logger:
+
+uart:
+  id: uart_bus
+  baud_rate: 9600
+  port: /tmp/m5stack-barcode-sim  # PORT in test_scanner_host.py
+
+m5stack_barcode:
+  id: scanner
+  uart_id: uart_bus
+  barcode_sensor:
+    name: Last Barcode
+    on_value:
+      - logger.log:
+          format: "SENSOR[%s]"
+          args: ["x.c_str()"]
+  scan_event:
+    name: Barcode Scanned
+    on_event:
+      - logger.log:
+          format: "EVENT[%s]"
+          args: ["event_type.c_str()"]
+  sound_switch:
+    name: Sound
+    on_state:
+      - logger.log:
+          format: "SOUND[%d]"
+          args: ["x"]
+  version_sensor:
+    id: version
+    name: Version
+    on_value:
+      - logger.log:
+          format: "VERSION[%s]"
+          args: ["x.c_str()"]
+  buzzer_volume_select:
+    name: Volume
+    on_value:
+      - logger.log:
+          format: "VOLUME[%s]"
+          args: ["x.c_str()"]
+  scanning_binary_sensor:
+    name: Scanning
+    trigger_on_initial_state: true  # also log the state published at boot
+    on_state:
+      - logger.log:
+          format: "SCANNING[%d]"
+          args: ["x"]
+  operation_mode_select:
+    name: Mode
+    on_value:
+      - logger.log:
+          format: "MODE[%s]"
+          args: ["x.c_str()"]
+  on_barcode:
+    - logger.log:
+        format: "BARCODE[%s]"
+        args: ["x.c_str()"]
+  on_scan_timeout:
+    - logger.log: "SCAN_TIMEOUT"

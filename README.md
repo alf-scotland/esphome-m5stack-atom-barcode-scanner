@@ -7,7 +7,7 @@ This repository provides an external component for ESPHome that enables support 
 This repository contains:
 
 - **Component** (`components/m5stack_barcode/`): The ESPHome external component
-- **Firmware** (`firmware/atom_lite.yaml`): A complete firmware example for the M5Stack Atom Lite + QR Scanner kit
+- **Firmware** (`firmware/atom_lite.yaml`): A complete firmware example for the M5Stack Atom Lite + QR Scanner kit, released with OTA updates via GitHub Releases. `firmware.yaml` is the entry point for ESPHome dashboard adoption and remote `packages:` use.
 - **Documentation** (`components/m5stack_barcode/index.rst`): Detailed component usage documentation
 
 ## Installation
@@ -30,6 +30,7 @@ uart:
   baud_rate: 9600
   tx_pin: GPIO19
   rx_pin: GPIO22
+  rx_buffer_size: 512
 
 m5stack_barcode:
   id: barcode_scanner
@@ -41,7 +42,59 @@ m5stack_barcode:
         args: [ 'x.c_str()' ]
 ```
 
+The UART must run at 9600 baud with both TX and RX configured (validated at config time).
+Values set in YAML are initial values: settings changed from Home Assistant persist across
+reboots, and a YAML value is applied again only when you change it in YAML.
+Barcodes are delivered through `on_barcode` in every operation mode — `host` mode scans on
+`m5stack_barcode.start`, the other modes scan on the hardware trigger or on their own.
+
 For all available options, actions, and conditions see [`components/m5stack_barcode/index.rst`](components/m5stack_barcode/index.rst).
+
+## Using the Reference Firmware
+
+The reference firmware (`firmware/atom_lite.yaml`) is published on
+[GitHub Releases](https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner/releases)
+and updates itself through the **Firmware Update** entity in Home Assistant.
+
+1. **Flash** `firmware.factory.bin` over USB, e.g. with [ESPHome Web](https://web.esphome.io/).
+2. **Connect it to Wi-Fi** — either right after flashing in ESPHome Web (Improv Serial), or
+   by joining the device's own access point and entering your Wi-Fi in the captive portal.
+3. **Adopt it** — Home Assistant discovers the device; add it. Home Assistant gives the
+   device its own encryption key, which also protects firmware uploads from then on.
+
+A new device accepts Wi-Fi setup and adoption for **15 minutes after power-up**. If that
+window closes before the device is set up (status LED pulses red), unplug it and plug it
+back in to reopen it.
+
+**Security:** the published binary contains no passwords or keys — anything baked into a
+public binary can be extracted by anyone who downloads it. Each device instead gets a unique
+key when it is adopted; only a factory reset of the ESP removes it. The fallback access point
+is open and accepts firmware uploads, so an adopted device no longer starts it when Wi-Fi is
+lost: to move it to a new network, connect it over USB and use **Change Wi-Fi** in
+[ESPHome Web](https://web.esphome.io/) (Improv Serial). Settings changed in Home Assistant
+are kept across reboots and updates.
+
+**Updating from a release before this change:** releases up to 2026.7.0 used a shared
+built-in key. After updating, remove the device in Home Assistant and add it again within
+15 minutes of it restarting (or power-cycle it first) so it receives its own key. Its
+settings are kept, including **Config Code Scanning** (on in those releases): turn it off
+so the firmware applies scanned configuration barcodes and Home Assistant stays in sync.
+
+### Updates
+
+The device checks for a new stable release every 6 hours and offers it through its
+**Firmware Update** entity in Home Assistant. Other builds are installed by hand:
+
+- **A specific release or pre-release:** flash its `firmware.factory.bin` over USB with
+  [ESPHome Web](https://web.esphome.io/). Pre-releases are never offered automatically.
+- **A pull request's build:** each PR that changes the firmware links its build in a
+  comment.
+- **Your own build:** install `firmware/atom_lite.yaml` from the ESPHome dashboard that
+  adopted the device; it holds the device's key, which OTA uploads need.
+
+To check that a downloaded binary was built by this repository, see
+[SECURITY.md](.github/SECURITY.md#verifying-a-firmware-binary). Maintainers: see
+[RELEASING.md](.github/RELEASING.md).
 
 ## Hardware Connection
 
@@ -87,7 +140,7 @@ The `scan_event` sub-component (entity class `event`) also appears as a device t
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.13 or higher
 - [uv](https://docs.astral.sh/uv/) for dependency management
 
 ### Setup
@@ -95,7 +148,7 @@ The `scan_event` sub-component (entity class `event`) also appears as a device t
 ```bash
 git clone https://github.com/alf-scotland/esphome-m5stack-atom-barcode-scanner.git
 cd esphome-m5stack-atom-barcode-scanner
-uv sync --all-extras --dev
+uv sync
 uv run pre-commit install
 ```
 
@@ -108,8 +161,11 @@ uv run esphome compile firmware/atom_lite.yaml
 # Lint everything
 uv run pre-commit run --all-files
 
-# Run config validation tests
+# Config validation, code generation and consistency tests
 uv run pytest tests/
+
+# Host-platform integration tests against an emulated scanner (compiles ESPHome)
+uv run pytest -m integration
 
 # Python linting only
 uv run ruff check .
@@ -121,7 +177,7 @@ uv run pre-commit run clang-tidy --hook-stage manual
 
 ### Code Style
 
-- **C++**: C++17, column limit 120 (`.clang-format`), clang-format v17
+- **C++**: C++17, column limit 120 (`.clang-format`), clang-format version pinned in `.pre-commit-config.yaml`
 - **Python**: line length 88, ruff with all rules (see `pyproject.toml`)
 - **YAML**: validated by yamllint (`.yamllint.yaml`)
 

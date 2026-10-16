@@ -81,6 +81,37 @@ Update status markers as branches land. Each item maps to one branch and one PR.
 
 ---
 
+## Tier 7 — Repository audit (2026-09)
+
+Found with a host-platform build of the component driven by an emulated scanner
+(now `tests/integration/`). All items landed on `claude/repo-audit-improvements-3376ej`.
+
+| # | Status | What |
+|---|--------|------|
+| 33 | ✅ | Non-host modes never published barcodes from `loop()`: framing waited for `05 D1 …`, which is only the reply to start/stop outside host mode |
+| 34 | ✅ | Start ACK and barcode in one read: barcode discarded and a false `on_scan_timeout` fired |
+| 35 | ✅ | `operation_mode: continuous/auto_sense` left the scan state IDLE; mode changes updated it before the ACK |
+| 36 | ✅ | Scan timeout started at queue time, not at the scanner's ACK; GET_VERSION completion relied on an "unreachable" branch |
+| 37 | ✅ | 128-byte barcode cap and RX overflow publishing the tail of oversized QR codes as a barcode |
+| 38 | ✅ | `scanning_binary_sensor` crashed code generation; the documented `m5stack_barcode.start: id` shorthand was rejected |
+| 39 | ✅ | Entities/actions moved to core patterns (`Parented`, index-based selects, `maybe_simple_id`, UART final validation) and deduplicated with templates and tables |
+| 40 | ✅ | Tests: codegen for every test YAML, enum/option consistency, host integration tests; CI compiles the test configs for ESP32 |
+| 41 | ✅ | CI: script injection and secret interpolation, release cache poisoning, clang-format 17 vs 22 drift, redundant uv-lockfile workflow |
+| 42 | ✅ | Firmware: dashboard adoption / `firmware.yaml` could not load the component; DLED buffer race; unlimited scan duration released the hardware trigger immediately |
+| 43 | ✅ | Public release binaries embedded the API encryption key and OTA password. Now `api: encryption: {}` (per-device key provisioned at adoption, also authenticating OTA), no OTA password, a 15 min `provisioning:` window and Improv Serial; CI needs no secrets |
+| 45 | ✅ | Settings changed from HA were reverted on every reboot. YAML values are now initial values: runtime changes persist, a YAML value is re-applied only when edited (per-setting YAML baseline in NVS, v2 prefs migrated) |
+| 46 | ✅ | Second review: latest queued setting wins, NAK fails fast, UTF-8 sanitising and boundary-safe truncation, no optimistic entity state at boot, RX buffer size warning |
+| 47 | ✅ | Third review: settings table-driven from one protocol table (each setting was wired in ~20 places); command frames checked at compile time and against the PDF in tests; commands are plain values (no callbacks or per-command heap allocation); warning status while the scanner does not answer |
+| 48 | ✅ | Firmware: scan LED stuck blue when a start never began; Atom button did nothing in level/pulse mode; open fallback AP (captive portal accepts firmware uploads) no longer started on adopted devices |
+| 49 | ✅ | Release: build provenance attestation, stable tags must be on `main`, `gh release` instead of a third-party action; `SECURITY.md` |
+| 51 | ✅ | Configuration barcodes applied by the firmware (config_code_scan_mode disabled by default), so HA stays in sync; codes checked against the PDF |
+| 52 | ✅ | Coverage in CI (C++ 93 % of lines, Python 100 %); codegen tests check the generated C++; mutation run (246 mutants): 145 → 191 detected, the rest reviewed as equivalent (logging, boundaries of timing constants). Found three bugs: a boot setting dropped by a same-value request, the scan state reset by an unchanged mode ACK, an oversized frame's tail published as a barcode |
+| 53 | ✅ | Hardware test plan (tests/hardware/TEST_PLAN.md) with a generated page of test barcodes; release docs consolidated into RELEASING.md |
+| 50 | ✅ | Superseded by 51. Settings changed by configuration barcodes with `config_code_scan_mode: enabled` still drift: the documented protocol has no way to read settings back. The opcodes appear to follow Zebra's SSI protocol (C6 parameter send, D0/D1 ACK/NAK, A3/A4 revision, E4/E5 start/stop decode), whose parameter request (0xC7) might read them back — to be tried on hardware before relying on it |
+| 44 | ⏸ | `pre-commit-autoupdate` PRs are opened with `GITHUB_TOKEN`, so CI does not run on them; needs a GitHub App or fine-grained PAT secret |
+
+---
+
 ## Notes
 
 - Items within a tier can be worked in parallel; tiers must be completed in order.

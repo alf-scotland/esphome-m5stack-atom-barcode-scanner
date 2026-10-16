@@ -7,9 +7,13 @@ updates:
       interval: weekly
     commit-message:
       prefix: "ci"
+    # One PR per week for all action bumps instead of one per action.
+    groups:
+      github-actions:
+        patterns: ["*"]
 
   # Keep Python dependencies in pyproject.toml up to date.
-  # Using the uv ecosystem so Dependabot understands uv-managed projects.
+  # The uv ecosystem updates pyproject.toml and uv.lock together.
   - package-ecosystem: uv
     directory: /
     schedule:

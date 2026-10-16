@@ -5,8 +5,12 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 TESTS_DIR = Path(__file__).parent
 
@@ -24,24 +28,36 @@ def pytest_collect_file(
 class YamlTestFile(pytest.File):
     """A pytest file collector that wraps an ESPHome test YAML."""
 
-    def collect(self) -> pytest.Item:
-        """Yield a single test item that validates the YAML config."""
-        yield YamlTestItem.from_parent(self, name="config_valid")
+    def collect(self) -> Iterator[pytest.Item]:
+        """Yield the validation and code generation checks for the YAML."""
+        # `config` validates the schema; `compile --only-generate` also runs every
+        # to_code() and writes the C++ sources, without needing a toolchain.
+        yield YamlTestItem.from_parent(self, name="config_valid", command=["config"])
+        yield YamlTestItem.from_parent(
+            self,
+            name="codegen",
+            command=["compile", "--only-generate"],
+        )
 
 
 class YamlTestItem(pytest.Item):
-    """A pytest item that runs `esphome config` on the parent YAML file."""
+    """A pytest item that runs an `esphome` command on the parent YAML file."""
+
+    def __init__(self, *, command: list[str], **kwargs: object) -> None:
+        """Store the esphome sub-command to run."""
+        super().__init__(**kwargs)
+        self.command = command
 
     def runtest(self) -> None:
-        """Validate the YAML with `esphome config` and fail if it errors."""
+        """Run the esphome command on the YAML and fail if it errors."""
         result = subprocess.run(
-            [sys.executable, "-m", "esphome", "config", str(self.fspath)],
+            [sys.executable, "-m", "esphome", *self.command, str(self.path)],
             capture_output=True,
             text=True,
             check=False,
         )
         if result.returncode != 0:
-            raise YamlValidationError(self, result.stderr or result.stdout)
+            raise YamlValidationError(self, result.stderr + result.stdout)
 
     def repr_failure(self, excinfo: pytest.ExceptionInfo) -> str:  # type: ignore[override]
         """Return a human-readable failure message."""
@@ -51,7 +67,7 @@ class YamlTestItem(pytest.Item):
 
     def reportinfo(self) -> tuple[Path, None, str]:  # type: ignore[override]
         """Return report info for pytest output."""
-        return Path(str(self.fspath)), None, f"ESPHome config: {self.fspath.basename}"
+        return self.path, None, f"esphome {' '.join(self.command)}: {self.path.name}"
 
 
 class YamlValidationError(Exception):
@@ -65,4 +81,4 @@ class YamlValidationError(Exception):
 
     def __str__(self) -> str:
         """Format the error with ESPHome output."""
-        return f"ESPHome config validation failed:\n{self.output}"
+        return f"esphome failed:\n{self.output[-5000:]}"

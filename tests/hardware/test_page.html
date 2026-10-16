@@ -1,0 +1,669 @@
+<title>Atom Scanner Field Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+:root {
+  --paper: #f3f4f1;
+  --surface: #ffffff;
+  --ink: #1a1f28;
+  --muted: #5a6371;
+  --line: #d8dcd4;
+  --accent: #0b6b87;
+  --accent-soft: #e2eff3;
+  --pass: #1e7b43;
+  --pass-soft: #e3f2e8;
+  --fail: #b42318;
+  --fail-soft: #fbe6e4;
+  --skip: #6b7280;
+  --skip-soft: #eceef1;
+  --shadow: 0 1px 2px rgb(26 31 40 / 0.06);
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --cond: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #111419;
+    --surface: #181c23;
+    --ink: #e7eaef;
+    --muted: #9aa4b2;
+    --line: #2a313c;
+    --accent: #5ab4d4;
+    --accent-soft: #16303a;
+    --pass: #52c07a;
+    --pass-soft: #15301f;
+    --fail: #f06a5f;
+    --fail-soft: #3a1a18;
+    --skip: #9aa4b2;
+    --skip-soft: #23282f;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #111419;
+  --surface: #181c23;
+  --ink: #e7eaef;
+  --muted: #9aa4b2;
+  --line: #2a313c;
+  --accent: #5ab4d4;
+  --accent-soft: #16303a;
+  --pass: #52c07a;
+  --pass-soft: #15301f;
+  --fail: #f06a5f;
+  --fail-soft: #3a1a18;
+  --skip: #9aa4b2;
+  --skip-soft: #23282f;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+  padding-inline: 16px;
+}
+.bar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  margin-inline: -16px;
+  padding: 10px 16px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.bar-inner, main { max-width: 46rem; margin-inline: auto; }
+.bar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.name { font: 600 1.05rem/1.2 var(--cond); letter-spacing: 0.01em; margin: 0; flex: 1 1 auto; }
+.counts { font: 500 0.8rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.counts b { font-weight: 500; }
+.counts .c-pass { color: var(--pass); }
+.counts .c-fail { color: var(--fail); }
+.meter { flex-basis: 100%; display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--line); }
+.meter span { display: block; height: 100%; }
+.meter .m-pass { background: var(--pass); }
+.meter .m-fail { background: var(--fail); }
+.meter .m-skip { background: var(--skip); }
+.bar-actions { display: flex; gap: 8px; }
+.btn {
+  font: 500 0.82rem var(--cond);
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn:hover { background: var(--accent-soft); }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { padding-block: 20px 64px; }
+.run { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 8px; color: var(--muted); font-size: 0.85rem; }
+.run label { font: 500 0.78rem var(--cond); letter-spacing: 0.06em; text-transform: uppercase; }
+.run input { font: 0.85rem var(--mono); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; width: 14rem; max-width: 100%; }
+.storage { flex-basis: 100%; }
+h2 {
+  font: 600 1.25rem/1.25 var(--cond);
+  text-wrap: balance;
+  margin: 36px 0 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.pnum { font: 500 0.8rem var(--mono); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 1px 6px; }
+main p, main li { max-width: 65ch; }
+main code { font: 0.86em var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
+main a { color: var(--accent); }
+ul { padding-left: 1.2rem; }
+ul:has(> .step) { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.step {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+  max-width: none;
+  display: grid;
+  gap: 6px;
+}
+.step[data-status="pass"] { background: var(--pass-soft); border-color: color-mix(in srgb, var(--pass) 35%, var(--line)); }
+.step[data-status="fail"] { background: var(--fail-soft); border-color: color-mix(in srgb, var(--fail) 45%, var(--line)); }
+.step[data-status="skip"] { background: var(--skip-soft); }
+.step-head { display: flex; gap: 8px; align-items: center; }
+.sid { font: 500 0.82rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.gate { font: 600 0.68rem var(--cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fail); border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; }
+.step-controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mark {
+  font: 500 0.8rem var(--cond);
+  letter-spacing: 0.03em;
+  min-width: 4.2rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+.mark[aria-pressed="true"][data-status="pass"] { background: var(--pass); border-color: var(--pass); color: var(--surface); }
+.mark[aria-pressed="true"][data-status="fail"] { background: var(--fail); border-color: var(--fail); color: var(--surface); }
+.mark[aria-pressed="true"][data-status="skip"] { background: var(--skip); border-color: var(--skip); color: var(--surface); }
+.note { flex: 1 1 10rem; min-width: 0; font: 0.85rem var(--sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.chip {
+  font: 500 0.8rem var(--mono);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); }
+.led { display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%; margin-right: 0.3em; vertical-align: -0.02em; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.2); }
+.led-blue { background: #1f5eff; }
+.led-purple { background: #b01cc8; }
+.led-green { background: #1cc84a; }
+.led-orange { background: #ff8a14; }
+.led-white { background: #f4f4f4; }
+.led-red { background: #f0231a; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 0.88rem; }
+th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 4px 10px 4px 0; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 12px; }
+.card {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+}
+.card:hover { border-color: var(--accent); }
+.card-code { display: grid; place-items: center; background: #fff; border-radius: 4px; aspect-ratio: 1; max-width: 100%; padding: 6px; }
+.card-code svg { width: 100%; height: 100%; }
+.card-label { font: 600 1rem var(--cond); }
+.card-kind { font-size: 0.78rem; color: var(--muted); }
+.card-content { font: 0.75rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: #fff;
+  color: #111;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+}
+.overlay-code { display: grid; place-items: center; min-height: 0; }
+.overlay-code svg { width: min(88vw, 70vh); height: auto; max-height: 70vh; }
+.overlay-code.linear svg { width: min(94vw, 40rem); }
+.overlay-foot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; font: 0.9rem var(--sans); }
+.overlay-foot b { font: 600 1.3rem var(--cond); margin-right: 8px; }
+.overlay-foot .content { font: 0.8rem var(--mono); color: #444; overflow-wrap: anywhere; flex: 1 1 12rem; }
+.overlay .close { font: 600 0.95rem var(--cond); border: 1px solid #111; background: #fff; color: #111; border-radius: 6px; padding: 8px 18px; cursor: pointer; }
+.copy-box { width: 100%; min-height: 8rem; font: 0.8rem var(--mono); margin-top: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .step { transition: background-color 0.15s, border-color 0.15s; }
+}
+</style>
+
+<div class="bar">
+  <div class="bar-inner">
+    <p class="name">Atom Scanner Field Test</p>
+    <span class="counts" id="counts"></span>
+    <div class="bar-actions">
+      <a class="btn" href="#barcodes">Barcodes</a>
+      <button type="button" class="btn" id="copy">Copy results</button>
+    </div>
+    <div class="meter" id="meter" aria-hidden="true"></div>
+  </div>
+</div>
+
+<main>
+  <div class="run">
+    <label for="build">Firmware under test</label>
+    <input id="build" type="text" placeholder="e.g. PR #105 @ abc1234" autocomplete="off">
+    <span class="storage" id="storage">Results are kept in this browser.</span>
+  </div>
+  <textarea class="copy-box" id="copy-box" hidden readonly aria-label="Results as text"></textarea>
+
+  <p>Verifies the reference firmware on a real M5Stack Atom Lite with the Atomic QR base,
+end to end: the UART link, Home Assistant control of every setting, scanning in every
+mode, configuration barcodes, persistence, security and factory reset. Run it on a PR's
+firmware artifact before merging, and before a release.</p>
+<p>The phases are ordered so that a failure shows up as early as possible: each phase only
+relies on what the phases before it proved. Steps marked <strong>GATE</strong> decide whether it is
+worth going on; if one fails, stop and send the log. Everything else is independent:
+note the failure and carry on.</p>
+<p>About 75 minutes, with <strong>one power cycle</strong> (step 7.4). Other reboots use the Restart
+button.</p>
+<h2>Setup</h2>
+<ul>
+<li>The PR's <code>firmware.factory.bin</code> (from the build comment on the PR).</li>
+<li>The device on a USB cable to a computer with Chrome: USB powers it and
+  <a href="https://web.esphome.io/">ESPHome Web</a> shows its serial log whether or not it has been
+  adopted. <strong>Keep the log open for the whole test</strong>; "log:" in a step means a line you
+  should see there.</li>
+<li>Home Assistant open on a second screen or phone.</li>
+<li>The test barcodes: <button type="button" class="chip" data-code="D1">D1</button>–<button type="button" class="chip" data-code="D6">D6</button> are data, <button type="button" class="chip" data-code="C1">C1</button>–<button type="button" class="chip" data-code="C8">C8</button> configuration barcodes. Show them on a
+  phone at full brightness (the scanner reads QR codes from screens well; print <button type="button" class="chip" data-code="D4">D4</button> and
+  <button type="button" class="chip" data-code="D5">D5</button> if it struggles with 1D codes on a screen). The generated test page shows each one
+  full-screen when you tap it.</li>
+</ul>
+<p>The status LED: <i class="led led-blue"></i>blue = host-mode scan running, <i class="led led-purple"></i>purple = continuous or auto-sense mode,
+<i class="led led-green"></i>green flash = barcode read, <i class="led led-orange"></i>orange flash = scan timed out, <i class="led led-orange"></i>orange pulse = no Wi-Fi,
+<i class="led led-white"></i>white pulse = no Home Assistant connection, <i class="led led-red"></i>red pulse = setup window closed.</p>
+<h2 id="phase-1"><span class="pnum">1</span>Flash and boot</h2>
+<ul>
+<li class="step" data-step="1.1" id="s1-1"><div class="step-head"><span class="sid">1.1</span></div><div class="step-text">Only when upgrading a device that runs a release up to 2026.7.0: in Home
+  Assistant set <strong>Volume</strong> to <strong>High</strong> (a change made at runtime, to check it survives
+  the upgrade). Note the other settings.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-1-1" placeholder="Note" aria-label="Note for step 1.1"></div></li>
+<li class="step" data-step="1.2" id="s1-2"><div class="step-head"><span class="sid">1.2</span></div><div class="step-text">Flash <code>firmware.factory.bin</code> with ESPHome Web (Connect → Install). If it offers
+  to erase the device, decline. Then open <strong>Logs</strong>.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-1-2" placeholder="Note" aria-label="Note for step 1.2"></div></li>
+<li class="step" data-step="1.3" id="s1-3"><div class="step-head"><span class="sid">1.3</span><span class="gate">Gate</span></div><div class="step-text">Scanner link. log: <code>Version response (… bytes)</code> and <code>Publishing version</code>,
+  and no <code>Scanner not responding</code>. If not: check the Atom is seated on the scanner base
+  and send the log. Nothing after this works without the link.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-1-3" placeholder="Note" aria-label="Note for step 1.3"></div></li>
+<li class="step" data-step="1.4" id="s1-4"><div class="step-head"><span class="sid">1.4</span></div><div class="step-text">Settings restore. log: <code>Migrating scanner settings from the previous preferences
+  format</code> after 1.1 (no setting is sent), or <code>No stored scanner settings</code> on a fresh device
+  followed by 15 <code>Command acknowledged</code>.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-1-4" placeholder="Note" aria-label="Note for step 1.4"></div></li>
+</ul>
+<h2 id="phase-2"><span class="pnum">2</span>Wi-Fi and adoption</h2>
+<p>Do this within 15 minutes of step 1.2, which restarted the setup window.</p>
+<ul>
+<li class="step" data-step="2.1" id="s2-1"><div class="step-head"><span class="sid">2.1</span></div><div class="step-text">In ESPHome Web choose <strong>Connect to Wi-Fi</strong> (Improv Serial). LED: orange pulse,
+  then white pulse once Wi-Fi is up.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-2-1" placeholder="Note" aria-label="Note for step 2.1"></div></li>
+<li class="step" data-step="2.2" id="s2-2"><div class="step-head"><span class="sid">2.2</span><span class="gate">Gate</span></div><div class="step-text">Adoption. When upgrading, first delete the old device in Home Assistant.
+  Add the discovered device: Home Assistant must not ask for an encryption key. LED:
+  green for a second, then off. log: an API client connects.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-2-2" placeholder="Note" aria-label="Note for step 2.2"></div></li>
+<li class="step" data-step="2.3" id="s2-3"><div class="step-head"><span class="sid">2.3</span><span class="gate">Gate</span></div><div class="step-text">State sync. Every setting entity shows a value within 10 s (only <strong>Last
+  Barcode</strong> stays unknown). After 1.1, <strong>Volume</strong> is still <strong>High</strong>.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-2-3" placeholder="Note" aria-label="Note for step 2.3"></div></li>
+<li class="step" data-step="2.4" id="s2-4"><div class="step-head"><span class="sid">2.4</span></div><div class="step-text"><strong>Firmware Update</strong> shows the PR build as installed and may offer the latest
+  release as an update. Do not install it: it would replace the PR build.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-2-4" placeholder="Note" aria-label="Note for step 2.4"></div></li>
+</ul>
+<h2 id="phase-3"><span class="pnum">3</span>Control from Home Assistant</h2>
+<ul>
+<li class="step" data-step="3.1" id="s3-1"><div class="step-head"><span class="sid">3.1</span></div><div class="step-text">Set <strong>Volume</strong> to Low, Medium, High. Each change: one beep, louder each time.
+  log: <code>Command acknowledged</code> before the entity changes.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-3-1" placeholder="Note" aria-label="Note for step 3.1"></div></li>
+<li class="step" data-step="3.2" id="s3-2"><div class="step-head"><span class="sid">3.2</span></div><div class="step-text">Turn <strong>Command ACK Sound</strong> off, change <strong>Volume</strong>: no beep. Turn it back on.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-3-2" placeholder="Note" aria-label="Note for step 3.2"></div></li>
+<li class="step" data-step="3.3" id="s3-3"><div class="step-head"><span class="sid">3.3</span></div><div class="step-text"><strong>Light Mode</strong> Always on: the white floodlight stays lit. Always off: dark.
+  Back to On when reading.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-3-3" placeholder="Note" aria-label="Note for step 3.3"></div></li>
+<li class="step" data-step="3.4" id="s3-4"><div class="step-head"><span class="sid">3.4</span></div><div class="step-text"><strong>Locate Light Mode</strong> Always on: the aiming light stays lit. Back to On when
+  reading.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-3-4" placeholder="Note" aria-label="Note for step 3.4"></div></li>
+<li class="step" data-step="3.5" id="s3-5"><div class="step-head"><span class="sid">3.5</span></div><div class="step-text">Click <strong>Boot Sound</strong> twice within a second. The switch ends in its original
+  state. log: <code>Superseding queued command</code> or two acknowledged changes; never a switch
+  that shows one state while the log shows the other.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-3-5" placeholder="Note" aria-label="Note for step 3.5"></div></li>
+</ul>
+<h2 id="phase-4"><span class="pnum">4</span>Scanning in host mode</h2>
+<ul>
+<li class="step" data-step="4.1" id="s4-1"><div class="step-head"><span class="sid">4.1</span><span class="gate">Gate</span></div><div class="step-text">Press <strong>Start Scan</strong>. LED blue, <strong>Scanning</strong> on, scanner light on. Scan
+  <button type="button" class="chip" data-code="D1">D1</button>. LED green flash, beep, <strong>Last Barcode</strong> <code>HELLO-123</code>, <strong>Barcode Scanned</strong> fires,
+  <strong>Scanning</strong> off.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-1" placeholder="Note" aria-label="Note for step 4.1"></div></li>
+<li class="step" data-step="4.2" id="s4-2"><div class="step-head"><span class="sid">4.2</span></div><div class="step-text">Press the Atom's button, scan <button type="button" class="chip" data-code="D6">D6</button>. <strong>Last Barcode</strong> <code>SECOND-CODE</code>.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-2" placeholder="Note" aria-label="Note for step 4.2"></div></li>
+<li class="step" data-step="4.3" id="s4-3"><div class="step-head"><span class="sid">4.3</span></div><div class="step-text">Press <strong>Start Scan</strong> and scan nothing. After 3 s: LED orange flash, <strong>Scanning</strong>
+  off. log: <code>Scan timed out after 3000 ms</code>.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-3" placeholder="Note" aria-label="Note for step 4.3"></div></li>
+<li class="step" data-step="4.4" id="s4-4"><div class="step-head"><span class="sid">4.4</span></div><div class="step-text"><strong>Start Scan</strong>, then <strong>Stop Scan</strong> at once. LED off, <strong>Scanning</strong> off, scanner
+  light off, no timeout afterwards.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-4" placeholder="Note" aria-label="Note for step 4.4"></div></li>
+<li class="step" data-step="4.5" id="s4-5"><div class="step-head"><span class="sid">4.5</span></div><div class="step-text"><strong>Decode Sound</strong> off: scanning <button type="button" class="chip" data-code="D1">D1</button> is silent. <strong>Decoding Success Light</strong> off: no
+  flash on the scanner when it reads. <strong>Sound</strong> off: no beep at all, including setting
+  changes. Turn all three back on.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-5" placeholder="Note" aria-label="Note for step 4.5"></div></li>
+<li class="step" data-step="4.6" id="s4-6"><div class="step-head"><span class="sid">4.6</span></div><div class="step-text"><strong>Scan Duration</strong> 1s: 4.3 times out after 1 s. Unlimited: no timeout within
+  30 s; <strong>Stop Scan</strong>. Back to 3s.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-6" placeholder="Note" aria-label="Note for step 4.6"></div></li>
+<li class="step" data-step="4.7" id="s4-7"><div class="step-head"><span class="sid">4.7</span></div><div class="step-text">Scan <button type="button" class="chip" data-code="D2">D2</button> (UTF-8). Note exactly what <strong>Last Barcode</strong> shows. Home Assistant must
+  stay connected. The scanner outputs GBK by default, so replacement characters (U+FFFD, shown as a diamond with a question mark) are
+  a finding for a follow-up, not a failure.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-7" placeholder="Note" aria-label="Note for step 4.7"></div></li>
+<li class="step" data-step="4.8" id="s4-8"><div class="step-head"><span class="sid">4.8</span></div><div class="step-text">Scan <button type="button" class="chip" data-code="D3">D3</button> (300 characters). <strong>Last Barcode</strong> holds the first 255 (it ends in
+  <code>0051-</code>); Home Assistant stays connected.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-8" placeholder="Note" aria-label="Note for step 4.8"></div></li>
+<li class="step" data-step="4.9" id="s4-9"><div class="step-head"><span class="sid">4.9</span></div><div class="step-text">Scan <button type="button" class="chip" data-code="D4">D4</button> (EAN-13) and <button type="button" class="chip" data-code="D5">D5</button> (Code 128): <code>4006381333931</code> and <code>M5-SCAN-128</code>.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-9" placeholder="Note" aria-label="Note for step 4.9"></div></li>
+<li class="step" data-step="4.10" id="s4-10"><div class="step-head"><span class="sid">4.10</span></div><div class="step-text">For each <strong>Terminator</strong> (CR LF, CR, TAB, CR CR, CR LF CR LF, None): set it,
+  scan <button type="button" class="chip" data-code="D1">D1</button>. <strong>Last Barcode</strong> is exactly <code>HELLO-123</code> every time, with nothing after it.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-10" placeholder="Note" aria-label="Note for step 4.10"></div></li>
+</ul>
+<h2 id="phase-5"><span class="pnum">5</span>Other operation modes</h2>
+<ul>
+<li class="step" data-step="5.1" id="s5-1"><div class="step-head"><span class="sid">5.1</span></div><div class="step-text"><strong>Operation Mode</strong> Continuous: LED purple, <strong>Scanning</strong> on. Hold <button type="button" class="chip" data-code="D1">D1</button> in front:
+  published, then again no sooner than <strong>Same Code Interval</strong> (500 ms). Set it to 2s:
+  repeats about every 2 s. Alternate <button type="button" class="chip" data-code="D1">D1</button> and <button type="button" class="chip" data-code="D6">D6</button>: each is published at once.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-5-1" placeholder="Note" aria-label="Note for step 5.1"></div></li>
+<li class="step" data-step="5.2" id="s5-2"><div class="step-head"><span class="sid">5.2</span></div><div class="step-text"><strong>Reading Interval</strong> 2s: noticeably slower reads. Back to 500ms.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-5-2" placeholder="Note" aria-label="Note for step 5.2"></div></li>
+<li class="step" data-step="5.3" id="s5-3"><div class="step-head"><span class="sid">5.3</span></div><div class="step-text">Auto-Sense: LED purple. Bring <button type="button" class="chip" data-code="D1">D1</button> into view: read. <strong>Stable Induction Time</strong> 1s:
+  the read comes noticeably later. Back to 500ms.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-5-3" placeholder="Note" aria-label="Note for step 5.3"></div></li>
+<li class="step" data-step="5.4" id="s5-4"><div class="step-head"><span class="sid">5.4</span></div><div class="step-text">Level: LED off, <strong>Scanning</strong> off. Press the Atom's button with <button type="button" class="chip" data-code="D1">D1</button> in view:
+  LED blue, then green. Without a code: orange after the scan duration.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-5-4" placeholder="Note" aria-label="Note for step 5.4"></div></li>
+<li class="step" data-step="5.5" id="s5-5"><div class="step-head"><span class="sid">5.5</span></div><div class="step-text">Pulse: same as 5.4.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-5-5" placeholder="Note" aria-label="Note for step 5.5"></div></li>
+<li class="step" data-step="5.6" id="s5-6"><div class="step-head"><span class="sid">5.6</span></div><div class="step-text">Still in Pulse, press <strong>Start Scan</strong> in Home Assistant: nothing happens, the LED
+  does not change. log: <code>Cannot start a scan outside host mode</code>.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-5-6" placeholder="Note" aria-label="Note for step 5.6"></div></li>
+<li class="step" data-step="5.7" id="s5-7"><div class="step-head"><span class="sid">5.7</span></div><div class="step-text">Back to Host.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-5-7" placeholder="Note" aria-label="Note for step 5.7"></div></li>
+</ul>
+<h2 id="phase-6"><span class="pnum">6</span>Configuration barcodes</h2>
+<p><strong>Config Code Scanning</strong> is off (the default): the scanner passes configuration barcodes
+on and the firmware applies them, so Home Assistant always shows the scanner's settings.
+In host mode the scanner only reads after <strong>Start Scan</strong>. A device upgraded in 1.1 kept
+its previous setting (on): turn <strong>Config Code Scanning</strong> off first.</p>
+<ul>
+<li class="step" data-step="6.1" id="s6-1"><div class="step-head"><span class="sid">6.1</span></div><div class="step-text"><strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C1">C1</button>. <strong>Volume</strong> becomes High. log: <code>Configuration barcode:
+  buzzer_volume = high</code>. <strong>Last Barcode</strong> does not change.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-1" placeholder="Note" aria-label="Note for step 6.1"></div></li>
+<li class="step" data-step="6.2" id="s6-2"><div class="step-head"><span class="sid">6.2</span></div><div class="step-text"><strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C2">C2</button>: <strong>Operation Mode</strong> Continuous, LED purple. Scan <button type="button" class="chip" data-code="C3">C3</button>
+  (continuous mode reads it without Start Scan): back to Host.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-2" placeholder="Note" aria-label="Note for step 6.2"></div></li>
+<li class="step" data-step="6.3" id="s6-3"><div class="step-head"><span class="sid">6.3</span></div><div class="step-text"><strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C4">C4</button>. <strong>Terminator</strong> becomes CR.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-3" placeholder="Note" aria-label="Note for step 6.3"></div></li>
+<li class="step" data-step="6.4" id="s6-4"><div class="step-head"><span class="sid">6.4</span></div><div class="step-text"><strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C5">C5</button> (a setting the firmware does not manage). log:
+  <code>Ignoring configuration barcode ^#SC^1020100</code>; no setting changes, no barcode.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-4" placeholder="Note" aria-label="Note for step 6.4"></div></li>
+<li class="step" data-step="6.5" id="s6-5"><div class="step-head"><span class="sid">6.5</span></div><div class="step-text"><strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C7">C7</button>. <strong>Config Code Scanning</strong> turns on.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-5" placeholder="Note" aria-label="Note for step 6.5"></div></li>
+<li class="step" data-step="6.6" id="s6-6"><div class="step-head"><span class="sid">6.6</span></div><div class="step-text"><strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C6">C6</button> (Volume Low). The scanner applies it itself now. Note:
+  does <strong>Volume</strong> in Home Assistant change, and does the log show the code? (Expected: no
+  and no. This is the drift that the default setting avoids.)</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-6" placeholder="Note" aria-label="Note for step 6.6"></div></li>
+<li class="step" data-step="6.7" id="s6-7"><div class="step-head"><span class="sid">6.7</span></div><div class="step-text">Turn <strong>Config Code Scanning</strong> off in Home Assistant, then set <strong>Volume</strong> to High
+  to bring the scanner back in line.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-7" placeholder="Note" aria-label="Note for step 6.7"></div></li>
+</ul>
+<h2 id="phase-7"><span class="pnum">7</span>Persistence</h2>
+<ul>
+<li class="step" data-step="7.1" id="s7-1"><div class="step-head"><span class="sid">7.1</span></div><div class="step-text">Set distinct values: <strong>Volume</strong> High, <strong>Terminator</strong> CR, <strong>Light Mode</strong> Always
+  off, <strong>Scan Duration</strong> 5s, <strong>Boot Sound</strong> on.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-7-1" placeholder="Note" aria-label="Note for step 7.1"></div></li>
+<li class="step" data-step="7.2" id="s7-2"><div class="step-head"><span class="sid">7.2</span></div><div class="step-text">Press <strong>Restart</strong>. After it reconnects every entity shows the same values at
+  once. log: <code>Restoring scanner settings from flash</code> and no setting commands sent.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-7-2" placeholder="Note" aria-label="Note for step 7.2"></div></li>
+<li class="step" data-step="7.3" id="s7-3"><div class="step-head"><span class="sid">7.3</span></div><div class="step-text">Only if the device is adopted in your ESPHome dashboard: install the same PR
+  build over the air from there. Same values afterwards.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-7-3" placeholder="Note" aria-label="Note for step 7.3"></div></li>
+<li class="step" data-step="7.4" id="s7-4"><div class="step-head"><span class="sid">7.4</span><span class="gate">Gate</span></div><div class="step-text"><strong>Power cycle</strong>: unplug the USB cable for 10 s and plug it back in. The
+  scanner beeps at power-up (it kept Boot Sound). LED: orange pulse, white pulse, green,
+  off. Values unchanged; scanning <button type="button" class="chip" data-code="D1">D1</button> beeps at high volume, floodlight stays off. If the
+  scanner behaves like its factory defaults while Home Assistant shows these values, the
+  scanner does not keep settings over a power loss: stop and report.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-7-4" placeholder="Note" aria-label="Note for step 7.4"></div></li>
+</ul>
+<h2 id="phase-8"><span class="pnum">8</span>Security</h2>
+<ul>
+<li class="step" data-step="8.1" id="s8-1"><div class="step-head"><span class="sid">8.1</span></div><div class="step-text">Switch off your Wi-Fi access point (or take the device out of range) for 3
+  minutes. LED orange pulse. Your phone's Wi-Fi list must <strong>not</strong> show an
+  <code>atom-barcode-…</code> network. Switch the access point back on: the device reconnects on
+  its own.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-8-1" placeholder="Note" aria-label="Note for step 8.1"></div></li>
+</ul>
+<h2 id="phase-9"><span class="pnum">9</span>Factory reset</h2>
+<p>Last, because it resets the scanner.</p>
+<ul>
+<li class="step" data-step="9.1" id="s9-1"><div class="step-head"><span class="sid">9.1</span></div><div class="step-text">Enable the <strong>Factory Reset Scanner</strong> entity (disabled by default) and press it.
+  log: <code>Factory reset requested</code>, <code>Command acknowledged</code>, a reboot, then <code>No stored
+  scanner settings; applying all configured values</code>. Home Assistant shows the YAML
+  values (<strong>Volume</strong> Medium, <strong>Terminator</strong> None, <strong>Light Mode</strong> On when reading).</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-9-1" placeholder="Note" aria-label="Note for step 9.1"></div></li>
+<li class="step" data-step="9.2" id="s9-2"><div class="step-head"><span class="sid">9.2</span></div><div class="step-text">Optional: <strong>Start Scan</strong> and scan <button type="button" class="chip" data-code="C8">C8</button> (factory default). Same as 9.1.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-9-2" placeholder="Note" aria-label="Note for step 9.2"></div></li>
+</ul>
+<p>Afterwards, set the values you want to use.</p>
+
+  <h2 id="barcodes">Barcodes</h2>
+  <p>Tap a barcode to show it full-screen, then hold the scanner 10–20 cm from the screen at full brightness.</p>
+  <div class="gallery">
+  <button type="button" class="card" data-code="D1"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m2 0h1m2 0h1m1 0h7m-21 1h1m5 0h1m4 0h2m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m2 0h1m1 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m4 0h2m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m3 0h1m3 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h3m1 0h1m-11 1h2m2 0h3m2 0h4m1 0h1m-17 1h1m4 0h1m1 0h5m3 0h1m1 0h4m-18 1h2m1 0h1m3 0h1m1 0h1m1 0h1m3 0h1m-19 1h2m3 0h1m1 0h3m1 0h2m3 0h1m1 0h2m-18 1h1m1 0h1m1 0h1m2 0h1m1 0h2m2 0h1m2 0h1m-11 1h2m2 0h3m1 0h1m1 0h2m-20 1h7m1 0h1m3 0h2m1 0h3m1 0h2m-21 1h1m5 0h1m2 0h3m2 0h2m2 0h1m-19 1h1m1 0h3m1 0h1m2 0h1m1 0h1m1 0h2m1 0h1m2 0h2m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h2m1 0h3m2 0h2m-20 1h1m1 0h3m1 0h1m1 0h6m4 0h1m-19 1h1m5 0h1m2 0h2m2 0h1m1 0h1m-16 1h7m9 0h1m2 0h1"/></svg></span><span class="card-label">D1</span><span class="card-kind">QR · Plain data</span><span class="card-content">HELLO-123</span></button>
+<button type="button" class="card" data-code="D2"><span class="card-code"><svg viewBox="0 0 33 33" class="segno"><path fill="#fff" d="M0 0h33v33h-33z"/><path class="qrline" stroke="#000" d="M4 4.5h7m1 0h8m2 0h7m-25 1h1m5 0h1m4 0h1m4 0h1m1 0h1m5 0h1m-25 1h1m1 0h3m1 0h1m2 0h2m2 0h2m1 0h1m1 0h1m1 0h3m1 0h1m-25 1h1m1 0h3m1 0h1m3 0h2m4 0h1m1 0h1m1 0h3m1 0h1m-25 1h1m1 0h3m1 0h1m1 0h3m4 0h1m2 0h1m1 0h3m1 0h1m-25 1h1m5 0h1m1 0h3m1 0h2m4 0h1m5 0h1m-25 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-16 1h1m1 0h1m3 0h1m-15 1h7m2 0h2m3 0h2m2 0h2m3 0h1m-18 1h1m8 0h1m1 0h1m1 0h2m2 0h1m-25 1h1m2 0h1m2 0h1m1 0h1m1 0h2m5 0h4m1 0h2m-24 1h1m1 0h4m1 0h6m2 0h1m2 0h1m2 0h2m-23 1h1m1 0h1m2 0h2m2 0h1m1 0h1m3 0h1m1 0h1m4 0h1m1 0h1m-25 1h3m2 0h1m1 0h1m2 0h1m2 0h1m4 0h3m1 0h2m-24 1h1m1 0h2m2 0h2m3 0h1m2 0h2m2 0h1m2 0h1m1 0h2m-25 1h1m1 0h1m2 0h1m1 0h1m1 0h5m1 0h3m4 0h2m-24 1h1m4 0h2m1 0h1m1 0h1m3 0h1m1 0h6m1 0h2m-17 1h1m3 0h3m1 0h1m3 0h2m2 0h1m-25 1h7m1 0h2m2 0h2m1 0h2m1 0h1m1 0h1m1 0h3m-25 1h1m5 0h1m1 0h2m4 0h3m3 0h4m-24 1h1m1 0h3m1 0h1m1 0h1m4 0h2m1 0h5m3 0h1m-25 1h1m1 0h3m1 0h1m1 0h7m1 0h1m3 0h1m1 0h3m-25 1h1m1 0h3m1 0h1m1 0h3m2 0h3m1 0h2m3 0h1m1 0h1m-25 1h1m5 0h1m1 0h3m2 0h3m1 0h3m4 0h1m-25 1h7m3 0h1m2 0h1m2 0h1m2 0h1m1 0h4"/></svg></span><span class="card-label">D2</span><span class="card-kind">QR · UTF-8</span><span class="card-content">Grüße ÄÖÜ 🙂</span></button>
+<button type="button" class="card" data-code="D3"><span class="card-code"><svg viewBox="0 0 65 65" class="segno"><path fill="#fff" d="M0 0h65v65h-65z"/><path class="qrline" stroke="#000" d="M4 4.5h7m4 0h1m2 0h1m3 0h1m1 0h1m1 0h2m3 0h1m2 0h5m1 0h3m2 0h2m3 0h2m2 0h7m-57 1h1m5 0h1m1 0h2m2 0h3m2 0h1m2 0h2m7 0h1m3 0h1m1 0h1m1 0h3m2 0h3m2 0h1m2 0h1m5 0h1m-57 1h1m1 0h3m1 0h1m2 0h3m1 0h2m2 0h1m1 0h2m1 0h2m2 0h1m1 0h1m1 0h1m2 0h1m2 0h3m1 0h3m1 0h4m2 0h1m1 0h3m1 0h1m-57 1h1m1 0h3m1 0h1m3 0h3m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m3 0h1m1 0h2m1 0h2m1 0h1m1 0h1m3 0h1m2 0h1m1 0h3m1 0h1m-57 1h1m1 0h3m1 0h1m1 0h2m7 0h4m1 0h1m1 0h1m1 0h5m2 0h1m2 0h1m1 0h1m3 0h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-57 1h1m5 0h1m3 0h1m1 0h2m1 0h2m1 0h1m2 0h1m1 0h1m1 0h2m3 0h1m1 0h1m4 0h1m1 0h3m1 0h1m1 0h2m3 0h1m5 0h1m-57 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-48 1h2m4 0h3m5 0h1m1 0h2m3 0h4m1 0h1m1 0h1m2 0h2m1 0h1m1 0h1m1 0h1m-48 1h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h2m2 0h1m2 0h3m1 0h5m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m3 0h2m2 0h1m3 0h1m2 0h1m-56 1h1m1 0h1m2 0h1m1 0h3m1 0h1m2 0h3m2 0h2m2 0h1m1 0h1m1 0h1m1 0h3m1 0h3m1 0h1m1 0h3m4 0h2m1 0h2m1 0h1m-53 1h2m1 0h1m2 0h2m2 0h3m1 0h2m3 0h1m1 0h1m2 0h1m3 0h1m1 0h1m1 0h1m3 0h2m2 0h1m1 0h2m5 0h2m1 0h3m1 0h1m-56 1h1m3 0h1m3 0h3m1 0h10m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2m-52 1h6m1 0h1m1 0h2m2 0h1m2 0h1m2 0h1m3 0h1m1 0h4m2 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m1 0h3m-57 1h1m1 0h1m4 0h1m1 0h1m3 0h5m1 0h3m2 0h1m1 0h2m1 0h1m2 0h2m3 0h3m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h3m-56 1h1m3 0h1m1 0h1m2 0h4m2 0h2m1 0h5m7 0h3m2 0h2m3 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h3m1 0h1m-57 1h3m5 0h1m2 0h1m1 0h3m1 0h1m4 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m2 0h2m2 0h2m4 0h2m1 0h1m3 0h3m-56 1h2m3 0h2m2 0h1m2 0h1m1 0h2m3 0h1m1 0h4m1 0h1m1 0h1m3 0h1m1 0h1m1 0h3m1 0h1m1 0h2m2 0h1m3 0h2m1 0h2m1 0h1m-56 1h1m5 0h8m2 0h1m2 0h3m2 0h1m1 0h1m2 0h2m1 0h1m2 0h2m3 0h1m1 0h1m1 0h5m3 0h1m1 0h1m-54 1h2m1 0h2m1 0h3m1 0h1m1 0h5m1 0h1m2 0h1m3 0h3m2 0h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h3m2 0h1m2 0h3m-55 1h1m2 0h1m2 0h1m4 0h5m2 0h4m2 0h5m1 0h1m2 0h1m2 0h1m2 0h1m3 0h1m1 0h3m1 0h1m1 0h1m1 0h2m-57 1h4m1 0h2m1 0h2m1 0h5m1 0h2m2 0h1m1 0h2m7 0h3m1 0h1m2 0h3m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-48 1h1m1 0h1m2 0h1m1 0h2m3 0h2m1 0h2m1 0h5m2 0h1m2 0h1m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-54 1h2m3 0h5m1 0h4m1 0h1m2 0h1m2 0h3m2 0h2m1 0h2m1 0h1m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-57 1h1m1 0h1m1 0h2m3 0h4m1 0h5m1 0h4m1 0h2m1 0h2m1 0h2m4 0h1m1 0h3m1 0h1m1 0h3m3 0h3m1 0h1m-56 1h3m1 0h1m1 0h1m1 0h2m2 0h1m4 0h2m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m3 0h1m1 0h1m1 0h5m2 0h2m1 0h1m5 0h1m1 0h1m-57 1h3m6 0h5m2 0h1m2 0h2m2 0h1m2 0h1m2 0h1m1 0h3m1 0h1m1 0h1m1 0h6m1 0h2m1 0h1m1 0h2m1 0h1m1 0h1m-56 1h1m2 0h5m4 0h1m3 0h1m1 0h2m5 0h6m2 0h1m3 0h2m2 0h2m2 0h1m1 0h5m1 0h1m1 0h1m-56 1h4m3 0h2m1 0h4m5 0h1m1 0h5m3 0h2m3 0h1m3 0h2m1 0h1m4 0h2m3 0h1m1 0h1m1 0h1m-56 1h1m2 0h1m1 0h1m1 0h2m3 0h2m4 0h4m1 0h3m1 0h1m1 0h1m1 0h1m7 0h1m1 0h2m4 0h1m1 0h1m1 0h4m-56 1h5m3 0h1m1 0h1m1 0h4m1 0h2m1 0h1m4 0h2m3 0h2m3 0h2m1 0h2m1 0h1m1 0h1m1 0h4m3 0h2m1 0h1m-53 1h7m2 0h1m1 0h1m3 0h1m3 0h1m1 0h1m1 0h5m1 0h1m1 0h1m5 0h1m1 0h1m4 0h6m1 0h1m1 0h1m-57 1h2m1 0h1m1 0h1m2 0h2m1 0h2m1 0h3m3 0h1m2 0h1m1 0h3m1 0h2m1 0h2m2 0h4m1 0h1m1 0h1m1 0h1m1 0h2m6 0h1m-56 1h1m4 0h2m1 0h3m1 0h3m2 0h1m2 0h5m1 0h1m1 0h1m1 0h1m1 0h1m3 0h1m1 0h4m2 0h3m1 0h1m3 0h1m1 0h1m1 0h1m-57 1h2m2 0h2m1 0h1m1 0h1m2 0h2m1 0h1m2 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h4m2 0h2m1 0h1m1 0h2m2 0h1m1 0h1m1 0h2m2 0h1m1 0h1m-53 1h2m1 0h3m1 0h3m3 0h4m3 0h2m1 0h1m1 0h1m1 0h3m1 0h3m1 0h7m3 0h1m4 0h2m-54 1h2m1 0h2m2 0h2m4 0h4m3 0h1m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m5 0h1m1 0h2m1 0h4m1 0h1m1 0h1m1 0h1m-54 1h9m1 0h1m1 0h4m1 0h1m1 0h1m3 0h1m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m3 0h2m1 0h2m1 0h1m1 0h3m1 0h1m1 0h3m-57 1h1m2 0h3m3 0h1m2 0h1m4 0h3m1 0h2m1 0h3m2 0h1m3 0h3m2 0h2m2 0h2m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m-55 1h1m3 0h3m6 0h4m1 0h1m2 0h1m3 0h3m2 0h1m1 0h1m2 0h1m3 0h1m1 0h2m2 0h2m1 0h2m1 0h1m1 0h1m1 0h1m-57 1h2m2 0h1m2 0h3m1 0h2m1 0h1m1 0h4m1 0h1m2 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m5 0h1m2 0h1m1 0h3m-57 1h2m2 0h1m1 0h2m1 0h2m3 0h1m1 0h1m7 0h2m2 0h1m2 0h3m1 0h2m1 0h1m3 0h1m1 0h5m1 0h1m1 0h1m-51 1h1m1 0h1m5 0h1m1 0h2m1 0h5m1 0h1m1 0h1m1 0h1m1 0h1m3 0h1m3 0h1m1 0h1m1 0h3m1 0h1m1 0h5m1 0h3m1 0h1m-56 1h3m1 0h1m1 0h2m4 0h2m2 0h1m2 0h1m1 0h2m1 0h2m2 0h1m3 0h3m1 0h1m1 0h1m3 0h1m1 0h1m2 0h3m2 0h1m1 0h3m-57 1h2m2 0h2m2 0h2m1 0h4m1 0h3m1 0h1m2 0h1m1 0h1m1 0h5m1 0h1m1 0h1m1 0h1m2 0h2m1 0h2m1 0h2m1 0h1m1 0h1m2 0h1m-53 1h2m2 0h1m1 0h1m1 0h2m2 0h2m2 0h1m1 0h1m2 0h1m2 0h1m3 0h1m1 0h1m3 0h1m1 0h3m2 0h4m1 0h1m1 0h4m1 0h1m-56 1h1m1 0h1m4 0h1m1 0h1m2 0h2m3 0h1m1 0h7m2 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h4m3 0h1m1 0h1m6 0h1m-57 1h1m1 0h1m2 0h3m1 0h1m1 0h2m6 0h1m1 0h6m1 0h1m3 0h3m1 0h3m2 0h2m1 0h1m1 0h1m1 0h1m1 0h2m2 0h2m-56 1h5m2 0h1m1 0h1m2 0h2m1 0h1m1 0h2m1 0h2m1 0h1m4 0h2m2 0h1m6 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m-51 1h1m1 0h4m1 0h3m4 0h2m2 0h1m1 0h7m1 0h1m5 0h1m1 0h1m1 0h1m1 0h7m1 0h1m1 0h1m-49 1h1m2 0h1m1 0h1m2 0h1m2 0h2m1 0h2m2 0h1m3 0h1m1 0h2m2 0h4m1 0h1m1 0h1m1 0h1m2 0h1m3 0h1m2 0h1m-56 1h7m7 0h1m2 0h1m1 0h1m2 0h1m2 0h2m1 0h1m1 0h1m1 0h1m1 0h2m4 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-57 1h1m5 0h1m2 0h4m1 0h1m1 0h2m3 0h4m1 0h1m3 0h2m1 0h1m1 0h1m1 0h1m1 0h4m1 0h1m2 0h2m3 0h1m1 0h2m-56 1h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h1m2 0h2m3 0h1m2 0h1m1 0h5m1 0h1m1 0h4m1 0h3m2 0h1m3 0h7m-55 1h1m1 0h3m1 0h1m2 0h1m3 0h1m1 0h2m1 0h3m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m2 0h2m1 0h4m1 0h1m1 0h2m2 0h4m1 0h2m-57 1h1m1 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m2 0h2m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m1 0h5m1 0h4m3 0h2m2 0h1m2 0h1m1 0h1m-57 1h1m5 0h1m4 0h1m1 0h1m1 0h1m1 0h4m3 0h2m1 0h1m1 0h3m3 0h1m1 0h3m2 0h2m1 0h1m1 0h1m3 0h3m1 0h2m-57 1h7m1 0h4m1 0h3m3 0h3m1 0h4m1 0h1m2 0h1m1 0h1m2 0h1m1 0h5m1 0h1m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1"/></svg></span><span class="card-label">D3</span><span class="card-kind">QR · Truncation to 255</span><span class="card-content">0001-0002-0003-0004-0005-0006-0007-00…</span></button>
+<button type="button" class="card" data-code="D4"><span class="card-code"><svg viewBox="0 0 43.350 26.411" version="1.1" xmlns="http://www.w3.org/2000/svg" >
+    <!--Autogenerated with python-barcode 0.16.1-->
+    <g id="barcode_group">
+        <rect width="100%" height="100%" style="fill:white"/>
+        <rect x="6.000mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="6.660mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="7.980mm" y="1.000mm" width="0.660mm" height="18.000mm" style="fill:black;"/>
+        <rect x="8.970mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="9.630mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="10.620mm" y="1.000mm" width="0.990mm" height="18.000mm" style="fill:black;"/>
+        <rect x="11.940mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="12.600mm" y="1.000mm" width="1.320mm" height="18.000mm" style="fill:black;"/>
+        <rect x="14.250mm" y="1.000mm" width="1.320mm" height="18.000mm" style="fill:black;"/>
+        <rect x="15.900mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="17.220mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="18.210mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="18.870mm" y="1.000mm" width="0.660mm" height="18.000mm" style="fill:black;"/>
+        <rect x="20.190mm" y="1.000mm" width="0.660mm" height="18.000mm" style="fill:black;"/>
+        <rect x="21.180mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="21.840mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="22.500mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="24.150mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="24.810mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="26.460mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="27.120mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="28.770mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="29.430mm" y="1.000mm" width="0.990mm" height="18.000mm" style="fill:black;"/>
+        <rect x="30.750mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="31.740mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="33.390mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="34.050mm" y="1.000mm" width="0.660mm" height="18.000mm" style="fill:black;"/>
+        <rect x="35.370mm" y="1.000mm" width="0.660mm" height="18.000mm" style="fill:black;"/>
+        <rect x="36.360mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <rect x="37.020mm" y="1.000mm" width="0.330mm" height="18.000mm" style="fill:black;"/>
+        <text x="21.675mm" y="24.000mm" style="fill:black;font-size:8pt;text-anchor:middle;">4006381333931</text>
+    </g>
+</svg>
+</span><span class="card-label">D4</span><span class="card-kind">EAN-13 · 1D</span><span class="card-content">4006381333931</span></button>
+<button type="button" class="card" data-code="D5"><span class="card-code"><svg viewBox="0 0 43.200 26.411" version="1.1" xmlns="http://www.w3.org/2000/svg" >
+    <!--Autogenerated with python-barcode 0.16.1-->
+    <g id="barcode_group">
+        <rect width="100%" height="100%" style="fill:white"/>
+        <rect x="6.000mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="6.600mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="7.200mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="8.200mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="8.600mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="9.400mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="10.400mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="11.000mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="12.000mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="12.600mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="13.200mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="13.800mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="14.800mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="15.400mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="16.200mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="17.000mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="17.800mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="18.600mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="19.200mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="19.600mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="20.400mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="21.400mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="21.800mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="23.000mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="23.600mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="24.200mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="24.800mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="25.800mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="26.400mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="27.400mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="28.000mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="28.800mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="29.800mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="30.200mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="31.000mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="31.600mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="32.400mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="33.200mm" y="1.000mm" width="0.800mm" height="18.000mm" style="fill:black;"/>
+        <rect x="34.200mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="34.600mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <rect x="35.600mm" y="1.000mm" width="0.600mm" height="18.000mm" style="fill:black;"/>
+        <rect x="36.400mm" y="1.000mm" width="0.200mm" height="18.000mm" style="fill:black;"/>
+        <rect x="36.800mm" y="1.000mm" width="0.400mm" height="18.000mm" style="fill:black;"/>
+        <text x="21.600mm" y="24.000mm" style="fill:black;font-size:8pt;text-anchor:middle;">M5-SCAN-128</text>
+    </g>
+</svg>
+</span><span class="card-label">D5</span><span class="card-kind">Code 128 · 1D</span><span class="card-content">M5-SCAN-128</span></button>
+<button type="button" class="card" data-code="D6"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m3 0h2m2 0h7m-21 1h1m5 0h1m2 0h3m2 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m2 0h1m4 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m1 0h1m1 0h3m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h2m2 0h1m-12 1h2m3 0h1m2 0h4m1 0h2m1 0h1m-17 1h5m1 0h3m2 0h1m1 0h4m2 0h1m-20 1h2m3 0h1m1 0h1m1 0h10m-17 1h3m1 0h2m3 0h1m2 0h1m1 0h1m1 0h2m-17 1h1m1 0h2m1 0h2m1 0h3m1 0h2m-10 1h2m2 0h3m3 0h1m-19 1h7m3 0h2m1 0h1m2 0h1m1 0h1m-19 1h1m5 0h1m2 0h2m2 0h2m4 0h1m-20 1h1m1 0h3m1 0h1m3 0h2m1 0h2m2 0h2m1 0h1m-21 1h1m1 0h3m1 0h1m10 0h1m-18 1h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h4m1 0h2m-21 1h1m5 0h1m1 0h3m1 0h1m3 0h1m3 0h1m-21 1h7m7 0h2m3 0h2"/></svg></span><span class="card-label">D6</span><span class="card-kind">QR · A second code</span><span class="card-content">SECOND-CODE</span></button>
+<button type="button" class="card" data-code="C1"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m3 0h1m3 0h7m-21 1h1m5 0h1m2 0h4m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m1 0h1m1 0h2m2 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h1m-9 1h1m1 0h5m4 0h1m2 0h5m-19 1h2m2 0h2m3 0h2m1 0h2m2 0h1m1 0h1m1 0h1m-19 1h2m2 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m-18 1h2m1 0h2m2 0h4m1 0h1m2 0h1m1 0h2m1 0h1m-21 1h1m3 0h1m1 0h4m2 0h4m1 0h4m-13 1h1m3 0h1m3 0h1m1 0h2m-20 1h7m2 0h1m2 0h1m2 0h1m1 0h1m1 0h1m-20 1h1m5 0h1m1 0h2m2 0h1m2 0h4m-19 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h4m2 0h3m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m1 0h1m-19 1h1m1 0h3m1 0h1m1 0h2m2 0h1m2 0h1m1 0h1m-18 1h1m5 0h1m2 0h2m1 0h1m2 0h4m-19 1h7m1 0h1m1 0h1m1 0h3m1 0h4"/></svg></span><span class="card-label">C1</span><span class="card-kind">QR · Volume high</span><span class="card-content">^#SC^2050800</span></button>
+<button type="button" class="card" data-code="C2"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m1 0h4m2 0h7m-21 1h1m5 0h1m1 0h2m2 0h1m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m5 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m4 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m2 0h1m1 0h2m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h1m2 0h2m-13 1h1m1 0h2m1 0h3m2 0h3m1 0h1m2 0h1m1 0h2m-21 1h1m4 0h1m1 0h1m2 0h1m1 0h2m2 0h1m1 0h1m1 0h1m-21 1h1m1 0h6m1 0h3m1 0h2m3 0h1m1 0h1m-16 1h1m1 0h3m3 0h1m2 0h2m1 0h2m-21 1h2m3 0h5m2 0h4m1 0h4m-13 1h1m2 0h1m2 0h4m1 0h2m-21 1h7m1 0h2m3 0h1m2 0h3m-19 1h1m5 0h1m1 0h2m2 0h1m2 0h4m-19 1h1m1 0h3m1 0h1m3 0h1m2 0h1m3 0h1m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h6m1 0h1m3 0h1m-20 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h2m1 0h1m-18 1h1m5 0h1m2 0h1m1 0h1m2 0h1m1 0h1m3 0h1m-21 1h7m1 0h3m3 0h2m1 0h1"/></svg></span><span class="card-label">C2</span><span class="card-kind">QR · Continuous mode</span><span class="card-content">^#SC^2050204</span></button>
+<button type="button" class="card" data-code="C3"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m1 0h1m2 0h2m1 0h7m-21 1h1m5 0h1m1 0h1m2 0h2m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m2 0h2m3 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m4 0h2m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h5m-13 1h1m1 0h2m1 0h3m1 0h4m1 0h1m2 0h1m1 0h2m-20 1h3m4 0h3m1 0h2m2 0h1m1 0h1m1 0h1m-21 1h1m1 0h1m1 0h1m1 0h1m4 0h1m1 0h2m3 0h1m1 0h1m-21 1h2m1 0h1m1 0h1m2 0h1m4 0h1m2 0h2m1 0h2m-20 1h4m1 0h3m1 0h1m1 0h4m1 0h4m-13 1h1m1 0h2m2 0h4m1 0h2m-21 1h7m1 0h1m4 0h1m2 0h3m-19 1h1m5 0h1m1 0h3m1 0h1m2 0h4m-19 1h1m1 0h3m1 0h1m2 0h1m1 0h3m3 0h1m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m2 0h3m1 0h1m3 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m-18 1h1m5 0h1m2 0h3m2 0h1m1 0h1m3 0h1m-21 1h7m1 0h2m4 0h2m1 0h1"/></svg></span><span class="card-label">C3</span><span class="card-kind">QR · Host mode</span><span class="card-content">^#SC^2050208</span></button>
+<button type="button" class="card" data-code="C4"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m3 0h1m1 0h1m1 0h7m-21 1h1m5 0h1m1 0h1m3 0h1m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m3 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m2 0h1m2 0h1m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-12 1h1m1 0h2m-13 1h1m1 0h1m1 0h1m1 0h1m2 0h3m4 0h1m2 0h1m-20 1h3m1 0h2m1 0h2m1 0h2m1 0h1m2 0h2m1 0h2m-19 1h1m1 0h4m1 0h2m1 0h2m2 0h2m2 0h1m-21 1h4m5 0h3m1 0h1m1 0h1m3 0h2m-20 1h1m2 0h1m1 0h3m1 0h1m1 0h2m2 0h4m-12 1h4m1 0h1m2 0h2m-18 1h7m2 0h1m2 0h1m1 0h1m1 0h2m1 0h2m-21 1h1m5 0h1m4 0h3m2 0h1m2 0h1m-20 1h1m1 0h3m1 0h1m1 0h2m2 0h2m2 0h1m1 0h2m-20 1h1m1 0h3m1 0h1m3 0h1m1 0h2m2 0h2m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h2m2 0h1m-21 1h1m5 0h1m3 0h1m2 0h1m1 0h2m2 0h1m-20 1h7m1 0h1m2 0h3m1 0h1m1 0h4"/></svg></span><span class="card-label">C4</span><span class="card-kind">QR · Terminator CR</span><span class="card-content">^#SC^3030052</span></button>
+<button type="button" class="card" data-code="C5"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m2 0h1m4 0h7m-21 1h1m5 0h1m3 0h2m2 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m2 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m2 0h2m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m1 0h1m2 0h1m2 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h2m-10 1h1m1 0h5m2 0h3m2 0h5m-18 1h1m1 0h1m3 0h1m1 0h1m2 0h1m3 0h1m1 0h1m1 0h1m-21 1h3m2 0h2m5 0h1m1 0h2m1 0h1m-18 1h3m2 0h1m2 0h3m1 0h1m2 0h1m1 0h2m1 0h1m-21 1h1m2 0h2m1 0h4m2 0h4m1 0h4m-13 1h1m1 0h1m1 0h1m3 0h1m1 0h2m-20 1h7m5 0h1m2 0h1m1 0h1m1 0h1m-20 1h1m5 0h1m1 0h2m2 0h1m4 0h2m-19 1h1m1 0h3m1 0h1m1 0h1m3 0h4m2 0h3m-21 1h1m1 0h3m1 0h1m1 0h1m2 0h1m4 0h1m1 0h1m-19 1h1m1 0h3m1 0h1m1 0h2m2 0h2m1 0h1m1 0h1m-18 1h1m5 0h1m5 0h1m2 0h4m-19 1h7m1 0h2m2 0h3m1 0h4"/></svg></span><span class="card-label">C5</span><span class="card-kind">QR · &quot;No Read&quot; message off (not managed; the scanner&#x27;s default)</span><span class="card-content">^#SC^1020100</span></button>
+<button type="button" class="card" data-code="C6"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m4 0h1m2 0h7m-21 1h1m5 0h1m1 0h1m1 0h1m3 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m3 0h2m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m3 0h1m3 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m5 0h1m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-11 1h3m-13 1h1m1 0h1m1 0h1m1 0h1m4 0h1m4 0h1m2 0h1m-20 1h1m2 0h3m1 0h1m1 0h1m1 0h1m4 0h2m1 0h2m-21 1h1m4 0h2m1 0h1m3 0h3m1 0h2m2 0h1m-20 1h1m6 0h2m1 0h1m1 0h1m1 0h1m3 0h2m-21 1h1m1 0h1m2 0h4m1 0h1m1 0h2m2 0h4m-12 1h2m1 0h1m1 0h1m2 0h2m-18 1h7m3 0h1m1 0h1m1 0h1m1 0h2m1 0h2m-21 1h1m5 0h1m2 0h1m1 0h3m1 0h2m2 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m3 0h2m2 0h1m1 0h2m-20 1h1m1 0h3m1 0h1m3 0h1m1 0h3m1 0h2m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h1m-21 1h1m5 0h1m2 0h3m1 0h1m1 0h2m2 0h1m-20 1h7m1 0h2m2 0h2m1 0h1m1 0h4"/></svg></span><span class="card-label">C6</span><span class="card-kind">QR · Volume low</span><span class="card-content">^#SC^2050802</span></button>
+<button type="button" class="card" data-code="C7"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m3 0h1m3 0h7m-21 1h1m5 0h1m3 0h1m1 0h1m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m1 0h2m1 0h1m2 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h1m1 0h1m-11 1h1m1 0h5m4 0h1m2 0h5m-18 1h1m2 0h1m2 0h1m1 0h2m1 0h2m2 0h1m1 0h1m1 0h1m-18 1h2m1 0h3m3 0h1m2 0h1m1 0h1m-18 1h3m1 0h2m1 0h1m2 0h1m1 0h1m2 0h1m1 0h2m1 0h1m-21 1h2m2 0h1m1 0h1m2 0h1m2 0h4m1 0h4m-13 1h3m1 0h1m3 0h1m1 0h2m-20 1h7m5 0h1m2 0h1m1 0h1m1 0h1m-20 1h1m5 0h1m1 0h2m1 0h2m4 0h2m-19 1h1m1 0h3m1 0h1m1 0h2m2 0h4m2 0h3m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m-19 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m-18 1h1m5 0h1m5 0h1m2 0h4m-19 1h7m1 0h3m1 0h3m1 0h4"/></svg></span><span class="card-label">C7</span><span class="card-kind">QR · Configuration code scanning on</span><span class="card-content">^#SC^1040601</span></button>
+<button type="button" class="card" data-code="C8"><span class="card-code"><svg viewBox="0 0 29 29" class="segno"><path fill="#fff" d="M0 0h29v29h-29z"/><path class="qrline" stroke="#000" d="M4 4.5h7m1 0h1m2 0h1m2 0h7m-21 1h1m5 0h1m1 0h2m1 0h2m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m3 0h3m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m4 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m3 0h2m2 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m3 0h3m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h1m1 0h3m-13 1h1m1 0h2m1 0h3m3 0h2m1 0h1m2 0h1m1 0h2m-19 1h1m2 0h1m1 0h3m2 0h1m3 0h1m1 0h1m1 0h1m-21 1h1m1 0h1m1 0h4m3 0h1m1 0h1m4 0h1m1 0h1m-21 1h2m1 0h2m2 0h1m2 0h1m5 0h2m1 0h2m-19 1h2m1 0h4m1 0h1m1 0h1m2 0h1m1 0h4m-13 1h4m1 0h5m1 0h2m-21 1h7m1 0h1m1 0h1m2 0h2m1 0h3m-19 1h1m5 0h1m1 0h1m3 0h2m2 0h3m-19 1h1m1 0h3m1 0h1m4 0h1m2 0h1m2 0h1m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h2m1 0h2m2 0h1m3 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m-18 1h1m5 0h1m2 0h1m1 0h4m1 0h1m3 0h1m-21 1h7m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1"/></svg></span><span class="card-label">C8</span><span class="card-kind">QR · Factory default</span><span class="card-content">^#SC^303FFF0</span></button>
+  </div>
+</main>
+
+<div class="overlay" id="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="ov-label">
+  <div class="overlay-code" id="ov-code"></div>
+  <div class="overlay-foot">
+    <span><b id="ov-label"></b><span id="ov-purpose"></span></span>
+    <span class="content" id="ov-content"></span>
+    <button type="button" class="close" id="ov-close">Close</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STEPS = ["1.1", "1.2", "1.3", "1.4", "2.1", "2.2", "2.3", "2.4", "3.1", "3.2", "3.3", "3.4", "3.5", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7", "4.8", "4.9", "4.10", "5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "6.1", "6.2", "6.3", "6.4", "6.5", "6.6", "6.7", "7.1", "7.2", "7.3", "7.4", "8.1", "9.1", "9.2"];
+  const CODES = {"D1": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m2 0h1m2 0h1m1 0h7m-21 1h1m5 0h1m4 0h2m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m2 0h1m1 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m4 0h2m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m3 0h1m3 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h3m1 0h1m-11 1h2m2 0h3m2 0h4m1 0h1m-17 1h1m4 0h1m1 0h5m3 0h1m1 0h4m-18 1h2m1 0h1m3 0h1m1 0h1m1 0h1m3 0h1m-19 1h2m3 0h1m1 0h3m1 0h2m3 0h1m1 0h2m-18 1h1m1 0h1m1 0h1m2 0h1m1 0h2m2 0h1m2 0h1m-11 1h2m2 0h3m1 0h1m1 0h2m-20 1h7m1 0h1m3 0h2m1 0h3m1 0h2m-21 1h1m5 0h1m2 0h3m2 0h2m2 0h1m-19 1h1m1 0h3m1 0h1m2 0h1m1 0h1m1 0h2m1 0h1m2 0h2m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h2m1 0h3m2 0h2m-20 1h1m1 0h3m1 0h1m1 0h6m4 0h1m-19 1h1m5 0h1m2 0h2m2 0h1m1 0h1m-16 1h7m9 0h1m2 0h1\"/></svg>", "kind": "QR", "purpose": "Plain data", "content": "HELLO-123"}, "D2": {"svg": "<svg viewBox=\"0 0 33 33\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h33v33h-33z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m1 0h8m2 0h7m-25 1h1m5 0h1m4 0h1m4 0h1m1 0h1m5 0h1m-25 1h1m1 0h3m1 0h1m2 0h2m2 0h2m1 0h1m1 0h1m1 0h3m1 0h1m-25 1h1m1 0h3m1 0h1m3 0h2m4 0h1m1 0h1m1 0h3m1 0h1m-25 1h1m1 0h3m1 0h1m1 0h3m4 0h1m2 0h1m1 0h3m1 0h1m-25 1h1m5 0h1m1 0h3m1 0h2m4 0h1m5 0h1m-25 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-16 1h1m1 0h1m3 0h1m-15 1h7m2 0h2m3 0h2m2 0h2m3 0h1m-18 1h1m8 0h1m1 0h1m1 0h2m2 0h1m-25 1h1m2 0h1m2 0h1m1 0h1m1 0h2m5 0h4m1 0h2m-24 1h1m1 0h4m1 0h6m2 0h1m2 0h1m2 0h2m-23 1h1m1 0h1m2 0h2m2 0h1m1 0h1m3 0h1m1 0h1m4 0h1m1 0h1m-25 1h3m2 0h1m1 0h1m2 0h1m2 0h1m4 0h3m1 0h2m-24 1h1m1 0h2m2 0h2m3 0h1m2 0h2m2 0h1m2 0h1m1 0h2m-25 1h1m1 0h1m2 0h1m1 0h1m1 0h5m1 0h3m4 0h2m-24 1h1m4 0h2m1 0h1m1 0h1m3 0h1m1 0h6m1 0h2m-17 1h1m3 0h3m1 0h1m3 0h2m2 0h1m-25 1h7m1 0h2m2 0h2m1 0h2m1 0h1m1 0h1m1 0h3m-25 1h1m5 0h1m1 0h2m4 0h3m3 0h4m-24 1h1m1 0h3m1 0h1m1 0h1m4 0h2m1 0h5m3 0h1m-25 1h1m1 0h3m1 0h1m1 0h7m1 0h1m3 0h1m1 0h3m-25 1h1m1 0h3m1 0h1m1 0h3m2 0h3m1 0h2m3 0h1m1 0h1m-25 1h1m5 0h1m1 0h3m2 0h3m1 0h3m4 0h1m-25 1h7m3 0h1m2 0h1m2 0h1m2 0h1m1 0h4\"/></svg>", "kind": "QR", "purpose": "UTF-8", "content": "Gr\u00fc\u00dfe \u00c4\u00d6\u00dc \ud83d\ude42"}, "D3": {"svg": "<svg viewBox=\"0 0 65 65\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h65v65h-65z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m4 0h1m2 0h1m3 0h1m1 0h1m1 0h2m3 0h1m2 0h5m1 0h3m2 0h2m3 0h2m2 0h7m-57 1h1m5 0h1m1 0h2m2 0h3m2 0h1m2 0h2m7 0h1m3 0h1m1 0h1m1 0h3m2 0h3m2 0h1m2 0h1m5 0h1m-57 1h1m1 0h3m1 0h1m2 0h3m1 0h2m2 0h1m1 0h2m1 0h2m2 0h1m1 0h1m1 0h1m2 0h1m2 0h3m1 0h3m1 0h4m2 0h1m1 0h3m1 0h1m-57 1h1m1 0h3m1 0h1m3 0h3m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m3 0h1m1 0h2m1 0h2m1 0h1m1 0h1m3 0h1m2 0h1m1 0h3m1 0h1m-57 1h1m1 0h3m1 0h1m1 0h2m7 0h4m1 0h1m1 0h1m1 0h5m2 0h1m2 0h1m1 0h1m3 0h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-57 1h1m5 0h1m3 0h1m1 0h2m1 0h2m1 0h1m2 0h1m1 0h1m1 0h2m3 0h1m1 0h1m4 0h1m1 0h3m1 0h1m1 0h2m3 0h1m5 0h1m-57 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-48 1h2m4 0h3m5 0h1m1 0h2m3 0h4m1 0h1m1 0h1m2 0h2m1 0h1m1 0h1m1 0h1m-48 1h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h2m2 0h1m2 0h3m1 0h5m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m3 0h2m2 0h1m3 0h1m2 0h1m-56 1h1m1 0h1m2 0h1m1 0h3m1 0h1m2 0h3m2 0h2m2 0h1m1 0h1m1 0h1m1 0h3m1 0h3m1 0h1m1 0h3m4 0h2m1 0h2m1 0h1m-53 1h2m1 0h1m2 0h2m2 0h3m1 0h2m3 0h1m1 0h1m2 0h1m3 0h1m1 0h1m1 0h1m3 0h2m2 0h1m1 0h2m5 0h2m1 0h3m1 0h1m-56 1h1m3 0h1m3 0h3m1 0h10m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2m-52 1h6m1 0h1m1 0h2m2 0h1m2 0h1m2 0h1m3 0h1m1 0h4m2 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m1 0h3m-57 1h1m1 0h1m4 0h1m1 0h1m3 0h5m1 0h3m2 0h1m1 0h2m1 0h1m2 0h2m3 0h3m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h3m-56 1h1m3 0h1m1 0h1m2 0h4m2 0h2m1 0h5m7 0h3m2 0h2m3 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h3m1 0h1m-57 1h3m5 0h1m2 0h1m1 0h3m1 0h1m4 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m2 0h2m2 0h2m4 0h2m1 0h1m3 0h3m-56 1h2m3 0h2m2 0h1m2 0h1m1 0h2m3 0h1m1 0h4m1 0h1m1 0h1m3 0h1m1 0h1m1 0h3m1 0h1m1 0h2m2 0h1m3 0h2m1 0h2m1 0h1m-56 1h1m5 0h8m2 0h1m2 0h3m2 0h1m1 0h1m2 0h2m1 0h1m2 0h2m3 0h1m1 0h1m1 0h5m3 0h1m1 0h1m-54 1h2m1 0h2m1 0h3m1 0h1m1 0h5m1 0h1m2 0h1m3 0h3m2 0h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h3m2 0h1m2 0h3m-55 1h1m2 0h1m2 0h1m4 0h5m2 0h4m2 0h5m1 0h1m2 0h1m2 0h1m2 0h1m3 0h1m1 0h3m1 0h1m1 0h1m1 0h2m-57 1h4m1 0h2m1 0h2m1 0h5m1 0h2m2 0h1m1 0h2m7 0h3m1 0h1m2 0h3m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-48 1h1m1 0h1m2 0h1m1 0h2m3 0h2m1 0h2m1 0h5m2 0h1m2 0h1m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-54 1h2m3 0h5m1 0h4m1 0h1m2 0h1m2 0h3m2 0h2m1 0h2m1 0h1m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-57 1h1m1 0h1m1 0h2m3 0h4m1 0h5m1 0h4m1 0h2m1 0h2m1 0h2m4 0h1m1 0h3m1 0h1m1 0h3m3 0h3m1 0h1m-56 1h3m1 0h1m1 0h1m1 0h2m2 0h1m4 0h2m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m3 0h1m1 0h1m1 0h5m2 0h2m1 0h1m5 0h1m1 0h1m-57 1h3m6 0h5m2 0h1m2 0h2m2 0h1m2 0h1m2 0h1m1 0h3m1 0h1m1 0h1m1 0h6m1 0h2m1 0h1m1 0h2m1 0h1m1 0h1m-56 1h1m2 0h5m4 0h1m3 0h1m1 0h2m5 0h6m2 0h1m3 0h2m2 0h2m2 0h1m1 0h5m1 0h1m1 0h1m-56 1h4m3 0h2m1 0h4m5 0h1m1 0h5m3 0h2m3 0h1m3 0h2m1 0h1m4 0h2m3 0h1m1 0h1m1 0h1m-56 1h1m2 0h1m1 0h1m1 0h2m3 0h2m4 0h4m1 0h3m1 0h1m1 0h1m1 0h1m7 0h1m1 0h2m4 0h1m1 0h1m1 0h4m-56 1h5m3 0h1m1 0h1m1 0h4m1 0h2m1 0h1m4 0h2m3 0h2m3 0h2m1 0h2m1 0h1m1 0h1m1 0h4m3 0h2m1 0h1m-53 1h7m2 0h1m1 0h1m3 0h1m3 0h1m1 0h1m1 0h5m1 0h1m1 0h1m5 0h1m1 0h1m4 0h6m1 0h1m1 0h1m-57 1h2m1 0h1m1 0h1m2 0h2m1 0h2m1 0h3m3 0h1m2 0h1m1 0h3m1 0h2m1 0h2m2 0h4m1 0h1m1 0h1m1 0h1m1 0h2m6 0h1m-56 1h1m4 0h2m1 0h3m1 0h3m2 0h1m2 0h5m1 0h1m1 0h1m1 0h1m1 0h1m3 0h1m1 0h4m2 0h3m1 0h1m3 0h1m1 0h1m1 0h1m-57 1h2m2 0h2m1 0h1m1 0h1m2 0h2m1 0h1m2 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h4m2 0h2m1 0h1m1 0h2m2 0h1m1 0h1m1 0h2m2 0h1m1 0h1m-53 1h2m1 0h3m1 0h3m3 0h4m3 0h2m1 0h1m1 0h1m1 0h3m1 0h3m1 0h7m3 0h1m4 0h2m-54 1h2m1 0h2m2 0h2m4 0h4m3 0h1m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m5 0h1m1 0h2m1 0h4m1 0h1m1 0h1m1 0h1m-54 1h9m1 0h1m1 0h4m1 0h1m1 0h1m3 0h1m2 0h1m1 0h1m1 0h3m1 0h1m1 0h1m3 0h2m1 0h2m1 0h1m1 0h3m1 0h1m1 0h3m-57 1h1m2 0h3m3 0h1m2 0h1m4 0h3m1 0h2m1 0h3m2 0h1m3 0h3m2 0h2m2 0h2m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m-55 1h1m3 0h3m6 0h4m1 0h1m2 0h1m3 0h3m2 0h1m1 0h1m2 0h1m3 0h1m1 0h2m2 0h2m1 0h2m1 0h1m1 0h1m1 0h1m-57 1h2m2 0h1m2 0h3m1 0h2m1 0h1m1 0h4m1 0h1m2 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m5 0h1m2 0h1m1 0h3m-57 1h2m2 0h1m1 0h2m1 0h2m3 0h1m1 0h1m7 0h2m2 0h1m2 0h3m1 0h2m1 0h1m3 0h1m1 0h5m1 0h1m1 0h1m-51 1h1m1 0h1m5 0h1m1 0h2m1 0h5m1 0h1m1 0h1m1 0h1m1 0h1m3 0h1m3 0h1m1 0h1m1 0h3m1 0h1m1 0h5m1 0h3m1 0h1m-56 1h3m1 0h1m1 0h2m4 0h2m2 0h1m2 0h1m1 0h2m1 0h2m2 0h1m3 0h3m1 0h1m1 0h1m3 0h1m1 0h1m2 0h3m2 0h1m1 0h3m-57 1h2m2 0h2m2 0h2m1 0h4m1 0h3m1 0h1m2 0h1m1 0h1m1 0h5m1 0h1m1 0h1m1 0h1m2 0h2m1 0h2m1 0h2m1 0h1m1 0h1m2 0h1m-53 1h2m2 0h1m1 0h1m1 0h2m2 0h2m2 0h1m1 0h1m2 0h1m2 0h1m3 0h1m1 0h1m3 0h1m1 0h3m2 0h4m1 0h1m1 0h4m1 0h1m-56 1h1m1 0h1m4 0h1m1 0h1m2 0h2m3 0h1m1 0h7m2 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h4m3 0h1m1 0h1m6 0h1m-57 1h1m1 0h1m2 0h3m1 0h1m1 0h2m6 0h1m1 0h6m1 0h1m3 0h3m1 0h3m2 0h2m1 0h1m1 0h1m1 0h1m1 0h2m2 0h2m-56 1h5m2 0h1m1 0h1m2 0h2m1 0h1m1 0h2m1 0h2m1 0h1m4 0h2m2 0h1m6 0h1m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m-51 1h1m1 0h4m1 0h3m4 0h2m2 0h1m1 0h7m1 0h1m5 0h1m1 0h1m1 0h1m1 0h7m1 0h1m1 0h1m-49 1h1m2 0h1m1 0h1m2 0h1m2 0h2m1 0h2m2 0h1m3 0h1m1 0h2m2 0h4m1 0h1m1 0h1m1 0h1m2 0h1m3 0h1m2 0h1m-56 1h7m7 0h1m2 0h1m1 0h1m2 0h1m2 0h2m1 0h1m1 0h1m1 0h1m1 0h2m4 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-57 1h1m5 0h1m2 0h4m1 0h1m1 0h2m3 0h4m1 0h1m3 0h2m1 0h1m1 0h1m1 0h1m1 0h4m1 0h1m2 0h2m3 0h1m1 0h2m-56 1h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h1m2 0h2m3 0h1m2 0h1m1 0h5m1 0h1m1 0h4m1 0h3m2 0h1m3 0h7m-55 1h1m1 0h3m1 0h1m2 0h1m3 0h1m1 0h2m1 0h3m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m2 0h2m1 0h4m1 0h1m1 0h2m2 0h4m1 0h2m-57 1h1m1 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m2 0h2m1 0h1m3 0h1m1 0h1m1 0h1m1 0h1m1 0h5m1 0h4m3 0h2m2 0h1m2 0h1m1 0h1m-57 1h1m5 0h1m4 0h1m1 0h1m1 0h1m1 0h4m3 0h2m1 0h1m1 0h3m3 0h1m1 0h3m2 0h2m1 0h1m1 0h1m3 0h3m1 0h2m-57 1h7m1 0h4m1 0h3m3 0h3m1 0h4m1 0h1m2 0h1m1 0h1m2 0h1m1 0h5m1 0h1m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1\"/></svg>", "kind": "QR", "purpose": "Truncation to 255", "content": "0001-0002-0003-0004-0005-0006-0007-0008-0009-0010-0011-0012-0013-0014-0015-0016-0017-0018-0019-0020-0021-0022-0023-0024-0025-0026-0027-0028-0029-0030-0031-0032-0033-0034-0035-0036-0037-0038-0039-0040-0041-0042-0043-0044-0045-0046-0047-0048-0049-0050-0051-0052-0053-0054-0055-0056-0057-0058-0059-0060-"}, "D4": {"svg": "<svg viewBox=\"0 0 43.350 26.411\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" >\n    <!--Autogenerated with python-barcode 0.16.1-->\n    <g id=\"barcode_group\">\n        <rect width=\"100%\" height=\"100%\" style=\"fill:white\"/>\n        <rect x=\"6.000mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"6.660mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"7.980mm\" y=\"1.000mm\" width=\"0.660mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"8.970mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"9.630mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"10.620mm\" y=\"1.000mm\" width=\"0.990mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"11.940mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"12.600mm\" y=\"1.000mm\" width=\"1.320mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"14.250mm\" y=\"1.000mm\" width=\"1.320mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"15.900mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"17.220mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"18.210mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"18.870mm\" y=\"1.000mm\" width=\"0.660mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"20.190mm\" y=\"1.000mm\" width=\"0.660mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"21.180mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"21.840mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"22.500mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"24.150mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"24.810mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"26.460mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"27.120mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"28.770mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"29.430mm\" y=\"1.000mm\" width=\"0.990mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"30.750mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"31.740mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"33.390mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"34.050mm\" y=\"1.000mm\" width=\"0.660mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"35.370mm\" y=\"1.000mm\" width=\"0.660mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"36.360mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"37.020mm\" y=\"1.000mm\" width=\"0.330mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <text x=\"21.675mm\" y=\"24.000mm\" style=\"fill:black;font-size:8pt;text-anchor:middle;\">4006381333931</text>\n    </g>\n</svg>\n", "kind": "EAN-13", "purpose": "1D", "content": "4006381333931"}, "D5": {"svg": "<svg viewBox=\"0 0 43.200 26.411\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" >\n    <!--Autogenerated with python-barcode 0.16.1-->\n    <g id=\"barcode_group\">\n        <rect width=\"100%\" height=\"100%\" style=\"fill:white\"/>\n        <rect x=\"6.000mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"6.600mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"7.200mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"8.200mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"8.600mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"9.400mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"10.400mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"11.000mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"12.000mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"12.600mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"13.200mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"13.800mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"14.800mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"15.400mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"16.200mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"17.000mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"17.800mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"18.600mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"19.200mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"19.600mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"20.400mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"21.400mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"21.800mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"23.000mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"23.600mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"24.200mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"24.800mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"25.800mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"26.400mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"27.400mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"28.000mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"28.800mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"29.800mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"30.200mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"31.000mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"31.600mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"32.400mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"33.200mm\" y=\"1.000mm\" width=\"0.800mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"34.200mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"34.600mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"35.600mm\" y=\"1.000mm\" width=\"0.600mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"36.400mm\" y=\"1.000mm\" width=\"0.200mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <rect x=\"36.800mm\" y=\"1.000mm\" width=\"0.400mm\" height=\"18.000mm\" style=\"fill:black;\"/>\n        <text x=\"21.600mm\" y=\"24.000mm\" style=\"fill:black;font-size:8pt;text-anchor:middle;\">M5-SCAN-128</text>\n    </g>\n</svg>\n", "kind": "Code 128", "purpose": "1D", "content": "M5-SCAN-128"}, "D6": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m3 0h2m2 0h7m-21 1h1m5 0h1m2 0h3m2 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m2 0h1m4 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m1 0h1m1 0h3m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h2m2 0h1m-12 1h2m3 0h1m2 0h4m1 0h2m1 0h1m-17 1h5m1 0h3m2 0h1m1 0h4m2 0h1m-20 1h2m3 0h1m1 0h1m1 0h10m-17 1h3m1 0h2m3 0h1m2 0h1m1 0h1m1 0h2m-17 1h1m1 0h2m1 0h2m1 0h3m1 0h2m-10 1h2m2 0h3m3 0h1m-19 1h7m3 0h2m1 0h1m2 0h1m1 0h1m-19 1h1m5 0h1m2 0h2m2 0h2m4 0h1m-20 1h1m1 0h3m1 0h1m3 0h2m1 0h2m2 0h2m1 0h1m-21 1h1m1 0h3m1 0h1m10 0h1m-18 1h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h4m1 0h2m-21 1h1m5 0h1m1 0h3m1 0h1m3 0h1m3 0h1m-21 1h7m7 0h2m3 0h2\"/></svg>", "kind": "QR", "purpose": "A second code", "content": "SECOND-CODE"}, "C1": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m3 0h1m3 0h7m-21 1h1m5 0h1m2 0h4m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m1 0h1m1 0h2m2 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h1m-9 1h1m1 0h5m4 0h1m2 0h5m-19 1h2m2 0h2m3 0h2m1 0h2m2 0h1m1 0h1m1 0h1m-19 1h2m2 0h1m1 0h1m1 0h1m1 0h2m1 0h1m1 0h1m-18 1h2m1 0h2m2 0h4m1 0h1m2 0h1m1 0h2m1 0h1m-21 1h1m3 0h1m1 0h4m2 0h4m1 0h4m-13 1h1m3 0h1m3 0h1m1 0h2m-20 1h7m2 0h1m2 0h1m2 0h1m1 0h1m1 0h1m-20 1h1m5 0h1m1 0h2m2 0h1m2 0h4m-19 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h4m2 0h3m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m1 0h1m-19 1h1m1 0h3m1 0h1m1 0h2m2 0h1m2 0h1m1 0h1m-18 1h1m5 0h1m2 0h2m1 0h1m2 0h4m-19 1h7m1 0h1m1 0h1m1 0h3m1 0h4\"/></svg>", "kind": "QR", "purpose": "Volume high", "content": "^#SC^2050800"}, "C2": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m1 0h4m2 0h7m-21 1h1m5 0h1m1 0h2m2 0h1m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m5 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m4 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m2 0h1m1 0h2m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h1m2 0h2m-13 1h1m1 0h2m1 0h3m2 0h3m1 0h1m2 0h1m1 0h2m-21 1h1m4 0h1m1 0h1m2 0h1m1 0h2m2 0h1m1 0h1m1 0h1m-21 1h1m1 0h6m1 0h3m1 0h2m3 0h1m1 0h1m-16 1h1m1 0h3m3 0h1m2 0h2m1 0h2m-21 1h2m3 0h5m2 0h4m1 0h4m-13 1h1m2 0h1m2 0h4m1 0h2m-21 1h7m1 0h2m3 0h1m2 0h3m-19 1h1m5 0h1m1 0h2m2 0h1m2 0h4m-19 1h1m1 0h3m1 0h1m3 0h1m2 0h1m3 0h1m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h6m1 0h1m3 0h1m-20 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h2m1 0h1m-18 1h1m5 0h1m2 0h1m1 0h1m2 0h1m1 0h1m3 0h1m-21 1h7m1 0h3m3 0h2m1 0h1\"/></svg>", "kind": "QR", "purpose": "Continuous mode", "content": "^#SC^2050204"}, "C3": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m1 0h1m2 0h2m1 0h7m-21 1h1m5 0h1m1 0h1m2 0h2m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m2 0h2m3 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m4 0h2m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h5m-13 1h1m1 0h2m1 0h3m1 0h4m1 0h1m2 0h1m1 0h2m-20 1h3m4 0h3m1 0h2m2 0h1m1 0h1m1 0h1m-21 1h1m1 0h1m1 0h1m1 0h1m4 0h1m1 0h2m3 0h1m1 0h1m-21 1h2m1 0h1m1 0h1m2 0h1m4 0h1m2 0h2m1 0h2m-20 1h4m1 0h3m1 0h1m1 0h4m1 0h4m-13 1h1m1 0h2m2 0h4m1 0h2m-21 1h7m1 0h1m4 0h1m2 0h3m-19 1h1m5 0h1m1 0h3m1 0h1m2 0h4m-19 1h1m1 0h3m1 0h1m2 0h1m1 0h3m3 0h1m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m2 0h3m1 0h1m3 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m-18 1h1m5 0h1m2 0h3m2 0h1m1 0h1m3 0h1m-21 1h7m1 0h2m4 0h2m1 0h1\"/></svg>", "kind": "QR", "purpose": "Host mode", "content": "^#SC^2050208"}, "C4": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m3 0h1m1 0h1m1 0h7m-21 1h1m5 0h1m1 0h1m3 0h1m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m3 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m2 0h3m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m2 0h1m2 0h1m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-12 1h1m1 0h2m-13 1h1m1 0h1m1 0h1m1 0h1m2 0h3m4 0h1m2 0h1m-20 1h3m1 0h2m1 0h2m1 0h2m1 0h1m2 0h2m1 0h2m-19 1h1m1 0h4m1 0h2m1 0h2m2 0h2m2 0h1m-21 1h4m5 0h3m1 0h1m1 0h1m3 0h2m-20 1h1m2 0h1m1 0h3m1 0h1m1 0h2m2 0h4m-12 1h4m1 0h1m2 0h2m-18 1h7m2 0h1m2 0h1m1 0h1m1 0h2m1 0h2m-21 1h1m5 0h1m4 0h3m2 0h1m2 0h1m-20 1h1m1 0h3m1 0h1m1 0h2m2 0h2m2 0h1m1 0h2m-20 1h1m1 0h3m1 0h1m3 0h1m1 0h2m2 0h2m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h2m2 0h1m-21 1h1m5 0h1m3 0h1m2 0h1m1 0h2m2 0h1m-20 1h7m1 0h1m2 0h3m1 0h1m1 0h4\"/></svg>", "kind": "QR", "purpose": "Terminator CR", "content": "^#SC^3030052"}, "C5": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m2 0h1m4 0h7m-21 1h1m5 0h1m3 0h2m2 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m2 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m2 0h2m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m1 0h1m2 0h1m2 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h2m-10 1h1m1 0h5m2 0h3m2 0h5m-18 1h1m1 0h1m3 0h1m1 0h1m2 0h1m3 0h1m1 0h1m1 0h1m-21 1h3m2 0h2m5 0h1m1 0h2m1 0h1m-18 1h3m2 0h1m2 0h3m1 0h1m2 0h1m1 0h2m1 0h1m-21 1h1m2 0h2m1 0h4m2 0h4m1 0h4m-13 1h1m1 0h1m1 0h1m3 0h1m1 0h2m-20 1h7m5 0h1m2 0h1m1 0h1m1 0h1m-20 1h1m5 0h1m1 0h2m2 0h1m4 0h2m-19 1h1m1 0h3m1 0h1m1 0h1m3 0h4m2 0h3m-21 1h1m1 0h3m1 0h1m1 0h1m2 0h1m4 0h1m1 0h1m-19 1h1m1 0h3m1 0h1m1 0h2m2 0h2m1 0h1m1 0h1m-18 1h1m5 0h1m5 0h1m2 0h4m-19 1h7m1 0h2m2 0h3m1 0h4\"/></svg>", "kind": "QR", "purpose": "\"No Read\" message off (not managed; the scanner's default)", "content": "^#SC^1020100"}, "C6": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m4 0h1m2 0h7m-21 1h1m5 0h1m1 0h1m1 0h1m3 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m3 0h2m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m3 0h1m3 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m5 0h1m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-11 1h3m-13 1h1m1 0h1m1 0h1m1 0h1m4 0h1m4 0h1m2 0h1m-20 1h1m2 0h3m1 0h1m1 0h1m1 0h1m4 0h2m1 0h2m-21 1h1m4 0h2m1 0h1m3 0h3m1 0h2m2 0h1m-20 1h1m6 0h2m1 0h1m1 0h1m1 0h1m3 0h2m-21 1h1m1 0h1m2 0h4m1 0h1m1 0h2m2 0h4m-12 1h2m1 0h1m1 0h1m2 0h2m-18 1h7m3 0h1m1 0h1m1 0h1m1 0h2m1 0h2m-21 1h1m5 0h1m2 0h1m1 0h3m1 0h2m2 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m3 0h2m2 0h1m1 0h2m-20 1h1m1 0h3m1 0h1m3 0h1m1 0h3m1 0h2m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h1m-21 1h1m5 0h1m2 0h3m1 0h1m1 0h2m2 0h1m-20 1h7m1 0h2m2 0h2m1 0h1m1 0h4\"/></svg>", "kind": "QR", "purpose": "Volume low", "content": "^#SC^2050802"}, "C7": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m3 0h1m3 0h7m-21 1h1m5 0h1m3 0h1m1 0h1m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m1 0h2m1 0h1m2 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h1m1 0h1m-11 1h1m1 0h5m4 0h1m2 0h5m-18 1h1m2 0h1m2 0h1m1 0h2m1 0h2m2 0h1m1 0h1m1 0h1m-18 1h2m1 0h3m3 0h1m2 0h1m1 0h1m-18 1h3m1 0h2m1 0h1m2 0h1m1 0h1m2 0h1m1 0h2m1 0h1m-21 1h2m2 0h1m1 0h1m2 0h1m2 0h4m1 0h4m-13 1h3m1 0h1m3 0h1m1 0h2m-20 1h7m5 0h1m2 0h1m1 0h1m1 0h1m-20 1h1m5 0h1m1 0h2m1 0h2m4 0h2m-19 1h1m1 0h3m1 0h1m1 0h2m2 0h4m2 0h3m-21 1h1m1 0h3m1 0h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m-19 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m-18 1h1m5 0h1m5 0h1m2 0h4m-19 1h7m1 0h3m1 0h3m1 0h4\"/></svg>", "kind": "QR", "purpose": "Configuration code scanning on", "content": "^#SC^1040601"}, "C8": {"svg": "<svg viewBox=\"0 0 29 29\" class=\"segno\"><path fill=\"#fff\" d=\"M0 0h29v29h-29z\"/><path class=\"qrline\" stroke=\"#000\" d=\"M4 4.5h7m1 0h1m2 0h1m2 0h7m-21 1h1m5 0h1m1 0h2m1 0h2m1 0h1m5 0h1m-21 1h1m1 0h3m1 0h1m3 0h3m1 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m1 0h2m4 0h1m1 0h3m1 0h1m-21 1h1m1 0h3m1 0h1m3 0h2m2 0h1m1 0h3m1 0h1m-21 1h1m5 0h1m3 0h3m1 0h1m5 0h1m-21 1h7m1 0h1m1 0h1m1 0h1m1 0h7m-13 1h1m1 0h3m-13 1h1m1 0h2m1 0h3m3 0h2m1 0h1m2 0h1m1 0h2m-19 1h1m2 0h1m1 0h3m2 0h1m3 0h1m1 0h1m1 0h1m-21 1h1m1 0h1m1 0h4m3 0h1m1 0h1m4 0h1m1 0h1m-21 1h2m1 0h2m2 0h1m2 0h1m5 0h2m1 0h2m-19 1h2m1 0h4m1 0h1m1 0h1m2 0h1m1 0h4m-13 1h4m1 0h5m1 0h2m-21 1h7m1 0h1m1 0h1m2 0h2m1 0h3m-19 1h1m5 0h1m1 0h1m3 0h2m2 0h3m-19 1h1m1 0h3m1 0h1m4 0h1m2 0h1m2 0h1m1 0h1m-20 1h1m1 0h3m1 0h1m1 0h2m1 0h2m2 0h1m3 0h1m-20 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m-18 1h1m5 0h1m2 0h1m1 0h4m1 0h1m3 0h1m-21 1h7m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1\"/></svg>", "kind": "QR", "purpose": "Factory default", "content": "^#SC^303FFF0"}};
+  const LOCAL_KEY = "atom-field-test-results";
+  const results = {};
+  let build = "";
+  let db = null;
+
+  // ── Rendering ──
+  function render() {
+    let pass = 0, fail = 0, skip = 0;
+    for (const id of STEPS) {
+      const r = results[id] || {};
+      const el = document.querySelector(`[data-step="${CSS.escape(id)}"]`);
+      if (!el) continue;
+      if (r.status) el.dataset.status = r.status; else delete el.dataset.status;
+      for (const b of el.querySelectorAll(".mark")) b.setAttribute("aria-pressed", String(b.dataset.status === r.status));
+      const note = el.querySelector(".note");
+      if (document.activeElement !== note) note.value = r.note || "";
+      if (r.status === "pass") pass++; else if (r.status === "fail") fail++; else if (r.status === "skip") skip++;
+    }
+    const done = pass + fail + skip;
+    document.getElementById("counts").innerHTML =
+      `${done}/${STEPS.length} recorded · <b class="c-pass">${pass} pass</b> · <b class="c-fail">${fail} fail</b> · ${skip} skipped`;
+    const pct = (n) => (100 * n / STEPS.length).toFixed(2) + "%";
+    document.getElementById("meter").innerHTML =
+      `<span class="m-pass" style="width:${pct(pass)}"></span><span class="m-fail" style="width:${pct(fail)}"></span><span class="m-skip" style="width:${pct(skip)}"></span>`;
+    const buildInput = document.getElementById("build");
+    if (document.activeElement !== buildInput) buildInput.value = build;
+  }
+
+  // ── Storage: the artifact's database when available, else this browser ──
+  function loadLocal() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}");
+      Object.assign(results, saved.results || {});
+      build = saved.build || "";
+    } catch (e) { /* storage unavailable: start empty */ }
+  }
+  function saveLocal() {
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ results, build })); } catch (e) { /* ignore */ }
+  }
+  const pending = new Map();  // doc path -> promise chain, one write at a time per document
+  function write(path, body) {
+    if (!db) { saveLocal(); return; }
+    const prev = pending.get(path) || Promise.resolve();
+    const next = prev.then(() => (body ? db.doc(path).set(body) : db.doc(path).delete())).catch((e) => {
+      document.getElementById("storage").textContent = "Could not save to the shared results (" + (e && e.code || "error") + "); keep this page open and copy the results.";
+    });
+    pending.set(path, next);
+  }
+  function record(id) {
+    // The note comes from its input: a snapshot may have replaced results[id] meanwhile.
+    const input = document.getElementById("note-" + id.replace(".", "-"));
+    const r = results[id] || (results[id] = {});
+    r.note = input ? input.value : r.note || "";
+    const body = r.status || r.note ? { step: id, status: r.status || null, note: r.note, at: new Date().toISOString() } : null;
+    write("results/" + id.replace(".", "-"), body);
+  }
+
+  // ── Interaction ──
+  document.addEventListener("click", (ev) => {
+    const mark = ev.target.closest(".mark");
+    if (mark) {
+      const id = mark.closest(".step").dataset.step;
+      const r = results[id] || (results[id] = {});
+      r.status = r.status === mark.dataset.status ? null : mark.dataset.status;
+      render();
+      record(id);
+      return;
+    }
+    const code = ev.target.closest("[data-code]");
+    if (code) openCode(code.dataset.code);
+  });
+  const timers = {};
+  document.addEventListener("input", (ev) => {
+    if (ev.target.classList.contains("note")) {
+      const id = ev.target.closest(".step").dataset.step;
+      (results[id] || (results[id] = {})).note = ev.target.value;
+      clearTimeout(timers[id]);
+      timers[id] = setTimeout(() => { render(); record(id); }, 700);
+    } else if (ev.target.id === "build") {
+      build = ev.target.value;
+      clearTimeout(timers.build);
+      timers.build = setTimeout(() => write("meta/run", { build, at: new Date().toISOString() }), 700);
+    }
+  });
+
+  // ── Barcode overlay ──
+  let wakeLock = null;
+  function openCode(label) {
+    const c = CODES[label];
+    if (!c) return;
+    const box = document.getElementById("ov-code");
+    box.innerHTML = c.svg;
+    box.classList.toggle("linear", c.kind !== "QR");
+    document.getElementById("ov-label").textContent = label;
+    document.getElementById("ov-purpose").textContent = c.kind + " · " + c.purpose;
+    document.getElementById("ov-content").textContent = c.content;
+    document.getElementById("overlay").hidden = false;
+    document.getElementById("ov-close").focus();
+    if (navigator.wakeLock) navigator.wakeLock.request("screen").then((l) => { wakeLock = l; }).catch(() => {});
+  }
+  function closeCode() {
+    document.getElementById("overlay").hidden = true;
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+  document.getElementById("ov-close").addEventListener("click", closeCode);
+  document.getElementById("overlay").addEventListener("click", (ev) => { if (ev.target.id === "overlay") closeCode(); });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeCode(); });
+
+  // ── Copy results ──
+  document.getElementById("copy").addEventListener("click", () => {
+    const lines = ["Atom Scanner Field Test" + (build ? " — " + build : "")];
+    for (const id of STEPS) {
+      const r = results[id];
+      if (r && (r.status || r.note)) lines.push(`${id} ${(r.status || "note").toUpperCase()}${r.note ? " — " + r.note : ""}`);
+    }
+    const text = lines.join("\n");
+    const box = document.getElementById("copy-box");
+    const showBox = () => { box.hidden = false; box.value = text; box.select(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        const b = document.getElementById("copy");
+        b.textContent = "Copied";
+        setTimeout(() => { b.textContent = "Copy results"; }, 1500);
+      }, showBox);
+    } else {
+      showBox();
+    }
+  });
+
+  // ── Start ──
+  loadLocal();
+  render();
+  if (window.claude && window.claude.use) {
+    window.claude.use("db").then((d) => {
+      if (!d) return;
+      db = d;
+      document.getElementById("storage").textContent = "Results are saved with this page, so they can be read back after the test.";
+      db.collection("results").onSnapshot((snap) => {
+        // The snapshot is the whole stored set: rebuild from it.
+        for (const id of Object.keys(results)) delete results[id];
+        for (const doc of snap.docs) {
+          const data = doc.data();
+          if (data && data.step) results[data.step] = { status: data.status || null, note: data.note || "" };
+        }
+        render();
+      }, () => {
+        document.getElementById("storage").textContent = "Shared results are unavailable; results are kept in this browser.";
+        db = null;
+      });
+      db.doc("meta/run").onSnapshot((snap) => {
+        if (snap.exists) { build = (snap.data() || {}).build || ""; render(); }
+      });
+    }).catch(() => {});
+  }
+})();
+</script>

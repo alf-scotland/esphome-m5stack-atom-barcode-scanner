@@ -1,287 +1,118 @@
 #pragma once
 
-/**
- * Command reference for M5Stack ATOM QR Code Scanner
- * Based on official documentation:
- * https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/datasheet/atombase/AtomicQR/ATOM_QRCODE_CMD_EN.pdf
- */
+// UART protocol of the M5Stack Atom QR code scanner, from ATOM_QRCODE_CMD_EN.pdf (docs/).
+//
+// Every command is a frame: a length byte L, L - 1 payload bytes and a big-endian 16-bit
+// checksum (the two's complement of the sum of the preceding bytes), L + 2 bytes in total.
+// Setting commands are "08 C6 04 08 00 ..." / "07 C6 04 08 00 ...": opcode C6 writes a
+// parameter, and the scanner keeps it across power cycles.
 
-#include <cstddef>  // For size_t
-#include <cstdint>  // For uint8_t, etc.
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
 namespace esphome {
 namespace m5stack_barcode {
 
-/**
- * All command codes for the barcode scanner.
- * These are structured as static class members to allow
- * clear organization by command type.
- */
-class Commands {
- public:
-  /**
-   * Basic scanner control commands.
-   * These commands are used to control the scanning operation.
-   */
-  static constexpr uint8_t WAKEUP[] = {0x00};  // Wake-up command (send before any other command)
-  static constexpr uint8_t START_SCAN[] = {0x04, 0xE4, 0x04, 0x00, 0xFF, 0x14};
-  static constexpr uint8_t STOP_SCAN[] = {0x04, 0xE5, 0x04, 0x00, 0xFF, 0x13};
-  static constexpr uint8_t GET_VERSION[] = {0x04, 0xA3, 0x04, 0x00, 0xFF, 0x55};
+/// Frame length (including the checksum) given its first byte.
+constexpr size_t frame_length(const uint8_t *frame) { return frame[0] + 2; }
 
-  // Add size constants for better safety
-  static constexpr size_t WAKEUP_SIZE = 1;
-  static constexpr size_t START_SCAN_SIZE = 6;
-  static constexpr size_t STOP_SCAN_SIZE = 6;
-  static constexpr size_t GET_VERSION_SIZE = 6;
+/// Whether a frame of `size` bytes has a consistent length byte and checksum.
+constexpr bool is_valid_frame(const uint8_t *frame, size_t size) {
+  if (size < 3 || frame_length(frame) != size)
+    return false;
+  uint16_t sum = 0;
+  for (size_t i = 0; i + 2 < size; i++)
+    sum += frame[i];
+  return static_cast<uint16_t>(-sum) == ((frame[size - 2] << 8) | frame[size - 1]);
+}
+template<size_t N> constexpr bool is_valid_frame(const uint8_t (&frame)[N]) { return is_valid_frame(frame, N); }
 
-  /**
-   * Operation mode setting commands.
-   * These define different scanning behavior modes.
-   */
-  struct Mode {
-    static constexpr uint8_t HOST[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x08, 0xFE, 0x95};
-    static constexpr uint8_t LEVEL[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x00, 0xFE, 0x9D};
-    static constexpr uint8_t PULSE[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x02, 0xFE, 0x9B};
-    static constexpr uint8_t CONTINUOUS[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x04, 0xFE, 0x99};
-    static constexpr uint8_t AUTO_SENSE[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8A, 0x09, 0xFE, 0x94};
+namespace frames {
 
-    // Single size constant for all mode commands
-    static constexpr size_t SIZE = 9;
-  };
+/// Sent before every command: wakes the scanner from sleep (not a frame).
+inline constexpr uint8_t WAKEUP = 0x00;
+inline constexpr uint8_t START_SCAN[] = {0x04, 0xE4, 0x04, 0x00, 0xFF, 0x14};
+inline constexpr uint8_t STOP_SCAN[] = {0x04, 0xE5, 0x04, 0x00, 0xFF, 0x13};
+/// Answered by an unframed product information string, not by an ACK.
+inline constexpr uint8_t GET_VERSION[] = {0x04, 0xA3, 0x04, 0x00, 0xFF, 0x55};
+/// PDF item 1, "Set default parameters".
+inline constexpr uint8_t FACTORY_RESET[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0xFF, 0x00, 0xFD, 0x35};
 
-  /**
-   * Terminator setting commands.
-   * These define what characters are appended after a barcode is read.
-   */
-  struct Terminator {
-    static constexpr uint8_t NONE[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x05, 0x00, 0xFE, 0x2F};
-    static constexpr uint8_t CRLF[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x05, 0x01, 0xFE, 0x2E};
-    static constexpr uint8_t CR[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x05, 0x02, 0xFE, 0x2D};
-    static constexpr uint8_t TAB[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x05, 0x03, 0xFE, 0x2C};
-    static constexpr uint8_t CRCR[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x05, 0x04, 0xFE, 0x2B};
-    static constexpr uint8_t CRLFCRLF[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x05, 0x05, 0xFE, 0x2A};
+/// Reply to every setting command and to start/stop decoding in host mode.
+inline constexpr uint8_t ACK[] = {0x04, 0xD0, 0x00, 0x00, 0xFF, 0x2C};
+/// A rejected command is answered with 05 D1 00 00 <cause> <checksum>, e.g. start/stop
+/// decoding outside host mode (PDF item 3).  Barcode output itself is unframed.
+inline constexpr uint8_t NAK_PREFIX[] = {0x05, 0xD1, 0x00, 0x00};
+inline constexpr size_t NAK_LENGTH = 7;
+inline constexpr size_t NAK_CAUSE_INDEX = 4;
 
-    // Single size constant for all terminator commands
-    static constexpr size_t SIZE = 10;
-  };
+static_assert(is_valid_frame(START_SCAN) && is_valid_frame(STOP_SCAN) && is_valid_frame(GET_VERSION) &&
+                  is_valid_frame(FACTORY_RESET) && is_valid_frame(ACK),
+              "bad frame");
 
-  /**
-   * Lighting control commands.
-   * These control the main illumination light.
-   */
-  struct Light {
-    static constexpr uint8_t ON_WHEN_READING[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x02, 0x00, 0xFE, 0x32};
-    static constexpr uint8_t ALWAYS_ON[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x02, 0x01, 0xFE, 0x31};
-    static constexpr uint8_t ALWAYS_OFF[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x02, 0x02, 0xFE, 0x30};
+}  // namespace frames
 
-    // Single size constant for all light commands
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Decoding success light control commands.
-   * These control whether the light flashes on successful decode.
-   */
-  struct DecodingSuccessLight {
-    static constexpr uint8_t LIGHT_ENABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0B, 0x01, 0xFE, 0x28};
-    static constexpr uint8_t LIGHT_DISABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0B, 0x00, 0xFE, 0x29};
-
-    // Single size constant for all decoding success light commands
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Locate lighting control commands.
-   * These control the aiming light (red dot or pattern).
-   */
-  struct LocateLight {
-    static constexpr uint8_t ON_WHEN_READING[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x03, 0x00, 0xFE, 0x31};
-    static constexpr uint8_t ALWAYS_ON[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x03, 0x01, 0xFE, 0x30};
-    static constexpr uint8_t ALWAYS_OFF[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x03, 0x02, 0xFE, 0x2F};
-
-    // Single size constant for all locate light commands
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Sound control commands.
-   * These control whether the scanner beeps when reading.
-   */
-  struct Sound {
-    // PDF item 11: value byte 0x01 = "Enable" muting = sounds OFF (DISABLED)
-    //                          0x00 = "Forbidden" muting = sounds ON (ENABLED)
-    static constexpr uint8_t SOUND_DISABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0C, 0x01, 0xFE, 0x27};
-    static constexpr uint8_t SOUND_ENABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0C, 0x00, 0xFE, 0x28};
-
-    // Single size constant for all sound commands
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Boot sound control commands.
-   * These control whether the scanner beeps when powered on.
-   */
-  struct BootSound {
-    static constexpr uint8_t BOOT_SOUND_ENABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0D, 0x01, 0xFE, 0x26};
-    static constexpr uint8_t BOOT_SOUND_DISABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0D, 0x00, 0xFE, 0x27};
-
-    // Single size constant for all boot sound commands
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Successful decode sound control commands.
-   * These control whether the scanner beeps when successfully decoding.
-   */
-  struct DecodeSound {
-    static constexpr uint8_t DECODE_SOUND_ENABLED[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x38, 0x01, 0xFE, 0xEE};
-    static constexpr uint8_t DECODE_SOUND_DISABLED[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x38, 0x00, 0xFE, 0xEF};
-
-    // Single size constant for all decode sound commands
-    static constexpr size_t SIZE = 9;
-  };
-
-  /**
-   * Volume settings for the buzzer.
-   * These control how loud the beep is.
-   */
-  struct Volume {
-    // Renamed from HIGH to avoid conflicts with Arduino
-    static constexpr uint8_t VOLUME_HIGH[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8C, 0x00, 0xFE, 0x9B};
-    static constexpr uint8_t VOLUME_MEDIUM[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8C, 0x01, 0xFE, 0x9A};
-    // Renamed from LOW to avoid conflicts with Arduino
-    static constexpr uint8_t VOLUME_LOW[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x8C, 0x02, 0xFE, 0x99};
-
-    // Single size constant for all volume commands
-    static constexpr size_t SIZE = 9;
-  };
-
-  /**
-   * Scan duration setting commands.
-   * These control how long the scanner attempts to read a barcode.
-   * Range: 500-25500ms, Default: 3000ms
-   */
-  struct ScanDuration {
-    static constexpr uint8_t MS_500[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x88, 0x05, 0xFE, 0x9A};
-    static constexpr uint8_t MS_1000[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x88, 0x0A, 0xFE, 0x95};
-    static constexpr uint8_t MS_3000[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x88, 0x1E, 0xFE, 0x81};
-    static constexpr uint8_t MS_5000[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x88, 0x32, 0xFE, 0x6D};
-    static constexpr uint8_t MS_10000[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x88, 0x64, 0xFE, 0x3B};
-    static constexpr uint8_t MS_15000[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x88, 0x96, 0xFE, 0x09};
-    static constexpr uint8_t MS_20000[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x88, 0xC8, 0xFD, 0xD7};
-    static constexpr uint8_t UNLIMITED[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x88, 0x00, 0xFE, 0x9F};
-
-    // Single size constant for all scan duration commands
-    static constexpr size_t SIZE = 9;
-  };
-
-  /**
-   * Stable induction time setting commands.
-   * These control the time scanner needs to detect a stable code.
-   * Range: 0-9900ms, Default: 500ms
-   */
-  struct StableInductionTime {
-    static constexpr uint8_t MS_0[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x02, 0x00, 0xFE, 0x31};
-    static constexpr uint8_t MS_100[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x02, 0x01, 0xFE, 0x30};
-    static constexpr uint8_t MS_300[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x02, 0x03, 0xFE, 0x2E};
-    static constexpr uint8_t MS_500[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x02, 0x05, 0xFE, 0x2C};
-    static constexpr uint8_t MS_1000[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x02, 0x0A, 0xFE, 0x27};
-
-    // Single size constant for all stable induction time commands
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Reading interval setting commands.
-   * These control the time between reading attempts.
-   * Range: 0-9900ms, Default: 500ms
-   */
-  struct ReadingInterval {
-    static constexpr uint8_t MS_0[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x89, 0x00, 0xFE, 0x9E};
-    static constexpr uint8_t MS_100[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x89, 0x01, 0xFE, 0x9D};
-    static constexpr uint8_t MS_300[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x89, 0x03, 0xFE, 0x9B};
-    static constexpr uint8_t MS_500[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x89, 0x05, 0xFE, 0x99};
-    static constexpr uint8_t MS_1000[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x89, 0x0A, 0xFE, 0x94};
-    static constexpr uint8_t MS_1500[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x89, 0x0F, 0xFE, 0x8F};
-    static constexpr uint8_t MS_2000[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0x89, 0x14, 0xFE, 0x8A};
-
-    // Single size constant for all reading interval commands
-    static constexpr size_t SIZE = 9;
-  };
-
-  /**
-   * Same code output interval setting commands.
-   * These control the delay before reading the same code again.
-   * Range: 0-9900ms, Default: 500ms
-   */
-  struct SameCodeInterval {
-    static constexpr uint8_t MS_0[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x03, 0x00, 0xFE, 0x30};
-    static constexpr uint8_t MS_100[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x03, 0x01, 0xFE, 0x2F};
-    static constexpr uint8_t MS_300[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x03, 0x03, 0xFE, 0x2D};
-    static constexpr uint8_t MS_500[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x03, 0x05, 0xFE, 0x2B};
-    static constexpr uint8_t MS_1000[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x03, 0x0A, 0xFE, 0x26};
-    static constexpr uint8_t MS_1500[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x03, 0x0F, 0xFE, 0x21};
-    static constexpr uint8_t MS_2000[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF3, 0x03, 0x14, 0xFE, 0x1C};
-
-    // Single size constant for all same code interval commands
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Command acknowledgment sound control commands.
-   * These control whether the scanner beeps when it processes a configuration command.
-   */
-  struct CmdAckSound {
-    // PDF item 14: 0x01 = "Enable" (default) = beep on config ACK; 0x00 = "Prohibit" = silent
-    static constexpr uint8_t CMD_ACK_SOUND_ENABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0E, 0x01, 0xFE, 0x25};
-    static constexpr uint8_t CMD_ACK_SOUND_DISABLED[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x0E, 0x00, 0xFE, 0x26};
-
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Configuration code scanning permission commands.
-   * These control whether the scanner can be reconfigured by scanning a special config barcode.
-   */
-  struct ConfigCodeScan {
-    // PDF item 21: 0x01 = "Enable" (default) = scanner accepts config barcodes; 0x00 = "Prohibit"
-    static constexpr uint8_t CONFIG_CODE_SCAN_ENABLED[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0xEC, 0x01, 0xFE, 0x3A};
-    static constexpr uint8_t CONFIG_CODE_SCAN_DISABLED[] = {0x07, 0xC6, 0x04, 0x08, 0x00, 0xEC, 0x00, 0xFE, 0x3B};
-
-    static constexpr size_t SIZE = 9;
-  };
-
-  /**
-   * Factory reset command.
-   * PDF item 1: "Set default parameters" — restores all scanner settings to factory defaults.
-   * After ACK the ESP clears its NVS preferences and reboots so that all YAML-configured
-   * settings are re-applied from scratch on the next boot.
-   *
-   * Scanner factory defaults differ from ESPHome component defaults in three places:
-   *   - sound_mode:      factory = enabled (sounds on);  component default = disabled
-   *   - buzzer_volume:   factory = high;                 component default = low
-   *   - boot_sound_mode: factory = enabled;              component default = disabled
-   * After the reboot the component re-applies its YAML defaults, restoring the intended state.
-   */
-  struct FactoryReset {
-    static constexpr uint8_t FACTORY_RESET[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0xFF, 0x00, 0xFD, 0x35};
-    static constexpr size_t SIZE = 10;
-  };
-
-  /**
-   * Response codes from the scanner.
-   * These are used to acknowledge commands or indicate status.
-   */
-  struct Responses {
-    static constexpr uint8_t ACK[] = {0x04, 0xD0, 0x00, 0x00, 0xFF, 0x2C};
-    // Non-host mode acknowledgment has a different format
-    static constexpr uint8_t NON_HOST_ACK[] = {0x05, 0xD1, 0x00, 0x00, 0x06, 0xFF, 0x24};
-
-    // Size constants for responses (these differ, so we keep both)
-    static constexpr size_t ACK_SIZE = 6;
-    static constexpr size_t NON_HOST_ACK_SIZE = 7;
-  };
+/// The scanner settings.  The order is persisted to NVS (ScannerPreferences): append only.
+enum class SettingId : uint8_t {
+  OPERATION_MODE,
+  TERMINATOR,
+  LIGHT_MODE,
+  LOCATE_LIGHT_MODE,
+  SOUND_MODE,
+  BUZZER_VOLUME,
+  DECODING_SUCCESS_LIGHT_MODE,
+  BOOT_SOUND_MODE,
+  DECODE_SOUND_MODE,
+  SCAN_DURATION,
+  STABLE_INDUCTION_TIME,
+  READING_INTERVAL,
+  SAME_CODE_INTERVAL,
+  CMD_ACK_SOUND_MODE,
+  CONFIG_CODE_SCAN_MODE,
 };
+inline constexpr size_t NUM_SETTINGS = 15;
+
+/// Values of the operation_mode setting (the order of its option keys).
+enum class OperationMode : uint8_t {
+  HOST,        // Scans on start/stop decoding commands
+  LEVEL,       // Scans while the trigger input is held
+  PULSE,       // Scans once per trigger pulse
+  CONTINUOUS,  // Scans all the time
+  AUTO_SENSE,  // Scans when an object is detected
+};
+
+/// A setting's values are indices 0 … num_values - 1 into its option keys and command frames.
+/// The keys are the YAML / HA select / action values and must match SETTINGS in __init__.py
+/// (tests/test_setting_tables.py checks this).  Two-state settings use "disabled", "enabled".
+struct SettingInfo {
+  const char *key;                  ///< YAML key, also used in logs
+  const char *const *values;        ///< option key per value
+  const uint8_t *frames;            ///< num_values frames of frame_size bytes, one per value
+  const char *const *config_codes;  ///< configuration barcode per value (after the prefix), or nullptr
+  uint8_t num_values;
+  uint8_t frame_size;
+
+  const uint8_t *frame(uint8_t value) const { return this->frames + value * this->frame_size; }
+  /// Look up an option key; returns false if `key` is not an option of this setting.
+  bool parse(const std::string &key, uint8_t &value) const;
+};
+
+const SettingInfo &get_setting_info(SettingId id);
+
+/// Configuration barcodes (AtomicQR_Reader_EN.pdf) are QR codes "^#SC^<code>".  With the
+/// scanner's config_code_scan_mode enabled it applies them itself, without telling the host;
+/// with it disabled it outputs them like any barcode.
+inline constexpr const char *CONFIG_CODE_PREFIX = "^#SC^";
+/// The configuration barcode that restores the scanner's factory defaults (PDF section 1.1).
+inline constexpr const char *FACTORY_RESET_CONFIG_CODE = "303FFF0";
+/// Find the setting and value a configuration barcode (without the prefix) sets.
+bool find_config_code(const std::string &code, SettingId &id, uint8_t &value);
+
+/// Bytes the scanner appends to each barcode for a terminator value ("" for none).
+const char *terminator_bytes(uint8_t terminator);
+/// Scan duration in milliseconds for a scan_duration value; 0 for unlimited.
+uint32_t scan_duration_ms(uint8_t scan_duration);
 
 }  // namespace m5stack_barcode
 }  // namespace esphome
