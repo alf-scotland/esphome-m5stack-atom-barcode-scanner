@@ -82,6 +82,11 @@ esphome:
                 id: scanner
                 operation_mode: continuous
       - if:
+          condition:
+            lambda: 'return getenv("SIM_RESEND") != nullptr;'
+          then:
+            - m5stack_barcode.resend_settings: scanner
+      - if:
           # A command well after boot (e.g. once an unresponsive scanner answers again).
           condition:
             lambda: 'return getenv("SIM_LATE_VOLUME") != nullptr;'
@@ -90,11 +95,6 @@ esphome:
             - m5stack_barcode.set_buzzer_volume:
                 id: scanner
                 buzzer_volume: high
-      - if:
-          condition:
-            lambda: 'return getenv("SIM_FACTORY_RESET") != nullptr;'
-          then:
-            - m5stack_barcode.factory_reset: scanner
 
 host:
 

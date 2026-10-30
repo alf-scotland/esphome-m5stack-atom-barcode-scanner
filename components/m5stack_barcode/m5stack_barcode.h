@@ -87,9 +87,6 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void start_scan();
   /// Stop the current HOST-mode scan.
   void stop_scan();
-  /// Reset the scanner to factory defaults, then reboot the ESP so every YAML-configured
-  /// setting is re-applied (NVS preferences are invalidated once the scanner ACKs).
-  void factory_reset();
   /// Publish whatever is buffered as a barcode immediately, without waiting for the frame to
   /// end.  Normally unnecessary: loop() frames barcodes by terminator or idle gap in every mode.
   void process_current_buffer();
@@ -98,6 +95,9 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_setting(SettingId id, uint8_t value);
   /// Change a setting given its option key (e.g. "medium"); invalid keys are logged and ignored.
   void set_setting(SettingId id, const std::string &key);
+  /// Send every setting's current value again, e.g. after the scanner's settings were changed
+  /// by a configuration barcode or it was reset.
+  void resend_settings();
   /// The setting's current value: the one the scanner last ACKed, or the YAML value before that.
   uint8_t get_setting(SettingId id) const { return this->settings_[static_cast<size_t>(id)]; }
 
@@ -112,7 +112,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   ScanState get_scan_state() const { return this->scan_state_; }
 
  protected:
-  enum class CommandType : uint8_t { SETTING, START_SCAN, STOP_SCAN, GET_VERSION, FACTORY_RESET };
+  enum class CommandType : uint8_t { SETTING, START_SCAN, STOP_SCAN, GET_VERSION };
   struct Command {
     CommandType type;
     SettingId setting{SettingId::OPERATION_MODE};  ///< SETTING only
@@ -154,8 +154,6 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   /// Whether rx_buffer_ holds a complete barcode frame (terminator received or line idle).
   bool has_complete_frame_() const;
   void process_barcode_();
-  /// Apply a configuration barcode (its content after CONFIG_CODE_PREFIX) the scanner passed on.
-  void apply_config_code_(const std::string &code);
   void process_version_();
 
   ESPPreferenceObject pref_;
@@ -215,7 +213,7 @@ class ScannerButton : public button::Button, public Parented<BarcodeScanner> {
 
 using StartButton = ScannerButton<&BarcodeScanner::start_scan>;
 using StopButton = ScannerButton<&BarcodeScanner::stop_scan>;
-using FactoryResetButton = ScannerButton<&BarcodeScanner::factory_reset>;
+using ResendSettingsButton = ScannerButton<&BarcodeScanner::resend_settings>;
 
 }  // namespace m5stack_barcode
 }  // namespace esphome

@@ -118,10 +118,8 @@ m5stack_barcode:
   stop_button:
     name: "Stop Scan"
 
-  factory_reset_button:
-    name: "Factory Reset"
-    entity_category: diagnostic
-    disabled_by_default: true
+  resend_settings_button:
+    name: "Resend Settings"
 
   on_barcode:
     - logger.log:

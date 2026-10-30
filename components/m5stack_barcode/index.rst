@@ -42,8 +42,7 @@ Component Options
 -----------------
 
 The scanner settings below (``operation_mode`` … ``same_code_interval``) are **initial
-values**. They are applied on first boot, after a factory reset, and whenever you change the
-value in YAML. Changes made at runtime — from Home Assistant entities or with the ``set_*``
+values**. They are applied on first boot and whenever you change the value in YAML. Changes made at runtime — from Home Assistant entities or with the ``set_*``
 actions — are stored in flash and kept across reboots and firmware updates until the YAML
 value is edited.
 
@@ -58,12 +57,14 @@ value is edited.
   Barcodes longer than 255 bytes (Home Assistant's state limit is 255 characters) are
   truncated on a character boundary. Bytes that are not valid UTF-8 (e.g. Latin-1 or GBK
   encoded codes) are replaced with ``�``, because Home Assistant's API rejects invalid UTF-8.
+  The scanner outputs GBK by default; see :ref:`m5stack_barcode-config_barcodes` to switch
+  it to UTF-8.
 - **version_sensor** (*Optional*): Expose the scanner's firmware version string as a Home Assistant ``text_sensor`` entity. Populated at boot.
 - **scan_event** (*Optional*): Expose successful scans as a Home Assistant ``event`` entity of type ``scan_successful``. Unlike the text sensor, events fire on every decode — including duplicate barcodes.
 - **scanning_binary_sensor** (*Optional*): Expose the current scan state as a Home Assistant ``binary_sensor`` entity. ``on`` while a HOST-mode scan is in progress and throughout ``continuous`` / ``auto_sense`` mode, ``off`` when idle.
 - **start_button** (*Optional*): Expose a Home Assistant ``button`` entity that starts a HOST-mode scan when pressed.
 - **stop_button** (*Optional*): Expose a Home Assistant ``button`` entity that stops the current HOST-mode scan when pressed.
-- **factory_reset_button** (*Optional*): Expose a Home Assistant ``button`` entity that resets the scanner to hardware factory defaults and reboots the ESP. See :ref:`m5stack_barcode-factory_reset_button`.
+- **resend_settings_button** (*Optional*): Expose a Home Assistant ``button`` entity that sends every setting to the scanner again. See :ref:`m5stack_barcode-resend_settings_action`.
 - **sound_switch** (*Optional*): Expose ``sound_mode`` as a Home Assistant ``switch`` entity. ``on`` = sound enabled, ``off`` = disabled.
 - **boot_sound_switch** (*Optional*): Expose ``boot_sound_mode`` as a Home Assistant ``switch`` entity.
 - **decode_sound_switch** (*Optional*): Expose ``decode_sound_mode`` as a Home Assistant ``switch`` entity.
@@ -125,8 +126,7 @@ value is edited.
       default is ``disabled`` to avoid audible noise in a Home Assistant installation.
       The other two deliberate divergences from factory defaults are ``boot_sound_mode``
       (factory: enabled; component: disabled) and ``buzzer_volume`` (factory: high;
-      component: low).  All three are restored to the component-configured values
-      automatically after a :ref:`factory reset <m5stack_barcode-factory_reset_button>`.
+      component: low).
 
 - **boot_sound_mode** (*Optional*): Controls power-up sound.
 
@@ -144,12 +144,13 @@ value is edited.
   - ``enabled`` (Default): Beep on configuration commands
   - ``disabled``: Apply configuration commands silently
 
-- **config_code_scan_mode** (*Optional*): Who applies a scanned manufacturer configuration
-  barcode (PDF item 21). See :ref:`m5stack_barcode-config_barcodes`.
+- **config_code_scan_mode** (*Optional*): Whether scanning a manufacturer configuration
+  barcode changes the scanner's settings (PDF item 21). See
+  :ref:`m5stack_barcode-config_barcodes`.
 
-  - ``disabled`` (Default): The scanner passes it on and the component applies it, so Home
-    Assistant stays in sync
-  - ``enabled``: The scanner applies it itself; Home Assistant is not told and shows the
+  - ``disabled`` (Default): The scanner ignores configuration barcodes, so its settings
+    always match Home Assistant
+  - ``enabled``: The scanner applies them itself; Home Assistant is not told and shows the
     previous value
 
 - **buzzer_volume** (*Optional*): Buzzer volume level.
@@ -231,6 +232,22 @@ Stop barcode scanning. Only works in "host" mode.
     on_...:
       then:
         - m5stack_barcode.stop: barcode_scanner
+
+.. _m5stack_barcode-resend_settings_action:
+
+``m5stack_barcode.resend_settings``
+***********************************
+
+Send every setting's current value (the one Home Assistant shows) to the scanner again.
+Settings are otherwise only sent when they change, so use this when the scanner's settings
+were changed behind the component's back: by a configuration barcode scanned with
+``config_code_scan_mode: enabled``, or after the scanner was reset or replaced.
+
+.. code-block:: yaml
+
+    on_...:
+      then:
+        - m5stack_barcode.resend_settings: barcode_scanner
 
 .. _m5stack_barcode-process_current_buffer_action:
 
@@ -479,21 +496,6 @@ Control whether scanned configuration barcodes may reconfigure the scanner.
             id: barcode_scanner
             config_code_scan_mode: disabled
 
-.. _m5stack_barcode-factory_reset_action:
-
-``m5stack_barcode.factory_reset``
-*********************************
-
-Reset the scanner to its factory defaults and reboot the ESP so every YAML-configured
-setting is re-applied. Same as pressing the
-:ref:`factory reset button <m5stack_barcode-factory_reset_button>`.
-
-.. code-block:: yaml
-
-    on_...:
-      then:
-        - m5stack_barcode.factory_reset: barcode_scanner
-
 Triggers
 --------
 
@@ -550,18 +552,23 @@ Configuration Barcodes
 
 The scanner's hardware guide (``docs/AtomicQR_Reader_EN.pdf``) prints QR codes that change
 its settings; they contain ``^#SC^`` followed by a code. With ``config_code_scan_mode:
-disabled`` (the default) the scanner outputs such a code like any barcode, and the component:
+disabled`` (the default) the scanner decodes them but neither applies nor outputs them, so
+they cannot change a setting behind Home Assistant's back.
 
-- applies codes for the settings it manages (operation mode, terminator, both lights, sound,
-  buzzer volume, boot, decode and setting-code sounds, configuration code scanning) over
-  UART, so the change is confirmed by the scanner and shows up in Home Assistant;
-- treats the factory default code as the ``factory_reset`` action;
-- logs and ignores every other code (baud rate, symbologies, prefixes, multi-step numeric
-  codes, …), so none of them changes the scanner;
-- never publishes a configuration code as a barcode.
+To change a setting the component does not manage, turn configuration code scanning on,
+scan the code and turn it off again. For example, the scanner outputs GBK-encoded text by
+default; ``^#SC^3030062`` ("Unicode" under *Data encoding format*) switches it to UTF-8, so
+non-ASCII barcodes reach Home Assistant intact. While it is on, codes for managed settings
+are applied by the scanner without the component knowing; afterwards, the
+:ref:`resend settings action <m5stack_barcode-resend_settings_action>` brings the scanner
+back to the values Home Assistant shows.
 
-With ``config_code_scan_mode: enabled`` the scanner applies every code itself and does not
-report it, so Home Assistant keeps showing the previous values.
+.. warning::
+
+    Do not scan the guide's *Factory Default Configuration* code. The scanner's factory
+    defaults switch its output to USB, which disconnects it from the ESP: every command then
+    fails with ``Scanner not responding``. See :ref:`m5stack_barcode-troubleshooting` to
+    switch it back.
 
 Sub-components
 --------------
@@ -575,7 +582,7 @@ have to be (re)sent stay unknown until the scanner acknowledges them. If a setti
 again before the scanner has received the previous change, only the latest value is sent. A
 setting the scanner rejects is logged as a warning and the entity keeps its previous state.
 
-Entities default to sensible icons; setting selects and switches and the factory reset
+Entities default to sensible icons; setting selects and switches and the resend settings
 button default to ``entity_category: config``, the version sensor to ``diagnostic``. Any of
 these can be overridden per entity.
 
@@ -696,53 +703,20 @@ A button entity that calls ``m5stack_barcode.stop`` when pressed.
         name: "Stop Scan"
         icon: "mdi:stop-circle-outline"
 
-.. _m5stack_barcode-factory_reset_button:
+.. _m5stack_barcode-resend_settings_button:
 
-``factory_reset_button``
-************************
+``resend_settings_button``
+**************************
 
-A button entity that resets the scanner to its hardware factory defaults, then reboots the
-ESP so the component can re-apply all YAML-configured settings from scratch.
-
-**What happens when pressed:**
-
-1. The factory-reset command (PDF item 1) is queued and sent to the scanner over UART.
-2. On ACK the component invalidates its NVS preferences (sets the stored version to 0).
-3. ``App.safe_reboot()`` is called — the ESP reboots.
-4. On boot, ``configure_defaults_()`` detects no valid preferences and sends every
-   YAML-configured setting to the scanner unconditionally.
-
-**Factory vs component defaults:** The scanner hardware resets to the manufacturer defaults
-for all settings.  Three of those defaults differ from the component defaults:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 30 25 25
-
-   * - Setting
-     - Hardware factory default
-     - Component default
-   * - ``sound_mode``
-     - ``enabled`` (sounds on)
-     - ``disabled``
-   * - ``buzzer_volume``
-     - ``high``
-     - ``low``
-   * - ``boot_sound_mode``
-     - ``enabled``
-     - ``disabled``
-
-These are corrected automatically when the component re-applies YAML settings after the
-reboot.  No user intervention is required.
+A button entity that calls ``m5stack_barcode.resend_settings`` when pressed. Defaults to
+``entity_category: config``.
 
 .. code-block:: yaml
 
     m5stack_barcode:
       id: barcode_scanner
-      factory_reset_button:
-        name: "Factory Reset Scanner"
-        icon: "mdi:restore"
-        entity_category: "config"
+      resend_settings_button:
+        name: "Resend Scanner Settings"
 
 .. _m5stack_barcode-sound_switch:
 
@@ -1154,10 +1128,6 @@ workarounds needed.
       stop_button:
         name: "Stop Scan"
         icon: "mdi:stop-circle-outline"
-      factory_reset_button:
-        name: "Factory Reset Scanner"
-        icon: "mdi:restore"
-        entity_category: "config"
 
       # Mode and duration selects
       operation_mode_select:
@@ -1198,6 +1168,8 @@ workarounds needed.
         name: "Buzzer Volume"
         icon: "mdi:volume-medium"
 
+.. _m5stack_barcode-troubleshooting:
+
 Troubleshooting
 ---------------
 
@@ -1209,7 +1181,15 @@ Troubleshooting
    ``Scanner not responding`` and sets the component's warning status (shown by a
    ``status_led``) until the scanner answers again.
    Check the power and wiring to the scanner.
-6. Enable logs for more detailed debugging:
+6. If every command fails, also after a power cycle, the scanner may have been reset to
+   its factory defaults (its *Factory Default Configuration* barcode), which switch its
+   output to USB. Its factory defaults also make it scan only while the trigger input is
+   held and accept configuration barcodes, so hold the trigger (e.g. the reference
+   firmware's *Hardware Trigger* button) while showing it the *TTL 232* code
+   ``^#SC^3030010`` from the hardware guide's *Serial Port* section. Then run the
+   :ref:`resend settings action <m5stack_barcode-resend_settings_action>` so the scanner
+   gets the values Home Assistant shows.
+7. Enable logs for more detailed debugging:
 
 .. code-block:: yaml
 

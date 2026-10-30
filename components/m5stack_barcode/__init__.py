@@ -22,7 +22,6 @@ from esphome.const import (
     CONF_ID,
     CONF_RX_BUFFER_SIZE,
     CONF_UART_ID,
-    DEVICE_CLASS_RESTART,
     ENTITY_CATEGORY_CONFIG,
     ENTITY_CATEGORY_DIAGNOSTIC,
 )
@@ -51,6 +50,7 @@ CONF_SCAN_EVENT = "scan_event"
 CONF_SCANNING_BINARY_SENSOR = "scanning_binary_sensor"
 CONF_START_BUTTON = "start_button"
 CONF_STOP_BUTTON = "stop_button"
+CONF_RESEND_SETTINGS_BUTTON = "resend_settings_button"
 CONF_FACTORY_RESET_BUTTON = "factory_reset_button"
 CONF_ON_BARCODE = "on_barcode"
 CONF_ON_SCAN_TIMEOUT = "on_scan_timeout"
@@ -207,9 +207,9 @@ SETTINGS = [
         "mdi:bell-check",
         "set_cmd_ack_sound_mode",
     ),
-    # Disabled, unlike the scanner's factory default: the scanner then passes
-    # configuration barcodes on and the component applies them, so Home Assistant
-    # stays in sync.
+    # Disabled, unlike the scanner's factory default: the scanner then ignores
+    # configuration barcodes, so they cannot change a setting behind Home Assistant's
+    # back (it applies them without telling the host).
     Setting(
         "config_code_scan_mode",
         _ON_OFF,
@@ -230,13 +230,9 @@ BUTTONS = {
         m5stack_barcode_ns.class_("StopButton", button.Button, _Parented),
         {"icon": "mdi:stop-circle-outline"},
     ),
-    CONF_FACTORY_RESET_BUTTON: (
-        m5stack_barcode_ns.class_("FactoryResetButton", button.Button, _Parented),
-        {
-            "device_class": DEVICE_CLASS_RESTART,
-            "entity_category": ENTITY_CATEGORY_CONFIG,
-            "icon": "mdi:restart-alert",
-        },
+    CONF_RESEND_SETTINGS_BUTTON: (
+        m5stack_barcode_ns.class_("ResendSettingsButton", button.Button, _Parented),
+        {"entity_category": ENTITY_CATEGORY_CONFIG, "icon": "mdi:sync"},
     ),
 }
 
@@ -244,7 +240,7 @@ BUTTONS = {
 SIMPLE_ACTIONS = {
     "m5stack_barcode.start": "start_scan()",
     "m5stack_barcode.stop": "stop_scan()",
-    "m5stack_barcode.factory_reset": "factory_reset()",
+    "m5stack_barcode.resend_settings": "resend_settings()",
     "m5stack_barcode.process_current_buffer": "process_current_buffer()",
 }
 
@@ -301,6 +297,12 @@ CONFIG_SCHEMA = (
             ): binary_sensor.binary_sensor_schema(icon="mdi:barcode-scan"),
             cv.Optional(CONF_ON_BARCODE): automation.validate_automation({}),
             cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation({}),
+            # The scanner's factory defaults switch it to USB, which cuts it off from
+            # the UART until its TTL 232 configuration barcode is scanned.
+            cv.Optional(CONF_FACTORY_RESET_BUTTON): cv.invalid(
+                "factory_reset_button was removed: the scanner's factory defaults "
+                "switch it to USB, which disconnects it from the ESP"
+            ),
             **{
                 cv.Optional(key): button.button_schema(cls, **defaults)
                 for key, (cls, defaults) in BUTTONS.items()

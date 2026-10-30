@@ -5,7 +5,6 @@
 #include <cstring>
 #include <iterator>
 
-#include "esphome/core/application.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
@@ -246,6 +245,19 @@ void BarcodeScanner::set_setting(SettingId id, const std::string &key) {
   this->queue_setting_(id, value);
 }
 
+void BarcodeScanner::resend_settings() {
+  ESP_LOGD(TAG, "Sending every setting again");
+  for (size_t i = 0; i < NUM_SETTINGS; i++) {
+    const auto id = static_cast<SettingId>(i);
+    // A command for the setting that is queued or in flight already sends its newest value.
+    const bool pending = std::any_of(this->command_queue_.begin(), this->command_queue_.end(), [id](const Command &c) {
+      return c.type == CommandType::SETTING && c.setting == id;
+    });
+    if (!pending)
+      this->queue_command_({CommandType::SETTING, id, this->settings_[i]});
+  }
+}
+
 void BarcodeScanner::queue_setting_(SettingId id, uint8_t value) {
   const auto same_setting = [id](const Command &command) {
     return command.type == CommandType::SETTING && command.setting == id;
@@ -278,15 +290,13 @@ const uint8_t *BarcodeScanner::command_frame_(const Command &command) const {
     case CommandType::STOP_SCAN:
       return frames::STOP_SCAN;
     case CommandType::GET_VERSION:
-      return frames::GET_VERSION;
-    case CommandType::FACTORY_RESET:
     default:
-      return frames::FACTORY_RESET;
+      return frames::GET_VERSION;
   }
 }
 
 void BarcodeScanner::log_command_(const char *action, const Command &command) const {
-  static const char *const NAMES[] = {"", "start scan", "stop scan", "get version", "factory reset"};
+  static const char *const NAMES[] = {"", "start scan", "stop scan", "get version"};
   const uint8_t *frame = this->command_frame_(command);
   char hex[format_hex_pretty_size(MAX_LOGGED_FRAME)];
   format_hex_pretty_to(hex, frame, std::min(frame_length(frame), MAX_LOGGED_FRAME), ' ');
@@ -414,16 +424,6 @@ void BarcodeScanner::finish_command_(bool success) {
         this->scan_timer_active_ = true;
       }
       break;
-    case CommandType::FACTORY_RESET:
-      if (success) {
-        // Invalidate the stored settings, so the next boot re-sends every YAML value.
-        ScannerPreferences empty{};
-        if (!this->pref_.save(&empty))
-          ESP_LOGW(TAG, "Failed to invalidate NVS preferences; settings may not fully re-sync after reboot");
-        ESP_LOGW(TAG, "Scanner factory reset acknowledged, rebooting to re-apply YAML settings");
-        App.safe_reboot();
-      }
-      break;
     case CommandType::STOP_SCAN:
     case CommandType::GET_VERSION:
       break;
@@ -474,11 +474,6 @@ void BarcodeScanner::stop_scan() {
   this->queue_command_({CommandType::STOP_SCAN});
   this->scan_timer_active_ = false;
   this->set_scan_state_(ScanState::IDLE);
-}
-
-void BarcodeScanner::factory_reset() {
-  ESP_LOGW(TAG, "Factory reset requested: the scanner reverts to its defaults and the ESP reboots");
-  this->queue_command_({CommandType::FACTORY_RESET});
 }
 
 void BarcodeScanner::process_current_buffer() {
@@ -606,10 +601,6 @@ void BarcodeScanner::process_barcode_() {
   if (this->scan_state_ == ScanState::MANUAL_SCANNING)
     this->set_scan_state_(ScanState::IDLE);
 
-  if (barcode.rfind(CONFIG_CODE_PREFIX, 0) == 0) {
-    this->apply_config_code_(barcode.substr(strlen(CONFIG_CODE_PREFIX)));
-    return;
-  }
   ESP_LOGD(TAG, "Barcode received: %s", barcode.c_str());
 
   if (this->barcode_sensor_ != nullptr)
@@ -617,26 +608,6 @@ void BarcodeScanner::process_barcode_() {
   this->barcode_callback_.call(barcode);
   if (this->scan_event_ != nullptr)
     this->scan_event_->trigger("scan_successful");
-}
-
-void BarcodeScanner::apply_config_code_(const std::string &code) {
-  // The scanner passed a configuration barcode on instead of applying it (config_code_scan_mode
-  // disabled).  Apply it over UART, so the change is confirmed and published like any other.
-  if (code == FACTORY_RESET_CONFIG_CODE) {
-    ESP_LOGI(TAG, "Configuration barcode: factory reset");
-    this->factory_reset();
-    return;
-  }
-  SettingId id;
-  uint8_t value;
-  if (!find_config_code(code, id, value)) {
-    ESP_LOGW(TAG, "Ignoring configuration barcode %s%s: not a setting this component manages", CONFIG_CODE_PREFIX,
-             code.c_str());
-    return;
-  }
-  const SettingInfo &setting = get_setting_info(id);
-  ESP_LOGI(TAG, "Configuration barcode: %s = %s", setting.key, setting.values[value]);
-  this->set_setting(id, value);
 }
 
 void BarcodeScanner::process_version_() {

@@ -5,7 +5,7 @@ esphome:
     - m5stack_barcode.stop:
         id: scanner
     - m5stack_barcode.process_current_buffer: scanner
-    - m5stack_barcode.factory_reset: scanner
+    - m5stack_barcode.resend_settings: scanner
     - m5stack_barcode.set_mode:
         id: scanner
         operation_mode: continuous

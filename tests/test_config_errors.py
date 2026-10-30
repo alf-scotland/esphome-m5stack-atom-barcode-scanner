@@ -56,8 +56,13 @@ def esphome_config(tmp_path: Path, uart: str, scanner: str = "") -> str:
         ("  baud_rate: 9600\n  tx_pin: GPIO17\n", "", "to declare a rx_pin"),
         (VALID_UART, "  operation_mode: turbo\n", "Unknown value 'turbo'"),
         (VALID_UART, "  scan_duration: 2s\n", "Unknown value '2s'"),
+        (
+            VALID_UART,
+            "  factory_reset_button:\n    name: Reset\n",
+            "switch it to USB, which disconnects it from the ESP",
+        ),
     ],
-    ids=["baud-rate", "no-tx", "no-rx", "bad-mode", "bad-duration"],
+    ids=["baud-rate", "no-tx", "no-rx", "bad-mode", "bad-duration", "factory-reset"],
 )
 def test_invalid_config_is_rejected(
     tmp_path: Path,

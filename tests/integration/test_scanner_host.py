@@ -41,10 +41,12 @@ ANSI = re.compile(r"\x1b\[[0-9;]*m")
 PARAM_VOLUME = 0x8C
 VOLUME_HIGH = 0x00
 PARAM_F2 = 0xF2
+PARAM_F3 = 0xF3
 F2_MUTE = 0x0C
 PARAM_MODE = 0x8A
 MODE_FIELD = 0  # operation_mode in the stored settings
 MODE_CONTINUOUS = 3  # its option index
+MODE_CONTINUOUS_PARAM = 0x04  # its value in the mode frame
 
 
 @pytest.fixture(scope="session")
@@ -313,20 +315,6 @@ def test_leaving_host_mode_cancels_the_scan_timeout(run: callable) -> None:
     )
     firmware.wait_for(r"MODE\[continuous\]")
     firmware.assert_absent(r"SCAN_TIMEOUT|SCANNING\[0\]", duration=2)
-
-
-def test_config_barcode_is_applied_not_published(run: callable) -> None:
-    """A configuration barcode the scanner passes on is applied over UART and synced."""
-    scanner, firmware = run(mode="continuous")
-    firmware.wait_for(r"MODE\[continuous\]")
-    scanner.emit_barcode(b"^#SC^2050801")  # buzzer volume: middle
-    firmware.wait_for(r"VOLUME\[medium\]")
-    assert any(f[5] == PARAM_VOLUME and f[6] == 1 for f in scanner.received)
-    scanner.emit_barcode(b"^#SC^3030010")  # communication mode: serial (not managed)
-    firmware.wait_for(r"Ignoring configuration barcode \^#SC\^3030010")
-    scanner.emit_barcode(b"AFTER")
-    firmware.wait_for(r"BARCODE\[AFTER\]")
-    assert not any("BARCODE[^#SC^" in line for line in firmware.lines)
 
 
 def test_stop_ends_the_scan(run: callable) -> None:
@@ -685,25 +673,21 @@ def test_mode_is_restored_at_boot(
     assert not any(f[5] == PARAM_MODE for f in setting_frames(scanner))
 
 
-def test_factory_reset_reapplies_the_yaml_values(
+def test_resend_sends_every_setting(
     run: callable,
     restart: callable,
     tmp_path: Path,
 ) -> None:
-    """A factory reset clears the stored settings; the next boot sends every value."""
-    _, firmware = run(extra_env={"SIM_SET_VOLUME": "1"})
-    firmware.wait_for(r"VOLUME\[high\]")
-    wait_for_stored_volume(tmp_path, VOLUME_HIGH)
+    """Resend sends every setting's current value, also the ones restored from flash."""
+    _, firmware = run(mode="continuous")
+    firmware.wait_for(r"MODE\[continuous\]")
+    wait_for_stored(tmp_path, MODE_FIELD, MODE_CONTINUOUS)
     restart()
-    _, firmware = run(extra_env={"SIM_FACTORY_RESET": "1"})
-    firmware.wait_for(r"rebooting to re-apply YAML settings")
-    assert firmware.proc.wait(timeout=10) == 0  # the host platform's reboot exits
-    assert read_prefs(tmp_path, "m5stack_barcode_settings")[0] == 0
-    restart()
-    scanner, firmware = run()
-    firmware.wait_for(r"No stored scanner settings", from_start=True)
-    firmware.wait_for(r"VOLUME\[low\]", from_start=True)
-    firmware.wait_for(
-        r"scan_duration set to 1s", from_start=True
-    )  # the last one queued
-    assert len(setting_frames(scanner)) >= 15  # noqa: PLR2004 - every setting
+    scanner, firmware = run(mode="continuous", extra_env={"SIM_RESEND": "1"})
+    firmware.wait_for(r"Sending every setting again", from_start=True)
+    firmware.wait_for(r"config_code_scan_mode set to disabled")  # the last one
+    frames = setting_frames(scanner)
+    # One frame per setting (F2/F3 frames name their setting in the next byte).
+    keys = {(f[5], f[6]) if f[5] in (PARAM_F2, PARAM_F3) else f[5] for f in frames}
+    assert len(frames) == len(keys) == 15  # noqa: PLR2004 - every setting
+    assert next(f for f in frames if f[5] == PARAM_MODE)[6] == MODE_CONTINUOUS_PARAM

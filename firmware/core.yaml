@@ -90,9 +90,8 @@ m5stack_barcode:
     name: "Start Scan"
   stop_button:
     name: "Stop Scan"
-  factory_reset_button:
-    name: "Factory Reset Scanner"
-    disabled_by_default: true
+  resend_settings_button:
+    name: "Resend Scanner Settings"
 
   on_barcode:
     - homeassistant.event:

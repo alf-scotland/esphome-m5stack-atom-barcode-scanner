@@ -2,15 +2,15 @@
 
 Verifies the reference firmware on a real M5Stack Atom Lite with the Atomic QR base,
 end to end: the UART link, Home Assistant control of every setting, scanning in every
-mode, configuration barcodes, persistence, security and factory reset. Run it on a PR's
-firmware artifact before merging, and before a release.
+mode, configuration barcodes, persistence and security. Run it on a PR's firmware
+artifact before merging, and before a release.
 
 The phases are ordered so that a failure shows up as early as possible: each phase only
 relies on what the phases before it proved. Steps marked **GATE** decide whether it is
 worth going on; if one fails, stop and send the log. Everything else is independent:
 note the failure and carry on.
 
-About 75 minutes, with **one power cycle** (step 7.4). Other reboots use the Restart
+About 60 minutes, with **one power cycle** (step 7.4). Other reboots use the Restart
 button.
 
 ## Setup
@@ -21,14 +21,15 @@ button.
   adopted. **Keep the log open for the whole test**; "log:" in a step means a line you
   should see there.
 - Home Assistant open on a second screen or phone.
-- The test barcodes: `D1`–`D6` are data, `C1`–`C8` configuration barcodes. Show them on a
+- The test barcodes: `D1`–`D6` are data, `C1`–`C3` configuration barcodes. Show them on a
   phone at full brightness (the scanner reads QR codes from screens well; print `D4` and
   `D5` if it struggles with 1D codes on a screen). The generated test page shows each one
   full-screen when you tap it.
 
 The status LED: blue = host-mode scan running, purple = continuous or auto-sense mode,
-green flash = barcode read, orange flash = scan timed out, orange pulse = no Wi-Fi,
-white pulse = no Home Assistant connection, red pulse = setup window closed.
+yellow flash = the scanner decoded a code, green flash = barcode read, orange flash = scan
+timed out, orange pulse = no Wi-Fi, white pulse = no Home Assistant connection, red pulse =
+setup window closed.
 
 ## 1. Flash and boot
 
@@ -36,13 +37,13 @@ white pulse = no Home Assistant connection, red pulse = setup window closed.
   Assistant set **Volume** to **High** (a change made at runtime, to check it survives
   the upgrade). Note the other settings.
 - **1.2** Flash `firmware.factory.bin` with ESPHome Web (Connect → Install). If it offers
-  to erase the device, decline. Then open **Logs**.
+  to erase the device, decline. Then open **Logs** and press **Reset Device**: the log
+  only shows a whole boot from there.
 - **1.3 GATE** Scanner link. log: `Version response (… bytes)` and `Publishing version`,
   and no `Scanner not responding`. If not: check the Atom is seated on the scanner base
   and send the log. Nothing after this works without the link.
-- **1.4** Settings restore. log: `Migrating scanner settings from the previous preferences
-  format` after 1.1 (no setting is sent), or `No stored scanner settings` on a fresh device
-  followed by 15 `Command acknowledged`.
+- **1.4** Settings restore. log: `Restoring scanner settings from flash` and no `Queuing`
+  of a setting: the first boot after flashing, before the log was open, stored them.
 
 ## 2. Wi-Fi and adoption
 
@@ -67,9 +68,6 @@ Do this within 15 minutes of step 1.2, which restarted the setup window.
   Back to On when reading.
 - **3.4** **Locate Light Mode** Always on: the aiming light stays lit. Back to On when
   reading.
-- **3.5** Click **Boot Sound** twice within a second. The switch ends in its original
-  state. log: `Superseding queued command` or two acknowledged changes; never a switch
-  that shows one state while the log shows the other.
 
 ## 4. Scanning in host mode
 
@@ -86,12 +84,13 @@ Do this within 15 minutes of step 1.2, which restarted the setup window.
   changes. Turn all three back on.
 - **4.6** **Scan Duration** 1s: 4.3 times out after 1 s. Unlimited: no timeout within
   30 s; **Stop Scan**. Back to 3s.
-- **4.7** Scan `D2` (UTF-8). Note exactly what **Last Barcode** shows. Home Assistant must
-  stay connected. The scanner outputs GBK by default, so replacement characters (U+FFFD, shown as a diamond with a question mark) are
-  a finding for a follow-up, not a failure.
+- **4.7** Scan `D2` (UTF-8). Home Assistant stays connected. The scanner outputs GBK by
+  default, so **Last Barcode** shows replacement characters (a diamond with a question
+  mark) and the log `replaced … invalid sequence(s)`; 6.2 switches it to UTF-8.
 - **4.8** Scan `D3` (300 characters). **Last Barcode** holds the first 255 (it ends in
   `0051-`); Home Assistant stays connected.
-- **4.9** Scan `D4` (EAN-13) and `D5` (Code 128): `4006381333931` and `M5-SCAN-128`.
+- **4.9** Scan `D4` (EAN-13) and `D5` (Code 128): `4006381333931` and `M5-SCAN-128`. If
+  they are not read from the screen, print them; note whether the LED flashed yellow.
 - **4.10** For each **Terminator** (CR LF, CR, TAB, CR CR, CR LF CR LF, None): set it,
   scan `D1`. **Last Barcode** is exactly `HELLO-123` every time, with nothing after it.
 
@@ -104,7 +103,8 @@ Do this within 15 minutes of step 1.2, which restarted the setup window.
 - **5.3** Auto-Sense: LED purple. Bring `D1` into view: read. **Stable Induction Time** 1s:
   the read comes noticeably later. Back to 500ms.
 - **5.4** Level: LED off, **Scanning** off. Press the Atom's button with `D1` in view:
-  LED blue, then green. Without a code: orange after the scan duration.
+  LED blue, then green. Press it again right away: blue and green again (the log never
+  shows `already running`). Without a code: orange after the scan duration.
 - **5.5** Pulse: same as 5.4.
 - **5.6** Still in Pulse, press **Start Scan** in Home Assistant: nothing happens, the LED
   does not change. log: `Cannot start a scan outside host mode`.
@@ -112,24 +112,22 @@ Do this within 15 minutes of step 1.2, which restarted the setup window.
 
 ## 6. Configuration barcodes
 
-**Config Code Scanning** is off (the default): the scanner passes configuration barcodes
-on and the firmware applies them, so Home Assistant always shows the scanner's settings.
-In host mode the scanner only reads after **Start Scan**. A device upgraded in 1.1 kept
-its previous setting (on): turn **Config Code Scanning** off first.
+With **Config Code Scanning** off (the default) the scanner ignores configuration barcodes,
+so they cannot change a setting behind Home Assistant's back. With it on, the scanner
+applies them itself without telling the firmware. A device upgraded in 1.1 kept its
+previous setting (on): turn **Config Code Scanning** off first. In host mode the scanner
+only reads after **Start Scan**.
 
-- **6.1** **Start Scan**, scan `C1`. **Volume** becomes High. log: `Configuration barcode:
-  buzzer_volume = high`. **Last Barcode** does not change.
-- **6.2** **Start Scan**, scan `C2`: **Operation Mode** Continuous, LED purple. Scan `C3`
-  (continuous mode reads it without Start Scan): back to Host.
-- **6.3** **Start Scan**, scan `C4`. **Terminator** becomes CR.
-- **6.4** **Start Scan**, scan `C5` (a setting the firmware does not manage). log:
-  `Ignoring configuration barcode ^#SC^1020100`; no setting changes, no barcode.
-- **6.5** **Start Scan**, scan `C7`. **Config Code Scanning** turns on.
-- **6.6** **Start Scan**, scan `C6` (Volume Low). The scanner applies it itself now. Note:
-  does **Volume** in Home Assistant change, and does the log show the code? (Expected: no
-  and no. This is the drift that the default setting avoids.)
-- **6.7** Turn **Config Code Scanning** off in Home Assistant, then set **Volume** to High
-  to bring the scanner back in line.
+- **6.1** Set **Volume** to Low. **Start Scan**, scan `C1` (Volume high): LED yellow, then
+  orange, nothing in the log. Change **Terminator** and back: the confirmation beeps are
+  still low.
+- **6.2** Turn **Config Code Scanning** on. **Start Scan**, scan `C2` (UTF-8 output): the
+  scanner beeps. **Start Scan**, scan `D2`: **Last Barcode** is exactly `Grüße ÄÖÜ 🙂`.
+- **6.3** **Start Scan**, scan `C1`. Note whether **Volume** in Home Assistant changes and
+  whether the log shows the code (expected: no and no; the scanner now beeps loud).
+- **6.4** Turn **Config Code Scanning** off, press **Resend Scanner Settings**: 15
+  `Command acknowledged`, and the confirmation beeps are low again, as **Volume** shows.
+  The scanner keeps UTF-8 output.
 
 ## 7. Persistence
 
@@ -152,17 +150,14 @@ its previous setting (on): turn **Config Code Scanning** off first.
   `atom-barcode-…` network. Switch the access point back on: the device reconnects on
   its own.
 
-## 9. Factory reset
+## If the scanner stops answering
 
-Last, because it resets the scanner.
-
-- **9.1** Enable the **Factory Reset Scanner** entity (disabled by default) and press it.
-  log: `Factory reset requested`, `Command acknowledged`, a reboot, then `No stored
-  scanner settings; applying all configured values`. Home Assistant shows the YAML
-  values (**Volume** Medium, **Terminator** None, **Light Mode** On when reading).
-- **9.2** Optional: **Start Scan** and scan `C8` (factory default). Same as 9.1.
-
-Afterwards, set the values you want to use.
+The log shows `Scanner not responding` for every command, also after a power cycle. The
+scanner's own factory defaults (its factory default barcode, scanned while **Config Code
+Scanning** is on) switch it to USB, which cuts it off from the Atom. To switch it back: press
+**Restart**, hold `C3` in front of the scanner and press **Hardware Trigger** (Diagnostic).
+The scanner beeps; press **Resend Scanner Settings**, and every setting is sent and
+acknowledged.
 
 ## Barcodes
 
@@ -175,13 +170,8 @@ Afterwards, set the values you want to use.
 | `D5` | Code 128 | `M5-SCAN-128` | 1D |
 | `D6` | QR | `SECOND-CODE` | A second code |
 | `C1` | QR | `^#SC^2050800` | Volume high |
-| `C2` | QR | `^#SC^2050204` | Continuous mode |
-| `C3` | QR | `^#SC^2050208` | Host mode |
-| `C4` | QR | `^#SC^3030052` | Terminator CR |
-| `C5` | QR | `^#SC^1020100` | "No Read" message off (not managed; the scanner's default) |
-| `C6` | QR | `^#SC^2050802` | Volume low |
-| `C7` | QR | `^#SC^1040601` | Configuration code scanning on |
-| `C8` | QR | `^#SC^303FFF0` | Factory default |
+| `C2` | QR | `^#SC^3030062` | UTF-8 output ("Unicode" data encoding) |
+| `C3` | QR | `^#SC^3030010` | Serial port output ("TTL 232"); recovery only |
 
 Configuration barcodes are from `components/m5stack_barcode/docs/AtomicQR_Reader_EN.pdf`.
 Regenerate the test page with `uv run tests/hardware/make_test_page.py`.

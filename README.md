@@ -78,7 +78,11 @@ are kept across reboots and updates.
 built-in key. After updating, remove the device in Home Assistant and add it again within
 15 minutes of it restarting (or power-cycle it first) so it receives its own key. Its
 settings are kept, including **Config Code Scanning** (on in those releases): turn it off
-so the firmware applies scanned configuration barcodes and Home Assistant stays in sync.
+so scanned configuration barcodes cannot change settings behind Home Assistant's back.
+
+**If the scanner stops answering** (`Scanner not responding` for every command): its own
+factory defaults switch it to USB. See [Troubleshooting](components/m5stack_barcode/index.rst#troubleshooting) to switch it
+back with the hardware guide's *TTL 232* barcode.
 
 ### Updates
 

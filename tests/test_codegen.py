@@ -133,8 +133,8 @@ def test_conditions_check_the_scan_state() -> None:
     ("entity", "category"),
     [
         ("buzzer_volume_select", "config"),
+        ("resend_settings_button", "config"),
         ("sound_switch", "config"),
-        ("factory_reset_button", "config"),
         ("version_sensor", "diagnostic"),
     ],
 )

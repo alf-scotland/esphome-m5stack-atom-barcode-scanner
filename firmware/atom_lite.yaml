@@ -266,7 +266,9 @@ script:
   # Hardware trigger: activates the scanner trig pin and waits for scan_duration
   # before timing out if the scanner hasn't responded.  With scan_duration: unlimited
   # (0 ms) the trigger is held for at most 60 s rather than released immediately.
+  # A decode stops it (see DLED), and pressing again starts a new scan.
   - id: hardware_trigger_with_timeout
+    mode: restart
     then:
       - script.execute: led_manual_scan_start
       - switch.turn_on: scanner_trigger_internal
@@ -301,6 +303,7 @@ binary_sensor:
     on_press:
       then:
         - script.execute: led_command_ack
+        - script.stop: hardware_trigger_with_timeout
         - switch.turn_off: scanner_trigger_internal
 
   # Atom Lite built-in button: starts a scan in host mode, pulls the trigger input in
