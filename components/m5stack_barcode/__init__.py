@@ -21,7 +21,6 @@ from esphome.components import (
 from esphome.const import (
     CONF_ID,
     CONF_RX_BUFFER_SIZE,
-    CONF_TRIGGER_ID,
     CONF_UART_ID,
     DEVICE_CLASS_RESTART,
     ENTITY_CATEGORY_CONFIG,
@@ -62,11 +61,7 @@ EVENT_TYPE_SCAN_SUCCESSFUL = "scan_successful"
 SettingId = m5stack_barcode_ns.enum("SettingId", is_class=True)
 SettingSelect = m5stack_barcode_ns.class_("SettingSelect", select.Select, _Parented)
 SettingSwitch = m5stack_barcode_ns.class_("SettingSwitch", switch.Switch, _Parented)
-SetSettingAction = m5stack_barcode_ns.class_(
-    "SetSettingAction",
-    automation.Action,
-    _Parented,
-)
+ScanState = m5stack_barcode_ns.enum("ScanState", is_class=True)
 
 _ON_OFF = ["disabled", "enabled"]
 _LIGHT_MODES = ["on_when_reading", "always_on", "always_off"]
@@ -245,55 +240,28 @@ BUTTONS = {
     ),
 }
 
-# Parameterless actions: action name -> C++ class
+# Parameterless actions: action name -> scanner call
 SIMPLE_ACTIONS = {
-    "m5stack_barcode.start": m5stack_barcode_ns.class_(
-        "StartAction",
-        automation.Action,
-        _Parented,
-    ),
-    "m5stack_barcode.stop": m5stack_barcode_ns.class_(
-        "StopAction",
-        automation.Action,
-        _Parented,
-    ),
-    "m5stack_barcode.factory_reset": m5stack_barcode_ns.class_(
-        "FactoryResetAction",
-        automation.Action,
-        _Parented,
-    ),
-    "m5stack_barcode.process_current_buffer": m5stack_barcode_ns.class_(
-        "ProcessCurrentBufferAction",
-        automation.Action,
-        _Parented,
-    ),
+    "m5stack_barcode.start": "start_scan()",
+    "m5stack_barcode.stop": "stop_scan()",
+    "m5stack_barcode.factory_reset": "factory_reset()",
+    "m5stack_barcode.process_current_buffer": "process_current_buffer()",
 }
 
+# Conditions: condition name -> scanner expression
 CONDITIONS = {
-    "m5stack_barcode.is_idle": m5stack_barcode_ns.class_(
-        "IsIdleCondition",
-        automation.Condition,
-        _Parented,
+    "m5stack_barcode.is_idle": f"get_scan_state() == {ScanState.IDLE}",
+    "m5stack_barcode.is_manual_scanning": (
+        f"get_scan_state() == {ScanState.MANUAL_SCANNING}"
     ),
-    "m5stack_barcode.is_manual_scanning": m5stack_barcode_ns.class_(
-        "IsManualScanningCondition",
-        automation.Condition,
-        _Parented,
-    ),
-    "m5stack_barcode.is_continuous_mode": m5stack_barcode_ns.class_(
-        "IsContinuousModeCondition",
-        automation.Condition,
-        _Parented,
-    ),
+    "m5stack_barcode.is_continuous_mode": "is_continuous_mode()",
 }
 
-BarcodeTrigger = m5stack_barcode_ns.class_(
-    "BarcodeTrigger",
-    automation.Trigger.template(cg.std_string),
-)
-ScanTimeoutTrigger = m5stack_barcode_ns.class_(
-    "ScanTimeoutTrigger",
-    automation.Trigger.template(),
+_CALLBACK_AUTOMATIONS = (
+    automation.CallbackAutomation(
+        CONF_ON_BARCODE, "add_on_barcode_callback", [(cg.std_string, "x")]
+    ),
+    automation.CallbackAutomation(CONF_ON_SCAN_TIMEOUT, "add_on_scan_timeout_callback"),
 )
 
 
@@ -331,12 +299,8 @@ CONFIG_SCHEMA = (
             cv.Optional(
                 CONF_SCANNING_BINARY_SENSOR,
             ): binary_sensor.binary_sensor_schema(icon="mdi:barcode-scan"),
-            cv.Optional(CONF_ON_BARCODE): automation.validate_automation(
-                {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(BarcodeTrigger)},
-            ),
-            cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation(
-                {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ScanTimeoutTrigger)},
-            ),
+            cv.Optional(CONF_ON_BARCODE): automation.validate_automation({}),
+            cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation({}),
             **{
                 cv.Optional(key): button.button_schema(cls, **defaults)
                 for key, (cls, defaults) in BUTTONS.items()
@@ -428,12 +392,7 @@ async def to_code(config: dict[str, Any]) -> None:
             btn = await button.new_button(conf)
             await cg.register_parented(btn, var)
 
-    for conf in config.get(CONF_ON_BARCODE, []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
-        await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
-    for conf in config.get(CONF_ON_SCAN_TIMEOUT, []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
-        await automation.build_automation(trigger, [], conf)
+    await automation.build_callback_automations(var, config, _CALLBACK_AUTOMATIONS)
 
 
 # ── Actions and conditions ────────────────────────────────────────────────────
@@ -443,43 +402,20 @@ _SCANNER_ID_SCHEMA = automation.maybe_simple_id(
 )
 
 
-async def _parented_to_code(
-    config: dict[str, Any],
-    obj_id: cv.ID,
-    template_arg: cg.TemplateArguments,
-    args: list[tuple[Any, str]],  # noqa: ARG001
-) -> MockObj:
-    var = cg.new_Pvariable(obj_id, template_arg)
-    await cg.register_parented(var, config[CONF_ID])
-    return var
-
-
-for _name, _cls in SIMPLE_ACTIONS.items():
-    # Every action only queues a command, so play_next_() always runs synchronously.
-    automation.register_action(_name, _cls, _SCANNER_ID_SCHEMA, synchronous=True)(
-        _parented_to_code,
+# Every action only queues a command, so the apply actions (always synchronous) fit.
+for _name, _call in SIMPLE_ACTIONS.items():
+    automation.register_apply_action(
+        _name, _SCANNER_ID_SCHEMA, automation.ApplyCall(_call)
     )
 
-for _name, _cls in CONDITIONS.items():
-    automation.register_condition(_name, _cls, _SCANNER_ID_SCHEMA)(_parented_to_code)
+for _name, _check in CONDITIONS.items():
+    automation.register_apply_condition(_name, _SCANNER_ID_SCHEMA, _check)
 
 
 def _register_setting_action(setting: Setting) -> None:
-    async def _to_code(
-        config: dict[str, Any],
-        action_id: cv.ID,
-        template_arg: cg.TemplateArguments,
-        args: list[tuple[Any, str]],
-    ) -> MockObj:
-        var = cg.new_Pvariable(
-            action_id,
-            cg.TemplateArguments(setting.id, *template_arg),
-        )
-        await cg.register_parented(var, config[CONF_ID])
-        # Static values are passed as their option key; lambdas must return one too.
-        value = await cg.templatable(config[setting.key], args, cg.std_string)
-        cg.add(var.set_value(value))
-        return var
+    def _index(config: dict[str, Any], value: str) -> str:  # noqa: ARG001
+        # A static value is passed as its option index; a lambda returns an option key.
+        return f"static_cast<uint8_t>({setting.options.index(value)})"
 
     schema = cv.Schema(
         {
@@ -489,12 +425,14 @@ def _register_setting_action(setting: Setting) -> None:
             ),
         },
     )
-    automation.register_action(
+    automation.register_apply_action(
         f"m5stack_barcode.{setting.action}",
-        SetSettingAction,
         schema,
-        synchronous=True,
-    )(_to_code)
+        automation.ApplyCall(
+            f"set_setting({setting.id}, {{}})",
+            ((setting.key, cg.std_string, _index),),
+        ),
+    )
 
 
 for _setting_entry in SETTINGS:

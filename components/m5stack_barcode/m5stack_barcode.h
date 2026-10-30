@@ -2,6 +2,7 @@
 
 #include <array>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "commands.h"
@@ -74,12 +75,12 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   void set_switch(SettingId id, switch_::Switch *sw) { this->switches_[static_cast<size_t>(id)] = sw; }
 
   /// Register a callback invoked with every decoded barcode.
-  void add_on_barcode_callback(std::function<void(const std::string &)> &&callback) {
-    this->barcode_callback_.add(std::move(callback));
+  template<typename F> void add_on_barcode_callback(F &&callback) {
+    this->barcode_callback_.add(std::forward<F>(callback));
   }
   /// Register a callback invoked when a HOST-mode scan times out without a result.
-  void add_on_scan_timeout_callback(std::function<void()> &&callback) {
-    this->scan_timeout_callback_.add(std::move(callback));
+  template<typename F> void add_on_scan_timeout_callback(F &&callback) {
+    this->scan_timeout_callback_.add(std::forward<F>(callback));
   }
 
   /// Start a HOST-mode scan. Ignored outside HOST mode or while a scan is in progress.

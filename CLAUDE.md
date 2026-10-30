@@ -77,13 +77,13 @@ uv run pre-commit install
 - Table-driven: one `Setting` entry per scanner setting defines its YAML option keys, default, HA entity (with its default `entity_category: config` and icon) and `set_*` action
 - Generates C++ via `cg`, using the entity factories (`select.new_select`, `switch.new_switch`, `button.new_button`, …) and `cg.register_parented`
 - Must use schema factory functions: `select.select_schema(X)`, `switch.switch_schema(X)`, `button.button_schema(X)`, `binary_sensor.binary_sensor_schema()` — never `.extend()` on the private `_*_SCHEMA` objects
-- A setting value is an index into its option keys everywhere (select option index, `set_initial_value()`, C++ tables, NVS), so the option lists must match the tables in `commands.cpp` (`tests/test_setting_tables.py` enforces this, and checks every frame against the PDF)
+- A setting value is an index into its option keys everywhere (select option index, `set_initial_value()`, static `set_*` action values, C++ tables, NVS), so the option lists must match the tables in `commands.cpp` (`tests/test_setting_tables.py` enforces this, and checks every frame against the PDF)
 
 **C++ layer** (the runtime):
 - `m5stack_barcode.h/.cpp` — `BarcodeScanner` extends `Component` + `uart::UARTDevice`: command queue, RX framing, settings state, NVS. The header also defines the HA entities as `Parented<BarcodeScanner>` templates (`SettingSelect<SettingId>`, `SettingSwitch<SettingId>`, `ScannerButton`) — entities are not `Component`s
 - `commands.h/.cpp` — the UART protocol: fixed frames (start/stop, version, factory reset, ACK/NAK), `SettingId` (its order is the NVS layout: append only) and one `SettingInfo` per setting holding its option keys and the PDF frame for each value. Frame length bytes and checksums are verified at compile time (`static_assert`)
 - The queue holds plain `Command` values (type, setting, value); `finish_command_()` applies each command's outcome, so there are no per-command callbacks or heap allocations
-- `automation.h` — triggers, actions (`ScannerMethodAction` aliases, `SetSettingAction<SettingId>`) and conditions; all `Parented<BarcodeScanner>`, registered `synchronous=True`. All `play()`/`check()` signatures use `const Ts &...x`
+- Automations have no C++ classes: actions and conditions are `automation.register_apply_action` / `register_apply_condition` (a generated function calls the scanner method; a static `set_*` value is passed as its option index, a lambda's as its option key), and `on_barcode` / `on_scan_timeout` are `automation.build_callback_automations` on the `add_on_*_callback` templates
 - Adding a setting: a `SettingId` entry (at the end), its option keys and frames in `commands.cpp`, a `Setting` row in `__init__.py`, and docs
 
 ### Data flow

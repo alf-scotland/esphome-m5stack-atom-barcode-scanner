@@ -92,21 +92,41 @@ def test_entities_are_wired_to_their_setting() -> None:
             assert f"* {table.group(1)}[] PROGMEM = {{{options}}};" in main
 
 
-def test_actions_set_valid_values_of_their_setting() -> None:
-    """Each set_* action targets its setting and passes one of its option keys."""
-    main = generated_main("test_m5stack_barcode_actions.yaml")
-    declarations = re.findall(
-        rf"static {NS}SetSettingAction<{NS}SettingId::(\w+)[^>]*> \*const (\w+) =",
-        main,
+def test_actions_set_their_setting() -> None:
+    """Each set_* action changes its setting; a static value is its option index."""
+    fixture = "test_m5stack_barcode_actions.yaml"
+    main = generated_main(fixture)
+    static = re.findall(
+        r"- m5stack_barcode\.(set_\w+):\n\s+id: scanner\n\s+(\w+): ([\w.]+)\n",
+        (TESTS_DIR / fixture).read_text(),
     )
-    declared = {var: key.lower() for key, var in declarations}
+    assert static
     settings = {s.key: s for s in component.SETTINGS}
-    static_values = re.findall(r'(\w+)->set_value\(ESPHOME_F\("([^"]*)"\)\);', main)
-    assert static_values
-    for var, value in static_values:
-        assert value in settings[declared[var]].options, (declared[var], value)
+    for action, key, value in static:
+        setting = settings[key]
+        assert setting.action == action
+        index = setting.options.index(value)
+        call = f"set_setting({setting_id(setting)}, static_cast<uint8_t>({index}));"
+        assert call in main, f"{action}: {value} should be index {index}"
+    # A lambda's option key is passed on as it is.
+    assert (
+        f'set_setting({NS}SettingId::DECODE_SOUND_MODE, std::string("disabled"));'
+        in main
+    )
     # Every setting's action is exercised by the fixture.
-    assert set(declared.values()) == set(settings)
+    called = set(re.findall(rf"->set_setting\({NS}SettingId::(\w+), ", main))
+    assert called == {s.key.upper() for s in settings.values()}
+
+
+def test_conditions_check_the_scan_state() -> None:
+    """Each condition is the right expression on the scanner."""
+    main = generated_main("test_m5stack_barcode_actions.yaml")
+    for check in (
+        f"get_scan_state() == {NS}ScanState::IDLE;",
+        f"get_scan_state() == {NS}ScanState::MANUAL_SCANNING;",
+        "is_continuous_mode();",
+    ):
+        assert f"return ::scanner->{check}" in main
 
 
 @pytest.mark.parametrize(
