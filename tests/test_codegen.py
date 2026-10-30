@@ -83,8 +83,13 @@ def test_entities_are_wired_to_their_setting() -> None:
         var = decl.group(1)
         assert f"set_{kind}({setting_id(setting)}, {var});" in main
         if setting.is_select:
+            count = len(setting.options)
+            table = re.search(
+                rf"{var}->traits\.set_options_static\((\w+), {count}\);", main
+            )
+            assert table, f"{setting.key}: no options set"
             options = ", ".join(f'"{o}"' for o in setting.options)
-            assert f"{var}->traits.set_options({{{options}}});" in main
+            assert f"* {table.group(1)}[] PROGMEM = {{{options}}};" in main
 
 
 def test_actions_set_valid_values_of_their_setting() -> None:

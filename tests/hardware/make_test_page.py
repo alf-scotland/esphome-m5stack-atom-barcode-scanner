@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["markdown==3.11.1", "segno==1.6.6", "python-barcode==0.16.1"]
+# dependencies = ["markdown==3.11.2", "segno==1.6.6", "python-barcode==0.16.1"]
 # ///
 """Render TEST_PLAN.md into test_page.html: the plan with its barcodes and a result log.
 

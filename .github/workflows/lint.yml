@@ -140,12 +140,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Cache PlatformIO
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.platformio
-          key: platformio-host-${{ hashFiles('uv.lock') }}
-
       - name: Run host-platform tests against the emulated scanner
         run: uv run pytest tests/integration -m integration -v
 
