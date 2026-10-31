@@ -258,9 +258,8 @@ button.</p>
   full-screen when you tap it.</li>
 </ul>
 <p>The status LED: <i class="led led-blue"></i>blue = host-mode scan running, <i class="led led-purple"></i>purple = continuous or auto-sense mode,
-yellow flash = the scanner decoded a code, <i class="led led-green"></i>green flash = barcode read, <i class="led led-orange"></i>orange flash = scan
-timed out, <i class="led led-orange"></i>orange pulse = no Wi-Fi, <i class="led led-white"></i>white pulse = no Home Assistant connection, <i class="led led-red"></i>red pulse =
-setup window closed.</p>
+<i class="led led-green"></i>green flash = barcode read, <i class="led led-orange"></i>orange flash = scan timed out, <i class="led led-orange"></i>orange pulse = no Wi-Fi,
+<i class="led led-white"></i>white pulse = no Home Assistant connection, <i class="led led-red"></i>red pulse = setup window closed.</p>
 <h2 id="phase-1"><span class="pnum">1</span>Flash and boot</h2>
 <ul>
 <li class="step" data-step="1.1" id="s1-1"><div class="step-head"><span class="sid">1.1</span></div><div class="step-text">Only when upgrading a device that runs a release up to 2026.7.0: in Home
@@ -319,7 +318,7 @@ setup window closed.</p>
 <li class="step" data-step="4.8" id="s4-8"><div class="step-head"><span class="sid">4.8</span></div><div class="step-text">Scan <button type="button" class="chip" data-code="D3">D3</button> (300 characters). <strong>Last Barcode</strong> holds the first 255 (it ends in
   <code>0051-</code>); Home Assistant stays connected.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-8" placeholder="Note" aria-label="Note for step 4.8"></div></li>
 <li class="step" data-step="4.9" id="s4-9"><div class="step-head"><span class="sid">4.9</span></div><div class="step-text">Scan <button type="button" class="chip" data-code="D4">D4</button> (EAN-13) and <button type="button" class="chip" data-code="D5">D5</button> (Code 128): <code>4006381333931</code> and <code>M5-SCAN-128</code>. If
-  they are not read from the screen, print them; note whether the LED flashed yellow.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-9" placeholder="Note" aria-label="Note for step 4.9"></div></li>
+  they are not read from the screen, print them; note whether the scanner beeps.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-9" placeholder="Note" aria-label="Note for step 4.9"></div></li>
 <li class="step" data-step="4.10" id="s4-10"><div class="step-head"><span class="sid">4.10</span></div><div class="step-text">For each <strong>Terminator</strong> (CR LF, CR, TAB, CR CR, CR LF CR LF, None): set it,
   scan <button type="button" class="chip" data-code="D1">D1</button>. <strong>Last Barcode</strong> is exactly <code>HELLO-123</code> every time, with nothing after it.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-4-10" placeholder="Note" aria-label="Note for step 4.10"></div></li>
 </ul>
@@ -346,8 +345,8 @@ applies them itself without telling the firmware. A device upgraded in 1.1 kept 
 previous setting (on): turn <strong>Config Code Scanning</strong> off first. In host mode the scanner
 only reads after <strong>Start Scan</strong>.</p>
 <ul>
-<li class="step" data-step="6.1" id="s6-1"><div class="step-head"><span class="sid">6.1</span></div><div class="step-text">Set <strong>Volume</strong> to Low. <strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C1">C1</button> (Volume high): LED yellow, then
-  orange, nothing in the log. Change <strong>Terminator</strong> and back: the confirmation beeps are
+<li class="step" data-step="6.1" id="s6-1"><div class="step-head"><span class="sid">6.1</span></div><div class="step-text">Set <strong>Volume</strong> to Low. <strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C1">C1</button> (Volume high): the LED stays
+  blue until the scan times out (orange), nothing in the log. Change <strong>Terminator</strong> and back: the confirmation beeps are
   still low.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-1" placeholder="Note" aria-label="Note for step 6.1"></div></li>
 <li class="step" data-step="6.2" id="s6-2"><div class="step-head"><span class="sid">6.2</span></div><div class="step-text">Turn <strong>Config Code Scanning</strong> on. <strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="C2">C2</button> (UTF-8 output): the
   scanner beeps. <strong>Start Scan</strong>, scan <button type="button" class="chip" data-code="D2">D2</button>: <strong>Last Barcode</strong> is exactly <code>Grüße ÄÖÜ 🙂</code>.</div><div class="step-controls"><button type="button" class="mark" data-status="pass">Pass</button><button type="button" class="mark" data-status="fail">Fail</button><button type="button" class="mark" data-status="skip">Skip</button><input type="text" class="note" id="note-6-2" placeholder="Note" aria-label="Note for step 6.2"></div></li>
@@ -382,9 +381,10 @@ only reads after <strong>Start Scan</strong>.</p>
 <p>The log shows <code>Scanner not responding</code> for every command, also after a power cycle. The
 scanner's own factory defaults (its factory default barcode, scanned while <strong>Config Code
 Scanning</strong> is on) switch it to USB, which cuts it off from the Atom. To switch it back: press
-<strong>Restart</strong>, hold <button type="button" class="chip" data-code="C3">C3</button> in front of the scanner and press <strong>Hardware Trigger</strong> (Diagnostic).
-The scanner beeps; press <strong>Resend Scanner Settings</strong>, and every setting is sent and
-acknowledged.</p>
+<strong>Restart</strong>, hold <button type="button" class="chip" data-code="C3">C3</button> in front of the scanner and press <strong>Hardware Trigger</strong> (Diagnostic):
+the scanner reads while the trigger is held (up to the scan duration) and beeps when it
+applies the code. Power-cycle, then press <strong>Resend Scanner Settings</strong>: every setting is
+sent and acknowledged.</p>
 
   <h2 id="barcodes">Barcodes</h2>
   <p>Tap a barcode to show it full-screen, then hold the scanner 10–20 cm from the screen at full brightness.</p>

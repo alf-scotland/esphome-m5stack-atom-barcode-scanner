@@ -27,9 +27,8 @@ button.
   full-screen when you tap it.
 
 The status LED: blue = host-mode scan running, purple = continuous or auto-sense mode,
-yellow flash = the scanner decoded a code, green flash = barcode read, orange flash = scan
-timed out, orange pulse = no Wi-Fi, white pulse = no Home Assistant connection, red pulse =
-setup window closed.
+green flash = barcode read, orange flash = scan timed out, orange pulse = no Wi-Fi,
+white pulse = no Home Assistant connection, red pulse = setup window closed.
 
 ## 1. Flash and boot
 
@@ -90,7 +89,7 @@ Do this within 15 minutes of step 1.2, which restarted the setup window.
 - **4.8** Scan `D3` (300 characters). **Last Barcode** holds the first 255 (it ends in
   `0051-`); Home Assistant stays connected.
 - **4.9** Scan `D4` (EAN-13) and `D5` (Code 128): `4006381333931` and `M5-SCAN-128`. If
-  they are not read from the screen, print them; note whether the LED flashed yellow.
+  they are not read from the screen, print them; note whether the scanner beeps.
 - **4.10** For each **Terminator** (CR LF, CR, TAB, CR CR, CR LF CR LF, None): set it,
   scan `D1`. **Last Barcode** is exactly `HELLO-123` every time, with nothing after it.
 
@@ -118,8 +117,8 @@ applies them itself without telling the firmware. A device upgraded in 1.1 kept 
 previous setting (on): turn **Config Code Scanning** off first. In host mode the scanner
 only reads after **Start Scan**.
 
-- **6.1** Set **Volume** to Low. **Start Scan**, scan `C1` (Volume high): LED yellow, then
-  orange, nothing in the log. Change **Terminator** and back: the confirmation beeps are
+- **6.1** Set **Volume** to Low. **Start Scan**, scan `C1` (Volume high): the LED stays
+  blue until the scan times out (orange), nothing in the log. Change **Terminator** and back: the confirmation beeps are
   still low.
 - **6.2** Turn **Config Code Scanning** on. **Start Scan**, scan `C2` (UTF-8 output): the
   scanner beeps. **Start Scan**, scan `D2`: **Last Barcode** is exactly `Grüße ÄÖÜ 🙂`.
@@ -155,9 +154,10 @@ only reads after **Start Scan**.
 The log shows `Scanner not responding` for every command, also after a power cycle. The
 scanner's own factory defaults (its factory default barcode, scanned while **Config Code
 Scanning** is on) switch it to USB, which cuts it off from the Atom. To switch it back: press
-**Restart**, hold `C3` in front of the scanner and press **Hardware Trigger** (Diagnostic).
-The scanner beeps; press **Resend Scanner Settings**, and every setting is sent and
-acknowledged.
+**Restart**, hold `C3` in front of the scanner and press **Hardware Trigger** (Diagnostic):
+the scanner reads while the trigger is held (up to the scan duration) and beeps when it
+applies the code. Power-cycle, then press **Resend Scanner Settings**: every setting is
+sent and acknowledged.
 
 ## Barcodes
 

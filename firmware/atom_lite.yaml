@@ -239,18 +239,6 @@ script:
       - delay: 500ms
       - script.execute: led_off
 
-  - id: led_command_ack
-    then:
-      - light.turn_on:
-          id: atom_status_led
-          brightness: 100%
-          red: 70%
-          green: 70%
-          blue: 0%
-          effect: none
-      - delay: 200ms
-      - script.execute: led_off
-
   - id: led_scan_timeout
     then:
       - light.turn_on:
@@ -266,7 +254,7 @@ script:
   # Hardware trigger: activates the scanner trig pin and waits for scan_duration
   # before timing out if the scanner hasn't responded.  With scan_duration: unlimited
   # (0 ms) the trigger is held for at most 60 s rather than released immediately.
-  # A decode stops it (see DLED), and pressing again starts a new scan.
+  # A barcode stops it (see on_barcode), and pressing again starts a new scan.
   - id: hardware_trigger_with_timeout
     mode: restart
     then:
@@ -285,9 +273,10 @@ script:
 # ── Physical inputs ───────────────────────────────────────────────────────────
 
 binary_sensor:
-  # DLED: scanner hardware output — HIGH while the laser/LED is active.
-  # Drives the ack LED flash and releases the hardware trigger.  Barcode data needs
-  # no help from this pin: the component frames it on the UART in every mode.
+  # DLED: scanner output, active while it is reading (its light is on), with or without a
+  # code in view.  Diagnostic only: releasing the trigger on it would end a read in level
+  # mode at once.  Barcode data needs no help from this pin: the component frames it on
+  # the UART in every mode.
   - platform: gpio
     pin:
       number: GPIO33
@@ -300,11 +289,6 @@ binary_sensor:
     filters:
       - delayed_on: 10ms
       - delayed_off: 10ms
-    on_press:
-      then:
-        - script.execute: led_command_ack
-        - script.stop: hardware_trigger_with_timeout
-        - switch.turn_off: scanner_trigger_internal
 
   # Atom Lite built-in button: starts a scan in host mode, pulls the trigger input in
   # level and pulse mode.
@@ -359,6 +343,8 @@ button:
 m5stack_barcode:
   # Merged with core.yaml by the package system, so the Home Assistant event fires too.
   on_barcode:
+    - script.stop: hardware_trigger_with_timeout
+    - switch.turn_off: scanner_trigger_internal
     - script.execute: led_scan_success
   on_scan_timeout:
     - script.execute: led_scan_timeout

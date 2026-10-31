@@ -1052,7 +1052,7 @@ Connect the M5Stack Barcode Scanner to your ESP device using the following conne
 .. note::
 
    Make sure to check your wiring carefully. The TX on the ESP connects to RX on the scanner, and vice versa.
-   The TRIG pin is used to activate the scanner (LOW active) and the DLED pin goes HIGH when a barcode is detected.
+   The TRIG pin is used to activate the scanner (LOW active). The DLED pin is LOW while the scanner is reading (its light is on), whether or not a code is in view; it does not signal a decode.
 
 Supported Barcode Types
 -----------------------
@@ -1186,7 +1186,8 @@ Troubleshooting
    output to USB. Its factory defaults also make it scan only while the trigger input is
    held and accept configuration barcodes, so hold the trigger (e.g. the reference
    firmware's *Hardware Trigger* button) while showing it the *TTL 232* code
-   ``^#SC^3030010`` from the hardware guide's *Serial Port* section. Then run the
+   ``^#SC^3030010`` from the hardware guide's *Serial Port* section until it beeps, and
+   power-cycle it. Then run the
    :ref:`resend settings action <m5stack_barcode-resend_settings_action>` so the scanner
    gets the values Home Assistant shows.
 7. Enable logs for more detailed debugging:
