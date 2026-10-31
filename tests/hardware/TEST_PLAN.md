@@ -154,10 +154,15 @@ only reads after **Start Scan**.
 
 The log shows `Scanner not responding` for every command, also after a power cycle. The
 scanner's own factory defaults (its factory default barcode, scanned while **Config Code
-Scanning** is on) switch it to USB, which cuts it off from the Atom. To switch it back: press
-**Restart**, hold `C3` in front of the scanner and press **Hardware Trigger** (Diagnostic).
-The scanner beeps; press **Resend Scanner Settings**, and every setting is sent and
-acknowledged.
+Scanning** is on) switch its output to USB. It still receives commands, so the firmware's
+settings reach it at boot, including Config Code Scanning off and sound off. To switch it
+back:
+
+1. Turn **Config Code Scanning** on. The switch stays off (the answer goes to USB), but the
+   scanner applies it.
+2. Hold `C3` in front of the scanner and press **Hardware Trigger** (Diagnostic). The LED
+   flashes yellow when it reads the code.
+3. Press **Resend Scanner Settings**: every setting is sent and acknowledged.
 
 ## Barcodes
 

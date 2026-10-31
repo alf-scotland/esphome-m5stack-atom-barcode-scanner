@@ -1052,7 +1052,7 @@ Connect the M5Stack Barcode Scanner to your ESP device using the following conne
 .. note::
 
    Make sure to check your wiring carefully. The TX on the ESP connects to RX on the scanner, and vice versa.
-   The TRIG pin is used to activate the scanner (LOW active) and the DLED pin goes HIGH when a barcode is detected.
+   The TRIG pin is used to activate the scanner (LOW active) and the DLED pin goes LOW when the scanner decodes a code, including configuration barcodes.
 
 Supported Barcode Types
 -----------------------
@@ -1183,12 +1183,18 @@ Troubleshooting
    Check the power and wiring to the scanner.
 6. If every command fails, also after a power cycle, the scanner may have been reset to
    its factory defaults (its *Factory Default Configuration* barcode), which switch its
-   output to USB. Its factory defaults also make it scan only while the trigger input is
-   held and accept configuration barcodes, so hold the trigger (e.g. the reference
-   firmware's *Hardware Trigger* button) while showing it the *TTL 232* code
-   ``^#SC^3030010`` from the hardware guide's *Serial Port* section. Then run the
-   :ref:`resend settings action <m5stack_barcode-resend_settings_action>` so the scanner
-   gets the values Home Assistant shows.
+   output to USB. It still receives commands on its serial input (only its answers go to
+   USB), so the settings the component sends at boot reach it, including
+   ``config_code_scan_mode: disabled`` and, by default, ``sound_mode: disabled``. To switch
+   it back:
+
+   a. Turn configuration code scanning on (e.g. the *Config Code Scanning* switch). The
+      switch stays off, because the scanner's answer goes to USB, but the scanner applies it.
+   b. Hold the trigger (e.g. the reference firmware's *Hardware Trigger* button) while
+      showing the scanner the *TTL 232* code ``^#SC^3030010`` from the hardware guide's
+      *Serial Port* section. It answers on its serial port again at once.
+   c. Run the :ref:`resend settings action <m5stack_barcode-resend_settings_action>` so
+      the scanner gets the values Home Assistant shows.
 7. Enable logs for more detailed debugging:
 
 .. code-block:: yaml

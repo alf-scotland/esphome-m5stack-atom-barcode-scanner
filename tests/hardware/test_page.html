@@ -381,10 +381,16 @@ only reads after <strong>Start Scan</strong>.</p>
 <h2>If the scanner stops answering</h2>
 <p>The log shows <code>Scanner not responding</code> for every command, also after a power cycle. The
 scanner's own factory defaults (its factory default barcode, scanned while <strong>Config Code
-Scanning</strong> is on) switch it to USB, which cuts it off from the Atom. To switch it back: press
-<strong>Restart</strong>, hold <button type="button" class="chip" data-code="C3">C3</button> in front of the scanner and press <strong>Hardware Trigger</strong> (Diagnostic).
-The scanner beeps; press <strong>Resend Scanner Settings</strong>, and every setting is sent and
-acknowledged.</p>
+Scanning</strong> is on) switch its output to USB. It still receives commands, so the firmware's
+settings reach it at boot, including Config Code Scanning off and sound off. To switch it
+back:</p>
+<ol>
+<li>Turn <strong>Config Code Scanning</strong> on. The switch stays off (the answer goes to USB), but the
+   scanner applies it.</li>
+<li>Hold <button type="button" class="chip" data-code="C3">C3</button> in front of the scanner and press <strong>Hardware Trigger</strong> (Diagnostic). The LED
+   flashes yellow when it reads the code.</li>
+<li>Press <strong>Resend Scanner Settings</strong>: every setting is sent and acknowledged.</li>
+</ol>
 
   <h2 id="barcodes">Barcodes</h2>
   <p>Tap a barcode to show it full-screen, then hold the scanner 10–20 cm from the screen at full brightness.</p>
