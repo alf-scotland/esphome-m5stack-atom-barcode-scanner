@@ -74,10 +74,41 @@ Update status markers as branches land. Each item maps to one branch and one PR.
 | 23 | ⏸ | — | Multi-device YAML split — pulled forward into item 13 |
 | 24 | ✅ | `feat/ota-manifest-and-update-component` | OTA manifest pipeline: per-device `manifests/*.json` generated on release, `update:` platform in firmware |
 | 25 | ✅ | — | PDF audit complete. All 21 commands reviewed. Items 5/6 (communication method / baud rate) are N/A — changing either breaks the UART connection. Item 20 (heartbeat control) deferred — not enough user value to justify a new RX response handler. |
-| 30 | ✅ | `feat/protocol-factory-reset` | PDF item 1: factory reset button — sends reset command, clears NVS, reboots so ESPHome re-applies all settings |
+| 30 | ✅ | `feat/protocol-factory-reset` | PDF item 1: factory reset button. **Removed after the hardware test:** the factory defaults switch the scanner to USB, cutting it off from the ESP; `resend_settings` re-syncs instead |
 | 31 | ✅ | `feat/protocol-cmd-ack-sound-config-code-scan` | PDF item 14: `cmd_ack_sound_switch` — controls scanner beep on config command ACK |
 | 32 | ✅ | `feat/protocol-cmd-ack-sound-config-code-scan` | PDF item 21: `config_code_scan_switch` — prevents scanner from being silently reconfigured by a scanned QR config code |
 | 26 | ⏸ | — | ESPHome core submission — **permanently deferred: this repo combines firmware and component; it cannot be submitted to esphome/esphome as-is. The component is written to core quality standards and could be extracted into a standalone PR in future, but that requires a structural change outside the scope of this repo.** `.clang-tidy` is kept as a 1:1 copy of ESPHome core's config. |
+
+---
+
+## Tier 7 — Repository audit (2026-09)
+
+Found with a host-platform build of the component driven by an emulated scanner
+(now `tests/integration/`). All items landed on `claude/repo-audit-improvements-3376ej`.
+
+| # | Status | What |
+|---|--------|------|
+| 33 | ✅ | Non-host modes never published barcodes from `loop()`: framing waited for `05 D1 …`, which is only the reply to start/stop outside host mode |
+| 34 | ✅ | Start ACK and barcode in one read: barcode discarded and a false `on_scan_timeout` fired |
+| 35 | ✅ | `operation_mode: continuous/auto_sense` left the scan state IDLE; mode changes updated it before the ACK |
+| 36 | ✅ | Scan timeout started at queue time, not at the scanner's ACK; GET_VERSION completion relied on an "unreachable" branch |
+| 37 | ✅ | 128-byte barcode cap and RX overflow publishing the tail of oversized QR codes as a barcode |
+| 38 | ✅ | `scanning_binary_sensor` crashed code generation; the documented `m5stack_barcode.start: id` shorthand was rejected |
+| 39 | ✅ | Entities/actions moved to core patterns (`Parented`, index-based selects, `maybe_simple_id`, UART final validation) and deduplicated with templates and tables |
+| 40 | ✅ | Tests: codegen for every test YAML, enum/option consistency, host integration tests; CI compiles the test configs for ESP32 |
+| 41 | ✅ | CI: script injection and secret interpolation, release cache poisoning, clang-format 17 vs 22 drift, redundant uv-lockfile workflow |
+| 42 | ✅ | Firmware: dashboard adoption / `firmware.yaml` could not load the component; DLED buffer race; unlimited scan duration released the hardware trigger immediately |
+| 43 | ✅ | Public release binaries embedded the API encryption key and OTA password. Now `api: encryption: {}` (per-device key provisioned at adoption, also authenticating OTA), no OTA password, a 15 min `provisioning:` window and Improv Serial; CI needs no secrets |
+| 45 | ✅ | Settings changed from HA were reverted on every reboot. YAML values are now initial values: runtime changes persist, a YAML value is re-applied only when edited (per-setting YAML baseline in NVS, v2 prefs migrated) |
+| 46 | ✅ | Second review: latest queued setting wins, NAK fails fast, UTF-8 sanitising and boundary-safe truncation, no optimistic entity state at boot, RX buffer size warning |
+| 47 | ✅ | Third review: settings table-driven from one protocol table (each setting was wired in ~20 places); command frames checked at compile time and against the PDF in tests; commands are plain values (no callbacks or per-command heap allocation); warning status while the scanner does not answer |
+| 48 | ✅ | Firmware: scan LED stuck blue when a start never began; Atom button did nothing in level/pulse mode; open fallback AP (captive portal accepts firmware uploads) no longer started on adopted devices |
+| 49 | ✅ | Release: build provenance attestation, stable tags must be on `main`, `gh release` instead of a third-party action; `SECURITY.md` |
+| 51 | ✅ | Configuration barcodes: `config_code_scan_mode` disabled by default. The firmware first applied the codes itself; the hardware test showed the scanner then neither applies nor outputs them, so that code was removed: disabled already keeps HA in sync, and `resend_settings` undoes drift when it is enabled |
+| 52 | ✅ | Coverage in CI (C++ 93 % of lines, Python 100 %); codegen tests check the generated C++; mutation run (246 mutants): 145 → 191 detected, the rest reviewed as equivalent (logging, boundaries of timing constants). Found three bugs: a boot setting dropped by a same-value request, the scan state reset by an unchanged mode ACK, an oversized frame's tail published as a barcode |
+| 53 | ✅ | Hardware test plan (tests/hardware/TEST_PLAN.md) with a generated page of test barcodes; release docs consolidated into RELEASING.md |
+| 50 | ✅ | Superseded by 51. Settings changed by configuration barcodes with `config_code_scan_mode: enabled` still drift: the documented protocol has no way to read settings back. The opcodes appear to follow Zebra's SSI protocol (C6 parameter send, D0/D1 ACK/NAK, A3/A4 revision, E4/E5 start/stop decode), whose parameter request (0xC7) might read them back — to be tried on hardware before relying on it |
+| 44 | ⏸ | `pre-commit-autoupdate` PRs are opened with `GITHUB_TOKEN`, so CI does not run on them; needs a GitHub App or fine-grained PAT secret |
 
 ---
 
