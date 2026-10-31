@@ -107,7 +107,7 @@ YAML → __init__.py (validate + codegen) → C++ component instantiation
 - **Wake-up sequence**: the scanner requires a wake-up command before accepting configuration commands
 - **Latest value wins**: a setting command still waiting in the queue is replaced by a newer value for the same setting; a NAK (`05 D1 00 00 …`) fails the command at once instead of waiting for the timeout
 - **Configuration barcodes**: QR codes `^#SC^<code>` from AtomicQR_Reader_EN.pdf. With `config_code_scan_mode: disabled` (component default) the scanner decodes them but neither applies nor outputs them (verified on hardware), so they cannot cause drift; with it enabled the scanner applies them without telling the host. `resend_settings()` sends every current value again to undo such drift
-- **No factory reset**: the PDF's "restore factory default" sets the scanner's communication mode to USB. The scanner still receives commands on its UART but answers on USB, so the component's boot settings (including config code scanning off) reach it unacknowledged. Recovery (verified on hardware): send config_code_scan_mode enabled, then scan the TTL 232 configuration barcode (`^#SC^3030010`) with the trigger held. `factory_reset_button` is rejected with that explanation. Do not add it back
+- **Factory reset is an action only**: the PDF's "restore factory default" sets the scanner's communication mode to USB. The scanner still receives commands on its UART but answers on USB, so anything sent afterwards (e.g. boot settings, including config code scanning off) reaches it unacknowledged. Recovery (verified on hardware): send config_code_scan_mode enabled, then scan the TTL 232 configuration barcode (`^#SC^3030010`) with the trigger held, then resend the settings; `firmware/recovery.yaml` does this without Home Assistant. `m5stack_barcode.factory_reset` only logs these steps on ACK; `factory_reset_button` is rejected, and the reference firmware must not expose a reset
 - **No optimistic entity state**: at boot only settings confirmed via NVS are published; the rest are published when ACKed (unknown in HA until then)
 - **Barcode text**: invalid UTF-8 sequences are replaced with U+FFFD (protobuf would otherwise drop the API connection) and barcodes are truncated to 255 bytes on a character boundary; the UART needs `rx_buffer_size: 512` (a config warning says so)
 - **Entities**: Select/Switch/Button entities are `Parented<BarcodeScanner>` (not `Component`s) and appear as individual HA entities
@@ -172,7 +172,7 @@ Use the PDFs as the source of truth for what the scanner *can do*. Use the C++ t
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `lint.yml` | push/PR to `main` | pre-commit hooks (yamllint, ruff, clang-format, cppcheck, pip-audit), pytest (config, codegen, consistency), host integration tests, ESP32 compile of the test configs |
+| `lint.yml` | push/PR to `main` | pre-commit hooks (yamllint, ruff, clang-format, cppcheck, pip-audit), pytest (config, codegen, consistency), host integration tests, ESP32 compile of the test configs and `firmware/recovery.yaml` |
 | `pr-firmware.yml` | PR to `main` | compiles firmware, posts artifact download link as PR comment |
 | `release.yml` | tag `v*.*.*` | builds firmware, creates GitHub Release, generates and commits OTA manifest |
 

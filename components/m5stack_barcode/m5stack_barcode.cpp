@@ -245,6 +245,11 @@ void BarcodeScanner::set_setting(SettingId id, const std::string &key) {
   this->queue_setting_(id, value);
 }
 
+void BarcodeScanner::factory_reset() {
+  ESP_LOGW(TAG, "Restoring the scanner's factory defaults");
+  this->queue_command_({CommandType::FACTORY_RESET});
+}
+
 void BarcodeScanner::resend_settings() {
   ESP_LOGD(TAG, "Sending every setting again");
   for (size_t i = 0; i < NUM_SETTINGS; i++) {
@@ -289,6 +294,8 @@ const uint8_t *BarcodeScanner::command_frame_(const Command &command) const {
       return frames::START_SCAN;
     case CommandType::STOP_SCAN:
       return frames::STOP_SCAN;
+    case CommandType::FACTORY_RESET:
+      return frames::FACTORY_RESET;
     case CommandType::GET_VERSION:
     default:
       return frames::GET_VERSION;
@@ -296,7 +303,7 @@ const uint8_t *BarcodeScanner::command_frame_(const Command &command) const {
 }
 
 void BarcodeScanner::log_command_(const char *action, const Command &command) const {
-  static const char *const NAMES[] = {"", "start scan", "stop scan", "get version"};
+  static const char *const NAMES[] = {"", "start scan", "stop scan", "get version", "factory reset"};
   const uint8_t *frame = this->command_frame_(command);
   char hex[format_hex_pretty_size(MAX_LOGGED_FRAME)];
   format_hex_pretty_to(hex, frame, std::min(frame_length(frame), MAX_LOGGED_FRAME), ' ');
@@ -422,6 +429,12 @@ void BarcodeScanner::finish_command_(bool success) {
         // with the ACK has already ended the scan.)
         this->scan_started_at_ = millis();
         this->scan_timer_active_ = true;
+      }
+      break;
+    case CommandType::FACTORY_RESET:
+      if (success) {
+        ESP_LOGW(TAG, "Scanner reset to factory defaults: it now answers on USB only. Hold its trigger while it reads "
+                      "its TTL 232 configuration barcode (^#SC^3030010), then resend the settings");
       }
       break;
     case CommandType::STOP_SCAN:

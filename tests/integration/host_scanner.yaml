@@ -83,6 +83,11 @@ esphome:
                 operation_mode: continuous
       - if:
           condition:
+            lambda: 'return getenv("SIM_FACTORY_RESET") != nullptr;'
+          then:
+            - m5stack_barcode.factory_reset: scanner
+      - if:
+          condition:
             lambda: 'return getenv("SIM_RESEND") != nullptr;'
           then:
             - m5stack_barcode.resend_settings: scanner

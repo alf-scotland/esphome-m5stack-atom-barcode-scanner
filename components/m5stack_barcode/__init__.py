@@ -241,6 +241,7 @@ SIMPLE_ACTIONS = {
     "m5stack_barcode.start": "start_scan()",
     "m5stack_barcode.stop": "stop_scan()",
     "m5stack_barcode.resend_settings": "resend_settings()",
+    "m5stack_barcode.factory_reset": "factory_reset()",
     "m5stack_barcode.process_current_buffer": "process_current_buffer()",
 }
 
@@ -298,10 +299,12 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_ON_BARCODE): automation.validate_automation({}),
             cv.Optional(CONF_ON_SCAN_TIMEOUT): automation.validate_automation({}),
             # The scanner's factory defaults switch it to USB, which cuts it off from
-            # the UART until its TTL 232 configuration barcode is scanned.
+            # the UART until its TTL 232 configuration barcode is scanned: too easy to
+            # trigger from a dashboard.
             cv.Optional(CONF_FACTORY_RESET_BUTTON): cv.invalid(
                 "factory_reset_button was removed: the scanner's factory defaults "
-                "switch it to USB, which disconnects it from the ESP"
+                "switch it to USB, which disconnects it from the ESP. The "
+                "m5stack_barcode.factory_reset action remains; see its documentation"
             ),
             **{
                 cv.Optional(key): button.button_schema(cls, **defaults)

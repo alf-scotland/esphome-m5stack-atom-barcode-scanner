@@ -164,6 +164,9 @@ back:
    flashes yellow when it reads the code.
 3. Press **Resend Scanner Settings**: every setting is sent and acknowledged.
 
+Without Home Assistant, use the recovery firmware instead (README, "If the scanner stops
+answering").
+
 ## Barcodes
 
 | Label | Type | Content | Purpose |

@@ -1,0 +1,80 @@
+# Recovery firmware for an Atom whose scanner no longer answers on its serial port, e.g.
+# after its factory defaults switched its output to USB. The scanner still receives
+# commands then, so this firmware allows configuration barcodes, holds the trigger while
+# the Atom's button is held and logs every byte on the UART. Steps: README.md, "If the
+# scanner stops answering". Flash it over USB and keep the log open:
+#
+#   uv run esphome run firmware/recovery.yaml
+#
+# Afterwards flash the normal firmware again.
+esphome:
+  name: atom-qr-recovery
+  on_boot:
+    priority: -100
+    then:
+      - delay: 1s
+      - script.execute: send_commands
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: esp-idf
+
+logger:
+
+uart:
+  tx_pin: GPIO19
+  rx_pin: GPIO22
+  baud_rate: 9600
+  # ">>>" lines are sent bytes, "<<<" lines the scanner's answers.
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+
+output:
+  - platform: gpio
+    id: scanner_trigger
+    pin:
+      number: GPIO23
+      inverted: true  # on = trigger held (line low)
+
+script:
+  # Commands from ATOM_QRCODE_CMD_EN.pdf, each after the wake-up byte.
+  - id: send_commands
+    mode: restart
+    then:
+      # Item 5: communication method serial port
+      - uart.write: [0x00]
+      - delay: 50ms
+      - uart.write: [0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0x01, 0x00, 0xFE, 0x33]
+      - delay: 500ms
+      # Item 21: allow scanning of configuration codes, so the TTL 232 barcode is applied
+      - uart.write: [0x00]
+      - delay: 50ms
+      - uart.write: [0x07, 0xC6, 0x04, 0x08, 0x00, 0xEC, 0x01, 0xFE, 0x3A]
+      - delay: 500ms
+      # Item 2: query the version; an answer means the serial port is back
+      - uart.write: [0x00]
+      - delay: 50ms
+      - uart.write: [0x04, 0xA3, 0x04, 0x00, 0xFF, 0x55]
+
+binary_sensor:
+  - platform: gpio
+    id: atom_button
+    pin:
+      number: GPIO39
+      inverted: true
+    # The factory defaults read only while the trigger is held.
+    on_press:
+      - output.turn_on: scanner_trigger
+    on_release:
+      - output.turn_off: scanner_trigger
+      - delay: 1s
+      - script.execute: send_commands
+  - platform: gpio
+    id: scanner_dled
+    pin:
+      number: GPIO33
+      inverted: true
+    on_press:
+      - logger.log: "Scanner decoded a code"

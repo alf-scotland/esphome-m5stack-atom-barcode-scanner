@@ -249,6 +249,28 @@ were changed behind the component's back: by a configuration barcode scanned wit
       then:
         - m5stack_barcode.resend_settings: barcode_scanner
 
+.. _m5stack_barcode-factory_reset_action:
+
+``m5stack_barcode.factory_reset``
+*********************************
+
+Restore the scanner's factory defaults (PDF item 1). There is deliberately no button entity
+for it.
+
+.. warning::
+
+    The factory defaults switch the scanner's output to USB. It keeps receiving commands but
+    no longer answers the ESP, so every command fails with ``Scanner not responding`` until
+    you switch it back as described in :ref:`m5stack_barcode-troubleshooting` (step a is not
+    needed right after the reset: the factory defaults allow configuration barcodes). They
+    also change the other settings; resend the settings afterwards.
+
+.. code-block:: yaml
+
+    on_...:
+      then:
+        - m5stack_barcode.factory_reset: barcode_scanner
+
 .. _m5stack_barcode-process_current_buffer_action:
 
 ``m5stack_barcode.process_current_buffer``
@@ -1182,7 +1204,8 @@ Troubleshooting
    ``status_led``) until the scanner answers again.
    Check the power and wiring to the scanner.
 6. If every command fails, also after a power cycle, the scanner may have been reset to
-   its factory defaults (its *Factory Default Configuration* barcode), which switch its
+   its factory defaults (its *Factory Default Configuration* barcode or the
+   :ref:`factory reset action <m5stack_barcode-factory_reset_action>`), which switch its
    output to USB. It still receives commands on its serial input (only its answers go to
    USB), so the settings the component sends at boot reach it, including
    ``config_code_scan_mode: disabled`` and, by default, ``sound_mode: disabled``. To switch
@@ -1195,6 +1218,10 @@ Troubleshooting
       *Serial Port* section. It answers on its serial port again at once.
    c. Run the :ref:`resend settings action <m5stack_barcode-resend_settings_action>` so
       the scanner gets the values Home Assistant shows.
+
+   On an M5Stack Atom, the repository's ``firmware/recovery.yaml`` does a and b without
+   Home Assistant: it sends the command at boot and holds the trigger while the Atom's
+   button is held (see the repository README).
 7. Enable logs for more detailed debugging:
 
 .. code-block:: yaml

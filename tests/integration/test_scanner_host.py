@@ -673,6 +673,15 @@ def test_mode_is_restored_at_boot(
     assert not any(f[5] == PARAM_MODE for f in setting_frames(scanner))
 
 
+def test_factory_reset_explains_the_recovery(run: callable) -> None:
+    """The reset frame is sent; its ACK logs how to get the scanner back, no reboot."""
+    scanner, firmware = run(extra_env={"SIM_FACTORY_RESET": "1"})
+    firmware.wait_for(r"Scanner reset to factory defaults: .*\^#SC\^3030010")
+    assert any(f[5:8] == bytes([PARAM_F2, 0xFF, 0x00]) for f in setting_frames(scanner))
+    firmware.wait_for(r"READY", from_start=True)
+    assert firmware.proc.poll() is None  # still running
+
+
 def test_resend_sends_every_setting(
     run: callable,
     restart: callable,

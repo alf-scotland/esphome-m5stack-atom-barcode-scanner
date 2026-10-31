@@ -154,7 +154,7 @@ jobs:
   component-compile:
     # Builds the test configs for the real target so every action, condition and
     # entity template is instantiated by the ESP32 toolchain (the reference
-    # firmware only uses a subset of them).
+    # firmware only uses a subset of them), and the recovery firmware.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -162,6 +162,8 @@ jobs:
         config:
           - tests/test_m5stack_barcode_all_entities.yaml
           - tests/test_m5stack_barcode_actions.yaml
+          # Not built anywhere else, so it cannot rot unnoticed.
+          - firmware/recovery.yaml
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

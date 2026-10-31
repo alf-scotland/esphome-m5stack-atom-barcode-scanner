@@ -36,6 +36,10 @@ inline constexpr uint8_t START_SCAN[] = {0x04, 0xE4, 0x04, 0x00, 0xFF, 0x14};
 inline constexpr uint8_t STOP_SCAN[] = {0x04, 0xE5, 0x04, 0x00, 0xFF, 0x13};
 /// Answered by an unframed product information string, not by an ACK.
 inline constexpr uint8_t GET_VERSION[] = {0x04, 0xA3, 0x04, 0x00, 0xFF, 0x55};
+/// PDF item 1, "Restore factory default configuration".  The factory defaults switch the
+/// scanner's output to USB (AtomicQR_Reader_EN.pdf, section 1.1): it keeps receiving commands
+/// but answers on USB until its TTL 232 configuration barcode is scanned.
+inline constexpr uint8_t FACTORY_RESET[] = {0x08, 0xC6, 0x04, 0x08, 0x00, 0xF2, 0xFF, 0x00, 0xFD, 0x35};
 
 /// Reply to every setting command and to start/stop decoding in host mode.
 inline constexpr uint8_t ACK[] = {0x04, 0xD0, 0x00, 0x00, 0xFF, 0x2C};
@@ -46,7 +50,7 @@ inline constexpr size_t NAK_LENGTH = 7;
 inline constexpr size_t NAK_CAUSE_INDEX = 4;
 
 static_assert(is_valid_frame(START_SCAN) && is_valid_frame(STOP_SCAN) && is_valid_frame(GET_VERSION) &&
-                  is_valid_frame(ACK),
+                  is_valid_frame(FACTORY_RESET) && is_valid_frame(ACK),
               "bad frame");
 
 }  // namespace frames

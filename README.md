@@ -80,10 +80,6 @@ built-in key. After updating, remove the device in Home Assistant and add it aga
 settings are kept, including **Config Code Scanning** (on in those releases): turn it off
 so scanned configuration barcodes cannot change settings behind Home Assistant's back.
 
-**If the scanner stops answering** (`Scanner not responding` for every command): its own
-factory defaults switch it to USB. See [Troubleshooting](components/m5stack_barcode/index.rst#troubleshooting) to switch it
-back with the hardware guide's *TTL 232* barcode.
-
 ### Updates
 
 The device checks for a new stable release every 6 hours and offers it through its
@@ -99,6 +95,39 @@ The device checks for a new stable release every 6 hours and offers it through i
 To check that a downloaded binary was built by this repository, see
 [SECURITY.md](.github/SECURITY.md#verifying-a-firmware-binary). Maintainers: see
 [RELEASING.md](.github/RELEASING.md).
+
+### If the scanner stops answering
+
+The log shows `Scanner not responding` for every command, also after a power cycle. The
+usual cause is the scanner's own factory defaults (its *Factory Default Configuration*
+barcode, or the `m5stack_barcode.factory_reset` action): they switch its output to USB. It
+still receives commands but answers on USB, and the configuration barcode that switches it
+back, *TTL 232* (`^#SC^3030010`, in the hardware guide's *Serial Port* section, and `C3` on
+the hardware test page `tests/hardware/test_page.html`), only works while configuration code
+scanning is allowed. The factory defaults read a code only while the trigger is held.
+
+**With the reference firmware in Home Assistant:**
+
+1. Turn **Config Code Scanning** on. The switch stays off, because the scanner answers on
+   USB, but the scanner applies it.
+2. Hold the *TTL 232* code in front of the scanner and press **Hardware Trigger**. The LED
+   flashes yellow when the scanner reads it.
+3. Press **Resend Scanner Settings**: every setting is sent and acknowledged again.
+
+**Without it** (another firmware, or the device is not adopted), flash the recovery firmware
+over USB and keep its log open:
+
+```bash
+uv run esphome run firmware/recovery.yaml
+```
+
+1. At boot it sends "allow configuration codes" (and the serial port setting).
+2. Hold the *TTL 232* code in front of the scanner, then hold the Atom's button until the log
+   shows `Scanner decoded a code`, and release it.
+3. A second later the firmware repeats the commands. Answers prove the serial port is back:
+   `<<< 04:D0:00:00:FF:2C` lines (acknowledged) and the product information.
+4. Flash your normal firmware again and resend the settings (**Resend Scanner Settings**,
+   or the `m5stack_barcode.resend_settings` action).
 
 ## Hardware Connection
 

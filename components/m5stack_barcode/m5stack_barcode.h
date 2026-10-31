@@ -98,6 +98,9 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   /// Send every setting's current value again, e.g. after the scanner's settings were changed
   /// by a configuration barcode or it was reset.
   void resend_settings();
+  /// Restore the scanner's factory defaults (PDF item 1).  They switch its output to USB, so it
+  /// stops answering until its TTL 232 configuration barcode is scanned with the trigger held.
+  void factory_reset();
   /// The setting's current value: the one the scanner last ACKed, or the YAML value before that.
   uint8_t get_setting(SettingId id) const { return this->settings_[static_cast<size_t>(id)]; }
 
@@ -112,7 +115,7 @@ class BarcodeScanner : public Component, public uart::UARTDevice {
   ScanState get_scan_state() const { return this->scan_state_; }
 
  protected:
-  enum class CommandType : uint8_t { SETTING, START_SCAN, STOP_SCAN, GET_VERSION };
+  enum class CommandType : uint8_t { SETTING, START_SCAN, STOP_SCAN, GET_VERSION, FACTORY_RESET };
   struct Command {
     CommandType type;
     SettingId setting{SettingId::OPERATION_MODE};  ///< SETTING only
